@@ -1,13 +1,14 @@
 """ This file explains explains the rules for adding and removing blocks from the local chain.
 """
-import time
 import copy
+import time
+
 import custom
-import networking
-import transactions
-import tools
-import target
 import database
+import target
+import tools
+import transactions
+from network import server
 
 
 def add_tx(tx, DB={}):
@@ -30,7 +31,7 @@ def add_tx(tx, DB={}):
             return False
         return True
     def too_big_block(tx, txs):
-        return len(tools.package(txs+[tx])) > networking.MAX_MESSAGE_SIZE - 5000
+        return len(tools.package(txs+[tx])) > server.MAX_MESSAGE_SIZE - 5000
     def verify_tx(tx, txs, out):
         if not type_check(tx, txs):
             out[0]+='type error'

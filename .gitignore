@@ -1,3 +1,6 @@
-*.py[cod~]
+*.pyc
 *.db
-log.py
+log*
+venv/
+todo
+

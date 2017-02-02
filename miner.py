@@ -1,17 +1,16 @@
 """ This file mines blocks and talks to peers. It maintains consensus of the
     blockchain.
 """
-from Queue import Empty
-import blockchain
-import copy
-import custom
-import tools
-import networking
 import multiprocessing
 import random
 import time
-import copy
+
+import blockchain
+import custom
 import target
+import tools
+
+
 def make_mint(pubkey, DB):
     address = tools.make_address([pubkey], 1)
     return {'type': 'mint',

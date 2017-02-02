@@ -1,8 +1,16 @@
 """We regularly check on peers to see if they have mined new blocks.
 This file explains how we initiate interactions with our peers.
 """
-import time, networking, tools, blockchain, custom, random, sys
-def cmd(peer, x): return networking.send_command(peer, x)
+import blockchain
+import custom
+import random
+import time
+import tools
+
+from network import server
+
+
+def cmd(peer, x): return server.send_command(peer, x)
 def download_blocks(peer, DB, peers_block_count, length):
     b=[max(0, length-10), min(peers_block_count['length']+1, length+custom.download_many)]
     blocks = cmd(peer, {'type': 'rangeRequest', 'range': b})
