@@ -9,36 +9,31 @@ from network.response import Response
 MAX_MESSAGE_SIZE = 60000
 
 
-def receive_all(client, data=''):
-    try:
-        data += client.recv(MAX_MESSAGE_SIZE)
-    except:
-        time.sleep(0.001)
-        tools.log('Receiving is not ready.')
-        receive_all(client, data)
+def receive_all(client, data='', step=0, length=0):
+    if step == 0:
+        # Read length of the string first
+        try:
+            str = client.recv(4)
+            print str
+            length = int(str)
+        except ValueError:
+            tools.log('Received Length is not a valid integer.')
+            return Response(False, "Length is not a valid integer")
+        return receive_all(client, data, step=1, length=length)
+    else:
+        while len(data) < length:
+            d = client.recv(MAX_MESSAGE_SIZE)
+            if not d:
+                return Response(False, 'Broken connection')
+            data += d
 
-    if not data:
-        return Response(False, 'Broken connection')
-    if len(data) < 5:
-        return receive_all(client, data)
-    try:
-        length = int(data[0:5])
-    except:
-        tools.log(sys.exc_info())
-        return Response(False, 'No length is in prefix')
-
-    data = data[5:]
-    while len(data) < length:
-        d = client.recv(MAX_MESSAGE_SIZE - len(data))
-        if not d:
-            return Response(False, 'Broken connection')
-        data += d
-    try:
-        received_message = Message()
-        received_message.load(data)
-        return Response(True, received_message)
-    except:
-        return Response(False, 'Deserializing expcetion: ' + sys.exc_info())
+        try:
+            received_message = Message()
+            received_message.load(data)
+            return Response(True, received_message)
+        except:
+            tools.log('Deserializing expcetion: ' + sys.exc_info())
+            return Response(False, 'Deserializing expcetion: ' + sys.exc_info())
 
 
 def send_error(msg, port, host, counter):
@@ -48,19 +43,34 @@ def send_error(msg, port, host, counter):
 
 
 def send_msg(msg, sock):
-    data = tools.buffer_(str(len(msg.dump())), 5) + msg.dump()
-    while data:
-        time.sleep(0.0001)
+    # Add length of the string to the start. Also pad it to be at least 5 characters.
+    try:
+        msg = msg.dump()
+    except:
+        tools.log("Send_msg received wrong type of message")
+        tools.log(sys.exc_info())
+        return Response(False, "Message type invalid")
+
+    length_of_msg = tools.buffer_(str(len(msg)), 4)
+    try:
+        sent = sock.send(length_of_msg)
+    except:
+        tools.log("Failed to send length of message")
+        tools.log(sys.exc_info())
+        return Response(False, "Could not send size")
+
+    while msg:
         try:
-            sent = sock.send(data)
+            sent = sock.send(msg)
         except:
             return Response(False, 'Peer died')
-        data = data[sent:]
-    return 0
+        msg = msg[sent:]
+
+    return Response(True)
 
 
-def send_any(string, sock):
-    msg = Message(_type="Socket", _message=string)
+def send_any(_object, sock):
+    msg = Message(_type="Socket", _message=_object)
     return send_msg(msg, sock)
 
 

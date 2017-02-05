@@ -149,7 +149,8 @@ def heart_monitor(queue):
             time.sleep(0.01)
             beat = queue.get(False)
             # log('heart monitor: ' +str(beat))
-            if beat == 'stop': return
+            if beat == 'stop':
+                return
             if beat not in beats:
                 log('adding thread: ' + str(beat))
             beats[beat] = t

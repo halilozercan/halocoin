@@ -9,6 +9,7 @@ import blockchain
 import custom
 import database
 import miner
+import network
 import peer_receive
 import peers_check
 import tools
@@ -50,17 +51,20 @@ def main(brainwallet, pubkey_flag=False):
          'args': (DB, DB['heart_queue']),
          'name': 'peer_recieve'}
     ]
+
     cmds = [database.DatabaseProcess(
         DB['heart_queue'],
         custom.database_name,
         tools.log,
         custom.database_port)]
+
     try:
         cmds[0].start()
     except Exception as exc:
         tools.log(exc)
+
     tools.log('starting ' + cmds[0].name)
-    time.sleep(4)
+    time.sleep(1)
     tools.db_put('test', 'TEST')
     tools.db_get('test')
     tools.db_put('test', 'undefined')
@@ -76,30 +80,41 @@ def main(brainwallet, pubkey_flag=False):
         tools.db_put('diffLength', '0')
     tools.db_put('stop', False)
     tools.log('stop: ' + str(tools.db_get('stop')))
+
     for process in processes[1:]:
         cmd = multiprocessing.Process(**process)
         cmd.start()
+        print "Started", process['name']
         cmds.append(cmd)
         tools.log('starting ' + cmd.name)
+
     if not pubkey_flag:
         tools.db_put('privkey', privkey)
     else:
         tools.db_put('privkey', 'Default')
+
     tools.db_put('address', tools.make_address([pubkey], 1))
     tools.log('stop: ' + str(tools.db_get('stop')))
+
     while not tools.db_get('stop'):
         time.sleep(0.5)
+
     tools.log('about to stop threads')
     DB['heart_queue'].put('stop')
+
     for p in [[custom.port, '127.0.0.1'],
               [custom.api_port, '127.0.0.1']]:
-        server.connect('stop', p[0], p[1])
+        network.send_receive('stop', p[0], p[1])
+
     cmds.reverse()
+
     for cmd in cmds[:-1]:
         cmd.join()
         tools.log('stopped a thread: ' + str(cmd))
+
     time.sleep(2)
-    server.connect('stop', custom.database_port, '127.0.0.1')
+    network.send_receive('stop', custom.database_port, '127.0.0.1')
+
     cmds[-1].join()
     tools.log('stopped a thread: ' + str(cmds[-1]))
     tools.log('all threads stopped')

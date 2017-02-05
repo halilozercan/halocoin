@@ -19,7 +19,7 @@ def get_address(tx):
 
 def main(c):
     if c[0] == 'start':
-        r = connect({'command': 'blockcount'})
+        r = run_command({'command': 'blockcount'})
         if is_off(r):
             p = raw_input('Brain wallet?\n')
             tools.daemonize(lambda: threads.main(p))
@@ -37,13 +37,7 @@ def main(c):
                      'pubkey': str(pubkey),
                      'address': str(address)})
     else:
-        c = {'command': c}
-        return run_command(c)
-
-
-def connect(p):
-    peer = ['localhost', custom.api_port]
-    return network.send_command(peer, p)
+        return run_command({'command': c})
 
 
 def is_off(response):
@@ -51,7 +45,9 @@ def is_off(response):
 
 
 def run_command(p):
-    response = connect(p)
+    tools.log("Running API command: " + p['command'])
+    peer = ['localhost', custom.api_port]
+    response = network.send_command(peer, p)
     if is_off(response):
         print("Node is probably off. Use --start argument to start.")
     return response
