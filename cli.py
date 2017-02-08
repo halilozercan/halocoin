@@ -5,7 +5,6 @@ import custom
 import network
 import threads
 import tools
-from network import server
 
 
 def get_address(tx):
@@ -20,7 +19,7 @@ def get_address(tx):
 def main(c):
     if c[0] == 'start':
         r = run_command({'command': 'blockcount'})
-        if is_off(r):
+        if r is None:
             p = raw_input('Brain wallet?\n')
             tools.daemonize(lambda: threads.main(p))
         else:
@@ -40,15 +39,11 @@ def main(c):
         return run_command({'command': c})
 
 
-def is_off(response):
-    return not response.is_successful() or 'error' in response.getData()
-
-
 def run_command(p):
     tools.log("Running API command: " + p['command'])
     peer = ['localhost', custom.api_port]
-    response = network.send_command(peer, p)
-    if is_off(response):
+    response = network.send_receive(peer, p)
+    if response is None:
         print("Node is probably off. Use --start argument to start.")
     return response
 

@@ -272,12 +272,14 @@ def kill_processes_using_ports(ports):
 
 
 def s_to_db(c):
-    response = network.send_command(['localhost', custom.database_port], c)
-    if not response.is_successful():
-        time.sleep(0.001)
+    log('s_to_db is called: {}'.format(str(c)))
+    response = network.send_receive(c, 'localhost', custom.database_port)
+    if response is None:
+        time.sleep(0.1)
         log('s to db failed at ' + str(c))
         return s_to_db(c)
     else:
+        log('s_to_db response: ' + str(response))
         return response
 
 

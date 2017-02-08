@@ -69,12 +69,12 @@ class DatabaseProcess(Process):
                 name = command['type']
                 assert (name not in ['__init__', 'run'])
                 out = getattr(self, name)(command['args'])
-                return Response(True, out)
+                return out
             except Exception as exc:
                 self.logfile(exc)
                 self.logfile('command: ' + str(command))
                 self.logfile('command type: ' + str(type(command)))
-                return Response(False, 'bad data')
+                return None
 
         self.DB = leveldb.LevelDB(self.database_name)
         self._get = self.DB.Get

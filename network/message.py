@@ -7,6 +7,24 @@ class Message:
         self.__type = _type
         self.__message = _message
 
+    def __len__(self):
+        return len(self.dump())
+
+    def __str__(self):
+        return self.__message.__str__()
+
+    def getType(self):
+        return self.__type
+
+    def getMessage(self):
+        return self.__message
+
+    def setType(self, _type):
+        self.__type = _type
+
+    def setMessage(self, message):
+        self.__message = message
+
     def dump(self):
         return pickle.dumps({
             'type': self.__type,

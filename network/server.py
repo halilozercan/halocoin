@@ -59,8 +59,11 @@ class Server:
             elif response.getData() is "ping":
                 network.send_any("pong", client)
             else:
-                response = self.__handler(response.getData())
-                network.send_any(response, client)
+                answer = self.__handler(response.getData().getMessage())
+                if answer is None:
+                    network.send_any("error", client)
+                else:
+                    network.send_any(answer, client)
         client.close()
         return 0
 
