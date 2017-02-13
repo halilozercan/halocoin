@@ -84,7 +84,6 @@ def main(brainwallet, pubkey_flag=False):
     for process in processes[1:]:
         cmd = multiprocessing.Process(**process)
         cmd.start()
-        print "Started", process['name']
         cmds.append(cmd)
         tools.log('starting ' + cmd.name)
 

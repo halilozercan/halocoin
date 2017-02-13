@@ -100,7 +100,6 @@ def send_receive(msg, host='localhost', port=custom.api_port, counter=0):
     try:
         s.connect((host, port))
     except:
-        tools.log('cannot connect host: {}:{}'.format(host,port))
         return None
 
     res = send_any(msg, s)

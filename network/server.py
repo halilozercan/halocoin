@@ -37,6 +37,8 @@ class Server:
 
         self.__socket.listen(self.__backlog)
 
+        print "Started server at", self.__port
+
         while True:
             try:
                 a = self.serve_once(network.MAX_MESSAGE_SIZE)
@@ -54,9 +56,9 @@ class Server:
         if not response.is_successful():
             return self.serve_once(size)
         else:
-            if response.getData() is "stop":
+            if response.getData().getMessage() is "stop":
                 return "stop"
-            elif response.getData() is "ping":
+            elif response.getData().getMessage() is "ping":
                 network.send_any("pong", client)
             else:
                 answer = self.__handler(response.getData().getMessage())

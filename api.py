@@ -138,11 +138,11 @@ def main(DB, heart_queue):
             possibles = globals().copy()
             possibles.update(locals())
             method = possibles.get(command[0])
-            out = method(DB, args)
+            return method(DB, args)
         except Exception as exc:
             tools.log(exc)
             out = 'Failure : ' + str(sys.exc_info())
-        return Response(True, out)
+            return None
 
     try:
         api_network = Server(responder, custom.api_port, heart_queue)
