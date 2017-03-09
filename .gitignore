@@ -1,6 +1,6 @@
 *.pyc
 *.db
 log*
+DB/
 venv/
 todo
-

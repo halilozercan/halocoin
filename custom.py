@@ -4,6 +4,7 @@ try:
     from cdecimal import Decimal
 except:
     from decimal import Decimal
+DEBUG = False
 peers = [['192.241.212.114', 7900]]#,['69.164.196.239', 8900]]
 current_loc=os.path.dirname(os.path.abspath(__file__))
 database_name = os.path.join(current_loc, 'DB')

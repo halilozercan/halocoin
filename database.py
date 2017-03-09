@@ -38,7 +38,10 @@ class DatabaseProcess(Process):
         Puts the val in args[1] under the key in args[0] with the salt
         prepended to the key.
         """
-        self._put(self.salt + str(args[0]), json.dumps(args[1]))
+        try:
+            self._put(self.salt + str(args[0]), json.dumps(args[1]))
+        except:
+            return False
 
     def existence(self, args):
         """
@@ -60,8 +63,9 @@ class DatabaseProcess(Process):
         # It isn't an error to try to delete something that isn't there.
         try:
             self._del(self.salt + str(args[0]))
+            return True
         except:
-            pass
+            return False
 
     def run(self):
         def command_handler(command):
@@ -80,8 +84,6 @@ class DatabaseProcess(Process):
         self._get = self.DB.Get
         self._put = self.DB.Put
         self._del = self.DB.Delete
-        """leveldb doesn't have a close func"""
-        self._close = _noop
 
         try:
             self.salt = self._get('salt')
@@ -89,6 +91,7 @@ class DatabaseProcess(Process):
             self.salt = os.urandom(5)
             self._put('salt', self.salt)
 
-        database_network = Server(command_handler, self.port, self.heart_queue)
+        database_network = Server(handler=command_handler,
+                                  port=self.port,
+                                  heart_queue=self.heart_queue)
         database_network.run()
-        self._close()

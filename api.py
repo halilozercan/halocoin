@@ -145,7 +145,7 @@ def main(DB, heart_queue):
             return None
 
     try:
-        api_network = Server(responder, custom.api_port, heart_queue)
+        api_network = Server(handler=responder, port=custom.api_port, heart_queue=heart_queue)
         api_network.run()
     except Exception as exc:
         tools.log('API init error.\nAPI could not be started. This error can be caused by blocked or busy ports.')

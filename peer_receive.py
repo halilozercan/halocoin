@@ -87,12 +87,11 @@ def main(DB, heart_queue):
             return check
         try:
             return funcs[dic['type']](check['newdic'], DB)
-        except Exception as exc:
-            tools.log(exc)
-
+        except Exception as e:
+            tools.log(e)
 
     try:
-        peer_network = Server(responder, custom.port, heart_queue, True)
+        peer_network = Server(handler=responder, port=custom.port, heart_queue=heart_queue, external=True)
         peer_network.run()
     except Exception as exc:
         tools.log('API init error.\nAPI could not be started. This error can be caused by blocked or busy ports.')

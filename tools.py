@@ -156,7 +156,8 @@ def heart_monitor(queue):
             beats[beat] = t
 
 
-logging.basicConfig(filename=custom.log_file, level=logging.INFO)
+if not custom.DEBUG:
+    logging.basicConfig(filename=custom.log_file, level=logging.INFO)
 
 
 def log(junk):
@@ -272,7 +273,7 @@ def kill_processes_using_ports(ports):
 
 
 def s_to_db(c):
-    response = network.send_receive(c, 'localhost', custom.database_port)
+    response = network.send_receive(c, host='localhost', port=custom.database_port)
     if response is None:
         time.sleep(0.1)
         return s_to_db(c)

@@ -10,7 +10,8 @@ import network
 import tools
 
 
-def cmd(peer, x): return network.send_receive(x, peer[0], peer[1])
+def cmd(peer, x):
+    return network.send_receive(message=x, host=peer[0], port=peer[1])
 
 
 def download_blocks(peer, DB, peers_block_count, length):
@@ -64,9 +65,9 @@ def peer_check(i, peers, DB):
     peers[i][3] = block_count['length']
     tools.db_put('peers_ranked', peers)
     length = tools.db_get('length')
-    diffLength = tools.db_get('diffLength')
-    size = max(len(diffLength), len(block_count['diffLength']))
-    us = tools.buffer_(diffLength, size)
+    diff_length = tools.db_get('diffLength')
+    size = max(len(diff_length), len(block_count['diffLength']))
+    us = tools.buffer_(diff_length, size)
     them = tools.buffer_(block_count['diffLength'], size)
     if them < us:
         give_block(peer, DB, block_count['length'])

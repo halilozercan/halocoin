@@ -13,8 +13,8 @@ class Response:
     def is_successful(self):
         return self.__dict['success']
 
-    def getData(self):
+    def get_data(self):
         return self.__dict['data']
 
-    def setData(self, new_data):
+    def set_data(self, new_data):
         self.__dict['data'] = new_data
