@@ -35,7 +35,7 @@ def range_request(dic, DB):
     counter = 0
     while (len(tools.package(out)) < custom.max_download
            and ran[0] + counter <= ran[1]):
-        block = tools.db_get(ran[0] + counter, DB)
+        block = tools.db_get(ran[0] + counter)
         if 'length' in block:
             out.append(block)
         counter += 1
@@ -53,7 +53,7 @@ def pushtx(dic, DB):
 
 def pushblock(dic, DB):
     length = tools.db_get('length')
-    block = tools.db_get(length, DB)
+    block = tools.db_get(length)
     if 'peer' in dic:
         peer = dic['peer']
     else:
@@ -76,8 +76,9 @@ def peers(dic, DB):
 
 def main(DB, heart_queue):
     def responder(dic, DB=DB):
-        funcs = {'receive_peer': receive_peer, 'block_count': block_count, 'range_request': range_request, 'txs': txs,
-                 'pushtx': pushtx, 'pushblock': pushblock, 'peers': peers}
+        funcs = {'receive_peer': receive_peer, 'block_count': block_count,
+                 'range_request': range_request, 'txs': txs,'pushtx': pushtx,
+                 'pushblock': pushblock, 'peers': peers}
         if 'type' not in dic:
             return 'oops: ' + str(dic)
         if dic['type'] not in funcs:
@@ -89,6 +90,7 @@ def main(DB, heart_queue):
             return funcs[dic['type']](check['newdic'], DB)
         except Exception as e:
             tools.log(e)
+            return None
 
     try:
         peer_network = Server(handler=responder, port=custom.port, heart_queue=heart_queue, external=True)

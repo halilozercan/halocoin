@@ -17,21 +17,25 @@ def make_mint(pubkey, DB):
             'pubkeys': [pubkey],
             'signatures': ['first_sig'],
             'count': tools.count(address, DB)}
+
+
 def genesis(pubkey, DB):
     target_ = target.target()
     out = {'version': custom.version,
            'length': 0,
            'time': time.time(),
            'target': target_,
-           'diffLength': blockchain.hexInvert(target_),
+           'diffLength': blockchain.hex_invert(target_),
            'txs': [make_mint(pubkey, DB)]}
     out = tools.unpackage(tools.package(out))
     return out
+
+
 def make_block(prev_block, txs, pubkey, DB):
     leng = int(prev_block['length']) + 1
     target_ = target.target(leng)
-    diffLength = blockchain.hexSum(prev_block['diffLength'],
-                                   blockchain.hexInvert(target_))
+    diffLength = blockchain.hex_sum(prev_block['diffLength'],
+                                    blockchain.hex_invert(target_))
     out = {'version': custom.version,
            'txs': txs + [make_mint(pubkey, DB)],
            'length': leng,
@@ -41,6 +45,8 @@ def make_block(prev_block, txs, pubkey, DB):
            'prevHash': tools.det_hash(prev_block)}
     out = tools.unpackage(tools.package(out))
     return out
+
+
 def POW(block, restart_signal):
     halfHash = tools.det_hash(block)
     block[u'nonce'] = random.randint(0, 10000000000000000000000000000000000000000)
@@ -53,17 +59,23 @@ def POW(block, restart_signal):
             restart_signal.clear()
             return {'solution_found': True}
     return block
+
+
 def new_worker(solution_queue):
-    in_queue=multiprocessing.Queue()
-    restart=multiprocessing.Event()
+    in_queue = multiprocessing.Queue()
+    restart = multiprocessing.Event()
     proc = multiprocessing.Process(target=miner, args=(restart, solution_queue, in_queue))
-    proc.daemon=True
+    proc.daemon = True
     proc.start()
-    return({'in_queue':in_queue, 'restart':restart, 'solution_queue':solution_queue, 'proc':proc})
+    return ({'in_queue': in_queue, 'restart': restart, 'solution_queue': solution_queue, 'proc': proc})
+
+
 def restart_workers(workers):
     for worker in workers:
         tools.dump_out(worker['in_queue'])
         worker['restart'].set()
+
+
 def main(pubkey, DB):
     num_cores = multiprocessing.cpu_count()
     solution_queue = multiprocessing.Queue()
@@ -71,7 +83,7 @@ def main(pubkey, DB):
     try:
         while True:
             DB['heart_queue'].put('miner')
-            if tools.db_get('stop'): 
+            if tools.db_get('stop'):
                 tools.dump_out(solution_queue)
                 tools.log('shutting off miner')
                 restart_workers(workers)
@@ -83,22 +95,25 @@ def main(pubkey, DB):
     except Exception as exc:
         tools.log('miner main: ')
         tools.log(exc)
+
+
 def main_once(pubkey, DB, num_cores, solution_queue, workers):
-    length=tools.db_get('length')
-    if length==-1:
+    length = tools.db_get('length')
+    if length == -1:
         candidate_block = genesis(pubkey, DB)
     else:
-        prev_block = tools.db_get(length, DB)
+        prev_block = tools.db_get(length)
         try:
             candidate_block = make_block(prev_block, tools.db_get('txs'), pubkey, DB)
-        except:#sometimes a block gets deleted after we grab length and before we call make_block.
+        except:  # sometimes a block gets deleted after we grab length and before we call make_block.
             return main_once(pubkey, DB, num_cores, solution_queue, workers)
     work = candidate_block
     for worker in workers:
         worker['in_queue'].put(work)
         worker['in_queue'].put(work)
-    start=time.time()
-    while solution_queue.empty() and time.time()<start+custom.blocktime/3 and tools.db_get('mine') and not tools.db_get('stop'):
+    start = time.time()
+    while solution_queue.empty() and time.time() < start + custom.blocktime / 3 and tools.db_get(
+            'mine') and not tools.db_get('stop'):
         time.sleep(0.1)
     restart_workers(workers)
     while not solution_queue.empty():
@@ -106,21 +121,23 @@ def main_once(pubkey, DB, num_cores, solution_queue, workers):
             DB['suggested_blocks'].put(solution_queue.get(False))
         except:
             continue
+
+
 def miner(restart, solution_queue, in_queue):
     while True:
-        #try:
-        if tools.db_get('stop'): 
+        # try:
+        if tools.db_get('stop'):
             tools.log('shutting off miner')
             return
-        if not(in_queue.empty()):
-            candidate_block=in_queue.get()#False)
+        if not (in_queue.empty()):
+            candidate_block = in_queue.get()  # False)
         else:
             time.sleep(1)
             continue
         possible_block = POW(candidate_block, restart)
-        if 'error' in possible_block: 
+        if 'error' in possible_block:
             continue
-        elif 'solution_found' in possible_block: 
+        elif 'solution_found' in possible_block:
             continue
         else:
             solution_queue.put(possible_block)

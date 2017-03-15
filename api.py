@@ -48,7 +48,7 @@ def info(DB, args):
         address = tools.db_get('address')
     else:
         address = args[0]
-    return tools.db_get(address, DB)
+    return tools.db_get(address)
 
 
 def myaddress(DB, args):
@@ -92,7 +92,7 @@ def mybalance(DB, args, address='default'):
     if address == 'default':
         address = tools.db_get('address')
     return \
-        tools.db_get(address, DB)['amount'] - tools.cost_0(tools.db_get('txs'), address)
+        tools.db_get(address)['amount'] - tools.cost_0(tools.db_get('txs'), address)
 
 
 def balance(DB, args):

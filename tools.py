@@ -43,7 +43,7 @@ def cost_0(txs, address):
 def fee_check(tx, txs, DB):
     address = addr(tx)
     cost = cost_0(txs + [tx], address)
-    acc = db_get(address, DB)
+    acc = db_get(address)
     if int(acc['amount']) < cost:
         log('insufficient money')
         return False
@@ -61,9 +61,9 @@ def set_(loc, dic, val):
 
 
 def adjust(pubkey, DB, f):  # location shouldn't be here.
-    acc = db_get(pubkey, DB)
+    acc = db_get(pubkey)
     f(acc)
-    db_put(pubkey, acc, DB)
+    db_put(pubkey, acc)
 
 
 def adjust_int(key, pubkey, amount, DB, add_block):
@@ -114,9 +114,9 @@ def adjust_list(location, pubkey, remove, item, DB, add_block):
 
 def symmetric_put(id_, dic, DB, add_block):
     if add_block:
-        db_put(id_, dic, DB)
+        db_put(id_, dic)
     else:
-        db_delete(id_, DB)
+        db_delete(id_)
 
 
 def add_peer(peer, current_peers=0):
@@ -281,29 +281,29 @@ def s_to_db(c):
         return response
 
 
-def db_get(n, DB={}): return s_to_db({'type': 'get', 'args': [str(n)]})
+def db_get(n): return s_to_db({'type': 'get', 'args': [str(n)]})
 
 
-def db_put(key, dic, DB={}): return s_to_db({'type': 'put', 'args': [str(key), dic]})
+def db_put(key, dic): return s_to_db({'type': 'put', 'args': [str(key), dic]})
 
 
-def db_delete(key, DB={}): return s_to_db({'type': 'delete', 'args': [str(key)]})  # db_put(key, 'undefined', DB)
+def db_delete(key): return s_to_db({'type': 'delete', 'args': [str(key)]})  # db_put(key, 'undefined', DB)
 
 
-def db_existence(key, DB={}): return s_to_db({'type': 'existence', 'args': [str(key)]})
+def db_existence(key): return s_to_db({'type': 'existence', 'args': [str(key)]})
 
 
 def count(address, DB):
     # Returns the number of transactions that pubkey has broadcast.
-    def zeroth_confirmation_txs(address, DB):
+    def zeroth_confirmation_txs(address):
         def is_zero_conf(t):
             other_address = make_address(t['pubkeys'], len(t['signatures']))
             return address == other_address
 
         return len(filter(is_zero_conf, db_get('txs')))
 
-    current = db_get(address, DB)['count']
-    zeroth = zeroth_confirmation_txs(address, DB)
+    current = db_get(address)['count']
+    zeroth = zeroth_confirmation_txs(address)
     return current + zeroth
 
 

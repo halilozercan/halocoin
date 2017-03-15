@@ -1,19 +1,18 @@
 """This is to make magic numbers easier to deal with."""
-import multiprocessing, os
-try:
-    from cdecimal import Decimal
-except:
-    from decimal import Decimal
+import multiprocessing
+import os
+from decimal import Decimal
+
 DEBUG = False
-peers = [['192.241.212.114', 7900]]#,['69.164.196.239', 8900]]
-current_loc=os.path.dirname(os.path.abspath(__file__))
+peers = [['139.179.21.17', 7900]]
+current_loc = os.path.dirname(os.path.abspath(__file__))
 database_name = os.path.join(current_loc, 'DB')
-log_file=os.path.join(current_loc, 'log')
-port=7900
-api_port=7899
-database_port=7898
+log_file = os.path.join(current_loc, 'log')
+port = 7900
+api_port = 7899
+database_port = 7898
 version = "0.0001"
-max_key_length=6**4
+max_key_length = 6 ** 4
 block_reward = 10 ** 5
 fee = 10 ** 3
 # Lower limits on what the "time" tag in a block can say.
@@ -27,13 +26,10 @@ history_length = 400
 inflection = Decimal('0.985')
 download_many = 50  # Max number of blocks to request from a peer at the same time.
 max_download = 58000
-#buy_shares_target='0'*4+'1'+'9'*59
-blocktime=60
+blocktime = 60
 DB = {
-    'reward_peers_queue':multiprocessing.Queue(),
+    'reward_peers_queue': multiprocessing.Queue(),
     'suggested_blocks': multiprocessing.Queue(),
     'suggested_txs': multiprocessing.Queue(),
     'heart_queue': multiprocessing.Queue(),
 }
-
-

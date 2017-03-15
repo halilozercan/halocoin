@@ -8,6 +8,7 @@ import tools
 
 
 class Server:
+
     def __init__(self, handler, port, heart_queue='default', external=False, keep_connection=False):
         self.__handler = handler
         self.__port = port

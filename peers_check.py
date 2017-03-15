@@ -47,7 +47,7 @@ def give_block(peer, DB, block_count_peer):
     blocks = []
     b = [max(block_count_peer - 5, 0), min(tools.db_get('length'), block_count_peer + custom.download_many)]
     for i in range(b[0], b[1] + 1):
-        blocks.append(tools.db_get(i, DB))
+        blocks.append(tools.db_get(i))
     cmd(peer, {'type': 'pushblock',
                'blocks': blocks})
     return 0

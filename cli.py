@@ -41,7 +41,7 @@ def main(c):
 
 def run_command(p):
     tools.log("Running API command: " + str(p['command']))
-    response = network.send_receive(p, 'localhost', custom.api_port)
+    response = network.send_receive(message=p, host='localhost', port=custom.api_port)
     if response is None:
         print("Node is probably off. Use --start argument to start.")
     return response
