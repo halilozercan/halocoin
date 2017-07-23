@@ -206,7 +206,7 @@ def POW(block):
     return block
 
 
-def make_half_way(block):
+def hash_without_nonce(block):
     a = copy.deepcopy(block)
     a.pop('nonce')
     return {u'nonce': block['nonce'], u'halfHash': det_hash(a)}
@@ -325,6 +325,12 @@ if __name__ == "__main__":
         print(time.time()-timea)
     print(time.time()-time_0)
     '''
+
+
+def median(mylist):
+    if len(mylist) < 1:
+        return 0
+    return sorted(mylist)[len(mylist) / 2]
 
 
 def daemonize(f):
