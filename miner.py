@@ -8,135 +8,89 @@ import time
 import blockchain
 import custom
 import tools
+from ntwrk import Response
+from service import Service, threaded, sync
 
 
-def make_mint(pubkey, DB):
-    address = tools.make_address([pubkey], 1)
-    return {'type': 'mint',
-            'pubkeys': [pubkey],
-            'signatures': ['first_sig'],
-            'count': tools.count(address, DB)}
+class MinerService(Service):
+    def __init__(self, engine):
+        Service.__init__(self, "miner")
+        self.engine = engine
+        self.db = None
+        self.blockchain = None
 
+    def on_register(self):
+        self.db = self.engine.db
+        self.blockchain = self.engine.blockchain
+        return True
 
-def genesis(pubkey, DB):
-    target_ = target.target()
-    out = {'version': custom.version,
-           'length': 0,
-           'time': time.time(),
-           'target': target_,
-           'diffLength': blockchain.hex_invert(target_),
-           'txs': [make_mint(pubkey, DB)]}
-    out = tools.unpackage(tools.package(out))
-    return out
-
-
-def make_block(prev_block, txs, pubkey, DB):
-    leng = int(prev_block['length']) + 1
-    target_ = target.target(leng)
-    diffLength = blockchain.hex_sum(prev_block['diffLength'],
-                                    blockchain.hex_invert(target_))
-    out = {'version': custom.version,
-           'txs': txs + [make_mint(pubkey, DB)],
-           'length': leng,
-           'time': time.time(),
-           'diffLength': diffLength,
-           'target': target_,
-           'prevHash': tools.det_hash(prev_block)}
-    out = tools.unpackage(tools.package(out))
-    return out
-
-
-def POW(block, restart_signal):
-    halfHash = tools.det_hash(block)
-    block[u'nonce'] = random.randint(0, 10000000000000000000000000000000000000000)
-    count = 0
-    while tools.det_hash({u'nonce': block['nonce'],
-                          u'halfHash': halfHash}) > block['target']:
-        count += 1
-        block[u'nonce'] += 1
-        if restart_signal.is_set():
-            restart_signal.clear()
-            return {'solution_found': True}
-    return block
-
-
-def new_worker(solution_queue):
-    in_queue = multiprocessing.Queue()
-    restart = multiprocessing.Event()
-    proc = multiprocessing.Process(target=miner, args=(restart, solution_queue, in_queue))
-    proc.daemon = True
-    proc.start()
-    return ({'in_queue': in_queue, 'restart': restart, 'solution_queue': solution_queue, 'proc': proc})
-
-
-def restart_workers(workers):
-    for worker in workers:
-        tools.dump_out(worker['in_queue'])
-        worker['restart'].set()
-
-
-def main(pubkey, DB):
-    num_cores = multiprocessing.cpu_count()
-    solution_queue = multiprocessing.Queue()
-    workers = [new_worker(solution_queue) for _ in range(num_cores)]
-    try:
-        while True:
-            DB['heart_queue'].put('miner')
-            if tools.db_get('stop'):
-                tools.dump_out(solution_queue)
-                tools.log('shutting off miner')
-                restart_workers(workers)
-                return
-            elif tools.db_get('mine'):
-                main_once(pubkey, DB, num_cores, solution_queue, workers)
-            else:
-                time.sleep(1)
-    except Exception as exc:
-        tools.log('miner main: ')
-        tools.log(exc)
-
-
-def main_once(pubkey, DB, num_cores, solution_queue, workers):
-    length = tools.db_get('length')
-    if length == -1:
-        candidate_block = genesis(pubkey, DB)
-    else:
-        prev_block = tools.db_get(length)
-        try:
-            candidate_block = make_block(prev_block, tools.db_get('txs'), pubkey, DB)
-        except:  # sometimes a block gets deleted after we grab length and before we call make_block.
-            return main_once(pubkey, DB, num_cores, solution_queue, workers)
-    work = candidate_block
-    for worker in workers:
-        worker['in_queue'].put(work)
-        worker['in_queue'].put(work)
-    start = time.time()
-    while solution_queue.empty() and time.time() < start + custom.blocktime / 3 and tools.db_get(
-            'mine') and not tools.db_get('stop'):
-        time.sleep(0.1)
-    restart_workers(workers)
-    while not solution_queue.empty():
-        try:
-            DB['suggested_blocks'].put(solution_queue.get(False))
-        except:
-            continue
-
-
-def miner(restart, solution_queue, in_queue):
-    while True:
-        # try:
-        if tools.db_get('stop'):
-            tools.log('shutting off miner')
-            return
-        if not (in_queue.empty()):
-            candidate_block = in_queue.get()  # False)
+    @threaded
+    def worker(self):
+        length = self.db.get('length')
+        print 'Miner working', length
+        if length == -1:
+            candidate_block = self.genesis(self.db.get('pubkey'))
         else:
-            time.sleep(1)
-            continue
-        possible_block = POW(candidate_block, restart)
-        if 'error' in possible_block:
-            continue
-        elif 'solution_found' in possible_block:
-            continue
-        else:
-            solution_queue.put(possible_block)
+            prev_block = self.db.get(length)
+            candidate_block = self.make_block(prev_block, self.db.get('txs'), self.db.get('pubkey'))
+
+        start = time.time()
+        possible_block = None
+        while self.threaded_running() and time.time() < start + custom.blocktime / 3 and possible_block is None:
+            result = self.POW(candidate_block)
+            if result.getFlag():
+                possible_block = result.getData()
+
+        if possible_block is not None:
+            tools.log('Mined block')
+            tools.log(possible_block)
+            self.blockchain.blocks_queue.put(possible_block)
+
+    def make_block(self, prev_block, txs, pubkey):
+        leng = int(prev_block['length']) + 1
+        target_ = self.blockchain.target(leng)
+        print "target", target_
+        diffLength = blockchain.hex_sum(prev_block['diffLength'],
+                                        blockchain.hex_invert(target_))
+        out = {'version': custom.version,
+               'txs': txs + [self.make_mint(pubkey)],
+               'length': leng,
+               'time': time.time(),
+               'diffLength': diffLength,
+               'target': target_,
+               'prevHash': tools.det_hash(prev_block)}
+        return out
+
+    def make_mint(self, pubkey):
+        return {'type': 'mint',
+                'pubkeys': [pubkey],
+                'signatures': ['first_sig'],
+                'count': 0}
+
+    def genesis(self, pubkey):
+        target_ = self.blockchain.target(0)
+        out = {'version': custom.version,
+               'length': 0,
+               'time': time.time(),
+               'target': target_,
+               'diffLength': blockchain.hex_invert(target_),
+               'txs': [self.make_mint(pubkey)]}
+        return out
+
+    def POW(self, block):
+        if 'nonce' in block:
+            block.pop('nonce')
+        halfHash = tools.det_hash(block)
+        block['nonce'] = random.randint(0, 10000000000000000000000000000000000000000)
+        count = 0
+        while tools.det_hash({'nonce': block['nonce'],
+                              'halfHash': halfHash}) > block['target']:
+            count += 1
+            if count > 10000:
+                return Response(False, None)
+            block['nonce'] += 1
+
+        print "Mining block with hash\n" + tools.det_hash({'nonce': block['nonce'],
+                                                           'halfHash': halfHash})
+
+        return Response(True, block)

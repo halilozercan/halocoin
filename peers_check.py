@@ -25,6 +25,7 @@ class PeersCheckService(Service):
         for peer in self.new_peers:
             self.old_peers = tools.add_peer(peer, self.old_peers)
         self.db.put('peers_ranked', self.old_peers)
+        return True
 
     @threaded
     def listen(self):
@@ -113,7 +114,7 @@ class PeersCheckService(Service):
                 self.blockchain.delete_block()
                 length -= 1
         for block in blocks:
-            self.blockchain.blocks_queue.put([block, peer])
+            self.blockchain.blocks_queue.put(block)
         return 0
 
     def ask_for_txs(self, peer):

@@ -18,7 +18,7 @@ import pt
 
 
 # print(json.dumps(x, indent=3, sort_keys=True))  for pretty printing
-def total_spendings_of_address(txs_in_pool, address):
+def spendings_of_address_in_pool(txs_in_pool, address):
     # cost of the zeroth confirmation transactions
     total_cost = []
     for tx in filter(lambda t: address == tx_owner_address(t), txs_in_pool):
@@ -34,7 +34,7 @@ def total_spendings_of_address(txs_in_pool, address):
 
 def fee_check(tx, txs_in_pool, acc):
     address = tx_owner_address(tx)
-    cost = total_spendings_of_address(txs_in_pool + [tx], address)
+    cost = spendings_of_address_in_pool(txs_in_pool + [tx], address)
     if int(acc['amount']) < cost:
         log('insufficient money')
         return False
@@ -112,7 +112,7 @@ def det_hash(x):
 def hash_without_nonce(block):
     a = copy.deepcopy(block)
     a.pop('nonce')
-    return {u'nonce': block['nonce'], u'halfHash': det_hash(a)}
+    return {'nonce': block['nonce'], 'halfHash': det_hash(a)}
 
 
 def base58_encode(num):

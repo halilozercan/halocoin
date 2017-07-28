@@ -36,11 +36,14 @@ class BlockchainService(Service):
 
     def on_register(self):
         self.db = self.engine.db
+        return True
 
     @threaded
     def process(self):
         if not self.blocks_queue.empty():
             candidate_block = self.blocks_queue.get()
+            tools.log('Received block')
+            tools.log(candidate_block)
             self.add_block(candidate_block)
         elif not self.tx_queue.empty():
             candidate_tx = self.tx_queue.get()
@@ -61,7 +64,7 @@ class BlockchainService(Service):
 
         # tools.log('attempt to add tx: ' +str(tx))
         txs_in_pool = self.db.get('txs')
-        response = BlockchainService.tx_verify_for_pool(tx, txs_in_pool, self.db.get(address))
+        response = BlockchainService.tx_verify_for_pool(tx, txs_in_pool, self.db.get_account(address))
         if response.getFlag():
             txs_in_pool.append(tx)
             self.db.put('txs', txs_in_pool)
@@ -80,42 +83,52 @@ class BlockchainService(Service):
             def tx_check(txs_in_block):
                 for tx in reversed(txs_in_block):
                     address_of_tx = tools.tx_owner_address(tx)
-                    account_of_tx = self.db.get(address_of_tx)
+                    account_of_tx = self.db.get_account(address_of_tx)
                     if BlockchainService.tx_integrity_check(tx, txs_in_block) \
                             and tools.fee_check(tx, txs_in_block, account_of_tx):
                         continue
                     else:
+                        tools.log('tx not valid')
                         return False  # Block is invalid
                 return True  # Block is valid
 
             if not isinstance(block, dict):
+                tools.log('Block is not a dict')
                 return False
 
             if 'error' in block:
+                tools.log('Errors in block')
                 return False
 
             if not ('length' in block and isinstance(block['length'], int)):
+                tools.log('Length is not valid')
                 return False
 
             length = self.db.get('length')
 
             if int(block['length']) != int(length) + 1:
+                tools.log('Length is not valid')
                 return False
 
             # TODO: understand what is going on here
             if block['diffLength'] != hex_sum(self.db.get('diffLength'),
                                               hex_invert(block['target'])):
+                tools.log('difflength is wrong')
                 return False
 
             if length >= 0:
                 if tools.det_hash(self.db.get(length)) != block['prevHash']:
+                    tools.log('prevhash different')
                     return False
 
-            if 'target' not in block.keys():
+            if 'target' not in block:
+                tools.log('no target in block')
                 return False
 
             nonce_and_hash = tools.hash_without_nonce(block)
+            print 'Adding block with hash\n' + tools.det_hash(nonce_and_hash)
             if tools.det_hash(nonce_and_hash) > block['target']:
+                tools.log('hash is not applicable to target')
                 return False
 
             if block['target'] != self.target(block['length']):
@@ -124,18 +137,19 @@ class BlockchainService(Service):
                 tools.log('wrong target')
                 return False
 
-            earliest = tools.median(self.recent_blockthings(self.db.get('times'),
-                                                            custom.mmm,
-                                                            self.db.get('length')))
+            #earliest = tools.median(self.recent_blockthings(self.db.get('times'),
+            #                                                custom.mmm,
+            #                                                self.db.get('length')))
+
             if 'time' not in block:
                 tools.log('no time')
                 return False
             if block['time'] > time.time() + 60 * 6:
                 tools.log('Received block is coming from future. Call the feds')
                 return False
-            if block['time'] < earliest:
-                tools.log('Received block is generated earlier than median.')
-                return False
+            #if block['time'] < earliest:
+            #    tools.log('Received block is generated earlier than median.')
+            #    return False
             if tx_check(block['txs']):
                 tools.log('Received block failed transactions check.')
                 return False
@@ -235,8 +249,10 @@ class BlockchainService(Service):
 
     @sync
     def mint(self, tx, add_block_flag):
+        print("Updating with mint tx")
         address = tools.tx_owner_address(tx)
-        account = self.db.get(address)
+        print("Rewarding address:" + address)
+        account = self.db.get_account(address)
         if add_block_flag:
             account['amount'] += custom.block_reward
             account['count'] += 1
@@ -244,11 +260,12 @@ class BlockchainService(Service):
             account['amount'] -= custom.block_reward
             account['count'] -= 1
         self.db.put(address, account)
+        print(account)
 
     @sync
     def spend(self, tx, add_block_flag):
         address = tools.tx_owner_address(tx)
-        account = self.db.get(address)
+        account = self.db.get_account(address)
         if add_block_flag:
             account['amount'] += -tx['amount']
             tx['to']['amount'] += tx['amount']

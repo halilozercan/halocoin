@@ -95,7 +95,10 @@ def api(action, **kwargs):
 
 
 def peer(action, **kwargs):
-    response = ntwrk.command(('localhost', 7900), {'action': action})
+    cmd = {'action': action}
+    cmd.update(kwargs)
+    print cmd
+    response = ntwrk.command(('localhost', 7900), cmd)
     print response
 
-api('stop')
+peer('pushblock', blocks=[{'nonce': 5756067516574144842966266391404712355944L, 'target': '0000ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff', 'time': 1501247612.519605, 'length': 0, 'version': '0.0001', 'diffLength': '100000000000000000000000000000000000000000000000000000000000100000000', 'txs': [{'count': 0, 'pubkeys': ['043f742d02bda3f03fd5154ce201d6b488484ea6b5c306d6b7ac0ef58414d72d080a3dd7f4821b479f5e7af76ea7762c468b40d2dc7db05b8e34cbc68694db1e69'], 'signatures': ['first_sig'], 'type': 'mint'}]}])

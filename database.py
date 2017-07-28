@@ -23,9 +23,7 @@ class DatabaseService(Service):
         except KeyError:
             self.salt = os.urandom(5)
             self.DB.Put('salt', self.salt)
-
-    def on_close(self):
-        self.DB.close()
+        return True
 
     @sync
     def get(self, key):
@@ -34,6 +32,13 @@ class DatabaseService(Service):
             return json.loads(self.DB.Get(self.salt + str(key)))
         except KeyError:
             return None
+
+    @sync
+    def get_account(self, address):
+        try:
+            return json.loads(self.DB.Get(self.salt + str(address)))
+        except KeyError:
+            return {'amount': 0, 'count': 0}
 
     @sync
     def put(self, key, value):

@@ -17,18 +17,26 @@ class ApiService(Service):
         self.engine = engine
         self.db = None
         self.blockchain = None
+        self.miner = None
 
     def on_register(self):
         self.db = self.engine.db
         self.blockchain = self.engine.blockchain
+        self.miner = self.engine.miner
 
-        self.s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.s.settimeout(1)
-        self.s.bind(('localhost', self.engine.config['api.port']))
-        self.s.listen(5)
+        try:
+            self.s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            self.s.settimeout(1)
+            self.s.bind(('localhost', self.engine.config['api.port']))
+            self.s.listen(5)
+        except:
+            tools.log("Could not start API socket!")
+            return False
+        return True
 
     def on_close(self):
         try:
+            self.s.shutdown(socket.SHUT_RDWR)
             self.s.close()
         except:
             print sys.exc_info()
@@ -50,9 +58,11 @@ class ApiService(Service):
                         result = 'Received action is not valid'
                 except:
                     result = 'Something went wrong while evaluating.\n' + str(sys.exc_info())
+                    tools.log(result)
                 response = Message(headers={'ack': message.get_header('id')},
                                    body=result)
                 ntwrk.send(response, client_sock)
+                client_sock.shutdown(socket.SHUT_RDWR)
                 client_sock.close()
         except:
             pass
@@ -70,7 +80,7 @@ class ApiService(Service):
         address = tools.make_address([pubkey], 1)
         if 'count' not in tx:
             try:
-                tx['count'] = tools.count(self.db.get(address), address, self.db.get('txs'))
+                tx['count'] = tools.count(self.db.get_account(address), address, self.db.get('txs'))
             except:
                 tx['count'] = 1
         if 'pubkeys' not in tx:
@@ -84,32 +94,24 @@ class ApiService(Service):
         return self.db.get('peers_ranked')
 
     @sync
-    def info(self, args):
-        if len(args) < 1:
+    def info(self, subject=None):
+        if subject is None:
             return 'not enough inputs'
-        if args[0] == 'myaddress':
+        if subject == 'myaddress':
             address = self.db.get('address')
         else:
-            address = args[0]
-        return self.db.get(address)
+            address = subject
+        return self.db.get_account(address)
 
     @sync
     def myaddress(self):
         return self.db.get('address')
 
     @sync
-    def spend(self, args):
-        if len(args) < 2:
+    def spend(self, amount=0, address=None):
+        if amount == 0 and address is None:
             return 'not enough inputs'
-        return self.easy_add_transaction({'type': 'spend', 'amount': int(args[0]), 'to': args[1]})
-
-    @sync
-    def pushtx(self, args):
-        tx = tools.unpackage(args[0].decode('base64'))
-        if len(args) == 1:
-            return self.easy_add_transaction(tx)
-        privkey = tools.det_hash(args[1])
-        return self.easy_add_transaction(tx, privkey)
+        return self.easy_add_transaction({'type': 'spend', 'amount': int(amount), 'to': address})
 
     @sync
     def blockcount(self):
@@ -120,6 +122,16 @@ class ApiService(Service):
         return self.db.get('txs')
 
     @sync
+    def pubkey(self):
+        return self.db.get('pubkey')
+
+    @sync
+    def block(self, number=-1):
+        if number == -1:
+            number = self.db.get('length')
+        return self.db.get(str(number))
+
+    @sync
     def difficulty(self):
         return self.blockchain.target(self.db.get('length'))
 
@@ -127,11 +139,8 @@ class ApiService(Service):
     def balance(self, address='default'):
         if address == 'default':
             address = self.db.get('address')
-        account = self.db.get(address)
-        if account is None:
-            return 0
-        else:
-            return account['amount'] - tools.total_spendings_of_address(self.db.get('txs'), address)
+        account = self.db.get_account(address)
+        return account['amount'] - tools.spendings_of_address_in_pool(self.db.get('txs'), address)
 
     @sync
     def mybalance(self):
@@ -145,13 +154,10 @@ class ApiService(Service):
 
     @sync
     def mine(self):
-        m = not (self.db.get('mine'))
-        self.db.put('mine', m)
-        if m:
-            m = 'on'
+        if self.miner.get_state() == Service.RUNNING:
+            self.miner.unregister()
         else:
-            m = 'off'
-        return 'miner is currently: ' + m
+            self.miner.register()
 
     @sync
     def pass_(self):

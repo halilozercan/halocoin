@@ -1,10 +1,13 @@
 """This program starts all the threads going. When it hears a kill signal, it kills all the threads.
 """
+import time
+
 import custom
 import tools
 from api import ApiService
 from blockchain import BlockchainService
-from database import PDatabaseService
+from database import DatabaseService
+from miner import MinerService
 from peer_receive import PeerReceiveService
 from peers_check import PeersCheckService
 from service import Service, async
@@ -35,21 +38,28 @@ class Engine(Service):
             'peer.port': custom.port
         }
 
-        self.db = PDatabaseService(self)
+        self.db = DatabaseService(self)
         self.blockchain = BlockchainService(self)
         self.api = ApiService(self)
         self.peers_check = PeersCheckService(self, custom.peers)
         self.peer_receive = PeerReceiveService(self)
+        self.miner = MinerService(self)
 
     def on_register(self):
         print('Starting full node')
-        self.db.register()
+        if not self.db.register():
+            return False
+
+        print("Waiting for database to warm up")
+        time.sleep(1)
 
         if not test_database(self.db):
             tools.log("Database service is not working.")
+            return False
 
         b = self.db.get('init')
         if not b:
+            print("Initializing Database")
             self.db.put('init', True)
             self.db.put('length', -1)
             self.db.put('memoized_votes', {})
@@ -62,29 +72,66 @@ class Engine(Service):
         self.db.put('stop', False)
 
         self.db.put('privkey', self.wallet['privkey'])
+        self.db.put('pubkey', self.wallet['pubkey'])
         self.db.put('address', tools.make_address([self.wallet['pubkey']], 1))
 
-        self.blockchain.register()
-        self.api.register()
-        #self.peers_check.register()
-        #self.peer_receive.register()
+        if not self.blockchain.register():
+            print("Blockchain service has failed. Exiting!")
+            self.unregister_sub_services()
+            return False
+        print("Started Blockchain")
+
+        if not self.api.register():
+            print("API service has failed. Exiting!")
+            self.unregister_sub_services()
+            return False
+        print("Started API")
+
+        if not self.peer_receive.register():
+            print("Peer Receive service has failed. Exiting!")
+            self.unregister_sub_services()
+            return False
+        print("Started Peer Receive")
+
+        if not self.peers_check.register():
+            print("Peers Check service has failed. Exiting!")
+            self.unregister_sub_services()
+            return False
+        print("Started Peers Check")
+        return True
+
+    def unregister_sub_services(self):
+        if self.miner.get_state() == Service.RUNNING:
+            self.miner.unregister()
+            print 'Closed miner'
+        if self.api.get_state() == Service.RUNNING:
+            self.api.unregister()
+            print 'Closed api'
+        if self.peers_check.get_state() == Service.RUNNING:
+            self.peers_check.unregister()
+            print 'Closed peers check'
+        if self.peer_receive.get_state() == Service.RUNNING:
+            self.peer_receive.unregister()
+            print 'Closed peer_receive'
+        if self.blockchain.get_state() == Service.RUNNING:
+            self.blockchain.unregister()
+            print 'Closed blockchain'
+        if self.db.get_state() == Service.RUNNING:
+            self.db.unregister()
+            print 'Closed db'
 
     @async
     def stop(self):
         print 'Closing services'
-        self.api.unregister()
-        print 'Closed api'
-        #self.peers_check.unregister()
-        print 'Closed peers check'
-        #self.peer_receive.unregister()
-        print 'Closed peer receive'
-        #self.blockchain.unregister()
-        print 'Closed blockchain'
-        self.db.unregister()
-        print 'Closed db and everything'
+        self.unregister_sub_services()
+        print "Closed everything"
         self.unregister()
 
 
 def main(wallet, config):
     new_service = Engine(wallet, config)
-    new_service.register()
+    if new_service.register():
+        new_service.join()
+        print("Exiting gracefully")
+    else:
+        print("Couldn't start Halocoin")

@@ -23,6 +23,24 @@ class Service:
         self.execution_lock = threading.Lock()
         self.__threads = {}
 
+    @staticmethod
+    def execute_order(service, order):
+        if order.action == '__close_threaded__':
+            result = True
+            service.__threads[order.args[0]][0] = False
+        elif order.action == '__shutdown_service__':
+            result = True
+            service.set_state(Service.STOPPED)
+        elif hasattr(service, order.action):
+            try:
+                result = getattr(service, order.action) \
+                    ._original(service, *order.args, **order.kwargs)
+            except:
+                result = None
+                tools.log(sys.exc_info())
+
+        return result
+
     def register(self):
         def service_target(service):
             service.set_state(Service.RUNNING)
@@ -30,21 +48,9 @@ class Service:
                 try:
                     order = service.into_service_queue.get(timeout=1)
                     if isinstance(order, Order):
-                        if order.action == '__close_threaded__':
-                            self.__threads[order.args[0]][0] = False
-                            self.service_responses[order.id] = True
-                            self.signals[order.id].set()
-                            self.__threads[order.args[0]][1].join()
-                        elif hasattr(service, order.action):
-                            try:
-                                result = getattr(service, order.action)\
-                                    ._original(service, *order.args, **order.kwargs)
-                            except:
-                                tools.log(sys.exc_info())
-                                result = None
-                                service.set_state(Service.TERMINATED)
-                            self.service_responses[order.id] = result
-                            self.signals[order.id].set()
+                        result = Service.execute_order(service, order)
+                        self.service_responses[order.id] = result
+                        self.signals[order.id].set()
                 except Queue.Empty:
                     pass
                 except TypeError:
@@ -52,7 +58,10 @@ class Service:
                     self.service_responses[order.id] = True
                     self.signals[order.id].set()
 
-        self.on_register()
+        cont = self.on_register()
+        if not cont:
+            tools.log("Service is not going to continue with registering!")
+            return False
 
         self.event_thread = threading.Thread(target=service_target, args=(self,), name=self.name)
         self.event_thread.start()
@@ -73,16 +82,23 @@ class Service:
                     self.__threads[clsMember._original.__name__] = [True, new_thread]
                     new_thread.start()
 
+        return True
+
     def on_register(self):
         # Implemented by subclass
-        pass
+        return True
 
     def on_close(self):
         # Implemented by subclass
-        pass
+        return True
+
+    def join(self):
+        for key, thread in self.__threads.iteritems():
+            thread[1].join()
+        self.event_thread.join()
 
     def unregister(self):
-        self.execute(None, True, args=(), kwargs={})
+        self.execute('__shutdown_service__', True, args=(), kwargs={})
         for key, thread in self.__threads.iteritems():
             thread[1].join()
 
@@ -98,13 +114,14 @@ class Service:
             warnings.warn('You are running a background method on an unregistered service. {} {}'.format(action, self.__class__.__name__))
             return result
 
-        # We are already in event thread and someone called a synced function. Just run it.
-        if threading.current_thread().name == self.event_thread.name:
-            result = getattr(self, action)._original(self, *args, **kwargs)
-            return result
-
         result = None
         new_order = Order(action, args, kwargs)
+
+        # We are already in event thread and someone called a synced function. Just run it.
+        if threading.current_thread().name == self.event_thread.name:
+            result = Service.execute_order(self, new_order)
+            return result
+
         self.signals[new_order.id] = threading.Event()
         self.into_service_queue.put(new_order)
         if expect_result:
@@ -121,6 +138,7 @@ class Service:
 
     def set_state(self, state):  # (INIT|RUNNING|STOPPED|TERMINATED) -> ()
         if state == Service.STOPPED or state == Service.TERMINATED:
+            tools.log('{} got stopped'.format(self.__class__.__name__))
             for thread in self.__threads.values():
                 thread[0] = False
         self.__state = state
@@ -134,6 +152,13 @@ class Service:
                      expect_result=True,
                      args=(thread_name,),
                      kwargs={})
+
+    def threaded_running(self):
+        thread_name = threading.current_thread().name
+        try:
+            return self.__threads[thread_name][0]
+        except:
+            return True
 
 
 def sync(func):

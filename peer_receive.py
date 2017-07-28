@@ -23,10 +23,15 @@ class PeerReceiveService(Service):
         self.db = self.engine.db
         self.blockchain = self.engine.blockchain
 
-        self.s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.s.settimeout(5)
-        self.s.bind(('localhost', self.engine.config['peer.port']))
-        self.s.listen(10)
+        try:
+            self.s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            self.s.settimeout(1)
+            self.s.bind(('localhost', self.engine.config['peer.port']))
+            self.s.listen(10)
+        except:
+            tools.log("Could not start Peer Receive socket!")
+            return False
+        return True
 
     @threaded
     def listen(self):
@@ -90,7 +95,7 @@ class PeerReceiveService(Service):
         return 'success'
 
     @sync
-    def pushblock(self, peer, blocks):
+    def pushblock(self, blocks):
         length = self.db.get('length')
         block = self.db.get(length)
 
@@ -99,5 +104,5 @@ class PeerReceiveService(Service):
                 self.blockchain.delete_block()
                 length -= 1
         for block in blocks:
-            self.blockchain.blocks_queue.put([block, peer])
+            self.blockchain.blocks_queue.put(block)
         return 'success'

@@ -5,6 +5,7 @@ import os
 import random
 import string
 
+import filelock
 import sys
 
 import custom
@@ -14,15 +15,6 @@ import ntwrk
 import tools
 
 
-def get_address(tx):
-    pubkey = str(raw_input('What is your address or pubkey\n>'))
-    if len(pubkey) > 40:
-        out = tools.make_address([pubkey], 1)
-    else:
-        out = pubkey
-    return tx
-
-
 def run_command(p):
     response = ntwrk.command(('localhost', custom.api_port), p)
     return response
@@ -30,11 +22,15 @@ def run_command(p):
 
 if __name__ == '__main__':
     actions = ['start', 'stop', 'send', 'balance', 'mybalance', 'difficulty', 'info', 'myaddress',
-               'peers', 'blockcount', 'txs', 'new_wallet']
+               'peers', 'blockcount', 'txs', 'new_wallet', 'pubkey', 'block', 'mine']
     parser = argparse.ArgumentParser(description='CLI for halocoin application.')
     parser.add_argument('action', help='Main action to take', choices=actions)
     parser.add_argument('--address', action="store", type=str, dest='address',
                         help='Give a valid blockchain address')
+    parser.add_argument('--amount', action="store", type=int, dest='amount',
+                        help='Amount of coins that are going to be used')
+    parser.add_argument('--number', action="store", type=int, dest='number',
+                        help='Block number')
     parser.add_argument('--wallet', action="store", type=str, dest='wallet',
                         help='Wallet file address')
     """
@@ -68,18 +64,20 @@ if __name__ == '__main__':
         exit(1)
 
     if args.action == 'start':
-        r = run_command({'action': 'blockcount'})
-        if r == 'Could not connect':
-            wallet_file = open(args.wallet, 'r')
-            wallet_encrypted_content = wallet_file.read()
-            from getpass import getpass
+        lock = filelock.FileLock('engine_lock')
+        try:
+            with lock.acquire(timeout=2):
+                wallet_file = open(args.wallet, 'r')
+                wallet_encrypted_content = wallet_file.read()
+                from getpass import getpass
 
-            wallet_pw = getpass('Wallet password: ')
-            wallet = json.loads(tools.decrypt(wallet_pw, wallet_encrypted_content))
+                wallet_pw = getpass('Wallet password: ')
+                wallet = json.loads(tools.decrypt(wallet_pw, wallet_encrypted_content))
 
-            # TODO: Real configuration
-            tools.daemonize(lambda: engine.main(wallet, None))
-        else:
+                # TODO: Real configuration
+                #tools.daemonize(lambda: engine.main(wallet, None))
+                engine.main(wallet, None)
+        except:
             print('Halocoin is already running')
     elif args.action == 'new_wallet':
         from getpass import getpass
@@ -105,4 +103,7 @@ if __name__ == '__main__':
             f.write(wallet_encrypted_content)
         print('New wallet is created: {}'.format(args.wallet))
     else:
-        print(run_command({'action': args.action}))
+        cmd = {'action': args.action}
+        if args.action == 'block':
+            cmd['number'] = args.number
+        print(run_command(cmd))
