@@ -6,7 +6,7 @@ from decimal import Decimal
 DEBUG = False
 peers = [['139.179.21.17', 7900]]
 current_loc = os.path.dirname(os.path.abspath(__file__))
-database_name = os.path.join(current_loc, 'DB')
+database_name = os.path.join(current_loc, 'pickle_db')
 log_file = os.path.join(current_loc, 'log')
 port = 7900
 api_port = 7899
@@ -27,9 +27,3 @@ inflection = Decimal('0.985')
 download_many = 50  # Max number of blocks to request from a peer at the same time.
 max_download = 58000
 blocktime = 60
-DB = {
-    'reward_peers_queue': multiprocessing.Queue(),
-    'suggested_blocks': multiprocessing.Queue(),
-    'suggested_txs': multiprocessing.Queue(),
-    'heart_queue': multiprocessing.Queue(),
-}

@@ -1,4 +1,6 @@
+import json
 import socket
+import uuid
 
 from message import Message
 from response import Response
@@ -76,12 +78,13 @@ def send(_msg, sock):
     return sent == len(msg)
 
 
-def connect(host='localhost', port=3699, ssl_args=None, unix_config=None):
+def connect(host='localhost', port=3699, ssl_args=None, unix_config=None, timeout=10):
     if unix_config is None:
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     else:
         s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
     s.setblocking(5)
+    s.settimeout(timeout)
     if ssl_args is not None:
         import ssl
         s = ssl.wrap_socket(s, **ssl_args)
@@ -93,3 +96,28 @@ def connect(host='localhost', port=3699, ssl_args=None, unix_config=None):
         return s
     except:
         return None
+
+
+def command(peer, message):
+    """
+    This method is special for blockchain communication. It is a pipeline of
+    connect, send and receive.
+    :param peer: A tuple containing address and port
+    :param message: message to be sent
+    :return: received response or error
+    """
+    sock = connect(peer[0], peer[1], timeout=1)
+    if sock is not None:
+        message_id = uuid.uuid4()
+        result = send(Message(headers={'id': message_id}, body=json.dumps(message)), sock)
+        if result:
+            response, leftover = receive(sock)
+            if response.getFlag():
+                response_msg = Message.from_yaml(response.getData())
+                return response_msg.get_body()
+        else:
+            return 'Could not receive proper result'
+    else:
+        return 'Could not connect'
+
+    return None

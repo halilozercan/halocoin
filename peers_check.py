@@ -1,150 +1,139 @@
 """We regularly check on peers to see if they have mined new blocks.
 This file explains how we initiate interactions with our peers.
 """
-import blockchain
-import custom
-import random
 import time
 
-import network
+import ntwrk
 import tools
+from service import Service, threaded, sync
 
 
-def cmd(peer, x):
-    return network.send_receive(message=x, host=peer[0], port=peer[1])
+class PeersCheckService(Service):
+    def __init__(self, engine, new_peers):
+        # This logic might change. Here we add new peers while initializing the service
+        Service.__init__(self, 'peers_check')
+        self.engine = engine
+        self.new_peers = new_peers
+        self.db = None
+        self.blockchain = None
+        self.old_peers = []
 
+    def on_register(self):
+        self.db = self.engine.db
+        self.blockchain = self.engine.blockchain
+        self.old_peers = self.db.get('peers_ranked')
+        for peer in self.new_peers:
+            self.old_peers = tools.add_peer(peer, self.old_peers)
+        self.db.put('peers_ranked', self.old_peers)
 
-def download_blocks(peer, DB, peers_block_count, length):
-    b = [max(0, length - 10), min(peers_block_count['length'] + 1, length + custom.download_many)]
-    blocks = cmd(peer, {'type': 'rangeRequest', 'range': b})
-    if type(blocks) != list: return -1
-    if not isinstance(blocks, list): return []
-    length = tools.db_get('length')
-    block = tools.db_get(length)
-    for i in range(10):  # this part should be re-written so badly
-        if tools.fork_check(blocks, DB, length, block):
-            blockchain.delete_block(DB)
-            length -= 1
-    for block in blocks:
-        DB['suggested_blocks'].put([block, peer])
-    return 0
+    @threaded
+    def listen(self):
+        if len(self.old_peers) > 0:
+            # Sort old peers by their rank. r[2] contains rank number.
+            pr = sorted(self.old_peers, key=lambda r: r[2])
+            # Reverse because high rank number means lower quality
+            pr.reverse()
 
+            if self.blockchain.blocks_queue.empty() and self.db.get('length') > 3:
+                time.sleep(1)
 
-def ask_for_txs(peer, DB):
-    txs = cmd(peer, {'type': 'txs'})
-    if not isinstance(txs, list):
-        return -1
-    for tx in txs:
-        DB['suggested_txs'].put(tx)
-    T = tools.db_get('txs')
-    pushers = filter(lambda t: t not in txs, T)
-    for push in pushers:
-        cmd(peer, {'type': 'pushtx', 'tx': push})
-    return 0
+            while not self.blockchain.blocks_queue.empty():
+                time.sleep(0.1)
 
+            i = tools.exponential_random(3.0 / 4) % len(pr)
+            t1 = time.time()
+            r = self.peer_check(i, pr)
+            t2 = time.time()
+            p = pr[i][0]
+            pr = self.db.get('peers_ranked')
+            for peer in pr:
+                if peer[0] == p:
+                    pr[i][1] *= 0.8
+                    if r == 0:
+                        pr[i][1] += 0.2 * (t2 - t1)
+                    else:
+                        pr[i][1] += 0.2 * 30
+            self.db.put('peers_ranked', pr)
 
-def give_block(peer, DB, block_count_peer):
-    blocks = []
-    b = [max(block_count_peer - 5, 0), min(tools.db_get('length'), block_count_peer + custom.download_many)]
-    for i in range(b[0], b[1] + 1):
-        blocks.append(tools.db_get(i))
-    cmd(peer, {'type': 'pushblock',
-               'blocks': blocks})
-    return 0
+    @sync
+    def peer_check(self, i, peers):
+        peer = peers[i][0]
+        block_count = ntwrk.command(peer, {'action': 'blockCount'})
 
+        if not isinstance(block_count, dict):
+            return
+        if 'error' in block_count.keys():
+            return
 
-def peer_check(i, peers, DB):
-    peer = peers[i][0]
-    block_count = cmd(peer, {'type': 'blockCount'})
-    # tools.log('block count: ' +str(block_count))
-    if not isinstance(block_count, dict):
-        return
-    if 'error' in block_count.keys():
-        return
-    peers[i][2] = block_count['diffLength']
-    peers[i][3] = block_count['length']
-    tools.db_put('peers_ranked', peers)
-    length = tools.db_get('length')
-    diff_length = tools.db_get('diffLength')
-    size = max(len(diff_length), len(block_count['diffLength']))
-    us = tools.buffer_(diff_length, size)
-    them = tools.buffer_(block_count['diffLength'], size)
-    if them < us:
-        give_block(peer, DB, block_count['length'])
-    elif us == them:
-        try:
-            ask_for_txs(peer, DB)
-        except Exception as exc:
-            tools.log('ask for tx error')
-            tools.log(exc)
-    else:
-        download_blocks(peer, DB, block_count, length)
-    F = False
-    my_peers = tools.db_get('peers_ranked')
-    their_peers = cmd(peer, {'type': 'peers'})
-    if type(their_peers) == list:
-        for p in their_peers:
-            if p not in my_peers:
-                F = True
-                my_peers.append(p)
-        for p in my_peers:
-            if p not in their_peers:
-                cmd(peer, {'type': 'recieve_peer', 'peer': p})
-    if F:
-        tools.db_put('peers_ranked', my_peers)
+        peers[i][2] = block_count['diffLength']
+        peers[i][3] = block_count['length']
+        self.db.put('peers_ranked', peers)
+        length = self.db.get('length')
+        diff_length = self.db.get('diffLength')
+        size = max(len(diff_length), len(block_count['diffLength']))
+        us = tools.buffer_(diff_length, size)
+        them = tools.buffer_(block_count['diffLength'], size)
+        # This is the most important peer operation part
+        # We are deciding what to do with this peer. We can either
+        # send them blocks, share txs or download blocks.
+        if them < us:
+            self.give_block(peer, block_count['length'])
+        elif us == them:
+            try:
+                self.ask_for_txs(peer)
+            except Exception as exc:
+                tools.log('ask for tx error')
+                tools.log(exc)
+        else:
+            self.download_blocks(peer, block_count, length)
+        flag = False
+        my_peers = self.db.get('peers_ranked')
+        their_peers = ntwrk.command(peer, {'action': 'peers'})
+        if type(their_peers) == list:
+            for p in their_peers:
+                if p not in my_peers:
+                    flag = True
+                    my_peers.append(p)
+            for p in my_peers:
+                if p not in their_peers:
+                    ntwrk.command(peer, {'action': 'receive_peer', 'peer': p})
+        if flag:
+            self.db.put('peers_ranked', my_peers)
 
+    def download_blocks(self, peer, peers_block_count, length):
+        b = [max(0, length - 10), min(peers_block_count['length'] + 1,
+                                      length + self.engine.config['peer.block_request_limit'])]
+        blocks = ntwrk.command(peer, {'action': 'rangeRequest', 'range': b})
+        if not isinstance(blocks, list):
+            return []
+        length = self.db.get('length')
+        block = self.db.get(length)
+        for i in range(10):  # this part should be re-written so badly
+            if tools.fork_check(blocks, length, block):
+                self.blockchain.delete_block()
+                length -= 1
+        for block in blocks:
+            self.blockchain.blocks_queue.put([block, peer])
+        return 0
 
-def exponential_random(r, i=0):
-    if random.random() < r: return i
-    return exponential_random(r, i + 1)
+    def ask_for_txs(self, peer):
+        txs = ntwrk.command(peer, {'action': 'txs'})
+        if not isinstance(txs, list):
+            return -1
+        for tx in txs:
+            self.blockchain.tx_queue.put(tx)
+        T = self.db.get('txs')
+        pushers = filter(lambda t: t not in txs, T)
+        for push in pushers:
+            ntwrk.command(peer, {'action': 'pushtx', 'tx': push})
+        return 0
 
-
-def main(peers, DB):
-    # Check on the peers to see if they know about more blocks than we do.
-    # DB['peers_ranked']=[]
-    p = tools.db_get('peers_ranked')
-    if type(p) != list:
-        time.sleep(3)
-        return main(peers, DB)
-    for peer in peers:
-        tools.add_peer(peer, p)
-    tools.db_put('peers_ranked', p)
-    try:
-        while True:
-            if tools.db_get('stop'): return
-            if len(peers) > 0:
-                main_once(DB)
-    except Exception as exc:
-        tools.log(exc)
-
-
-def main_once(DB):
-    DB['heart_queue'].put('peers check')
-    pr = tools.db_get('peers_ranked')
-    pr = sorted(pr, key=lambda r: r[2])
-    pr.reverse()
-    time.sleep(0.05)
-    if DB['suggested_blocks'].empty() and tools.db_get('length') > 3:
-        time.sleep(10)
-    i = 0
-    while not DB['suggested_blocks'].empty():
-        i += 1
-        time.sleep(0.1)
-        if i % 100 == 0:
-            DB['heart_queue'].put('peers check')
-    DB['heart_queue'].put('peers check')
-    i = exponential_random(3.0 / 4) % len(pr)
-    t1 = time.time()
-    r = peer_check(i, pr, DB)
-    t2 = time.time()
-    p = pr[i][0]
-    pr = tools.db_get('peers_ranked')
-    for peer in pr:
-        if peer[0] == p:
-            pr[i][1] *= 0.8
-            if r == 0:
-                pr[i][1] += 0.2 * (t2 - t1)
-            else:
-                pr[i][1] += 0.2 * 30
-    tools.db_put('peers_ranked', pr)  # BAD pr got edited in peer_check()
-    DB['heart_queue'].put('peers check')
+    def give_block(self, peer, block_count_peer):
+        blocks = []
+        b = [max(block_count_peer - 5, 0), min(self.db.get('length'),
+                                               block_count_peer + self.config['peer.block_request_limit'])]
+        for i in range(b[0], b[1] + 1):
+            blocks.append(self.db.get(i))
+        ntwrk.command(peer, {'action': 'pushblock',
+                             'blocks': blocks})
+        return 0

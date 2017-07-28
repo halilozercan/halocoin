@@ -1,3 +1,4 @@
+import json
 import socket
 import time
 
@@ -17,15 +18,18 @@ class ServiceA(Service):
 
     @sync
     def get(self):
+        print 'calling example'
+        self.example(1)
+        print 'example returned'
         return self.a
 
     @threaded
     def listen(self):
         print "running 2"
         time.sleep(1)
-        #if self.get() > 12:
-            #print 'not closing'
-            #self.close_threaded()
+        # if self.get() > 12:
+        # print 'not closing'
+        # self.close_threaded()
 
 
 class ServiceB(Service):
@@ -45,7 +49,7 @@ class ServiceB(Service):
             print 'socket thread running'
             client_sock, address = self.s.accept()
             response, leftover = ntwrk.receive(client_sock)
-            if response.is_successful():
+            if response.getFlag():
                 message = Message.from_yaml(response.getData())
                 self.serviceA.example(int(message.get_body()))
         except socket.timeout:
@@ -61,23 +65,37 @@ class ServiceB(Service):
         return self.a
 
 
+"""
 serviceA = ServiceA()
 serviceB = ServiceB(serviceA)
 
 serviceA.register()
 serviceB.register()
 
-time.sleep(3)
 serviceA.example(9)
 serviceA.example(5)
 print serviceA.get()
-time.sleep(3)
+#time.sleep(3)
 
-serviceA.example(15)
-print serviceA.get()
+#serviceA.example(15)
+#print serviceA.get()
 
 serviceA.unregister()
 serviceB.unregister()
 #print 'Sending data to ServiceB through socket'
 #s = ntwrk.connect('localhost', 2000)
 #ntwrk.send(Message(headers=None, body='5'), s)
+
+"""
+
+
+def api(action, **kwargs):
+    response = ntwrk.command(('localhost', 7899), {'action': action})
+    print response
+
+
+def peer(action, **kwargs):
+    response = ntwrk.command(('localhost', 7900), {'action': action})
+    print response
+
+api('stop')

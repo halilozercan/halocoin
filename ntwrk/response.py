@@ -5,7 +5,10 @@ class Response:
 
         self.__dict = dict(success=success, data=data)
 
-    def is_successful(self):
+    def setFlag(self, flag):
+        self.__dict['success'] = flag
+
+    def getFlag(self):
         return self.__dict['success']
 
     def getData(self):

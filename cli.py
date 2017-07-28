@@ -1,9 +1,16 @@
 #!/usr/bin/env python
 import argparse
+import json
+import os
+import random
+import string
+
+import sys
 
 import custom
-import network
-import threads
+import engine
+
+import ntwrk
 import tools
 
 
@@ -16,44 +23,23 @@ def get_address(tx):
     return tx
 
 
-def main(c):
-    if c[0] == 'start':
-        r = run_command({'command': 'blockcount'})
-        if r is None:
-            p = raw_input('Brain wallet?\n')
-            tools.daemonize(lambda: threads.main(p))
-        else:
-            print("blockchain is already running")
-    elif c[0] == 'new_address':
-        if len(c) < 2:
-            print("what is your brain wallet? not enough inputs.")
-        else:
-            privkey = tools.det_hash(c[1])
-            pubkey = tools.privtopub(privkey)
-            address = tools.make_address([pubkey], 1)
-            return ({'brain': str(c[1]),
-                     'privkey': str(privkey),
-                     'pubkey': str(pubkey),
-                     'address': str(address)})
-    else:
-        return run_command({'command': c})
-
-
 def run_command(p):
-    tools.log("Running API command: " + str(p['command']))
-    response = network.send_receive(message=p, host='localhost', port=custom.api_port)
-    if response is None:
-        print("Node is probably off. Use --start argument to start.")
+    response = ntwrk.command(('localhost', custom.api_port), p)
     return response
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='CLI for mc-chain application.')
+    actions = ['start', 'stop', 'send', 'balance', 'mybalance', 'difficulty', 'info', 'myaddress',
+               'peers', 'blockcount', 'txs', 'new_wallet']
+    parser = argparse.ArgumentParser(description='CLI for halocoin application.')
+    parser.add_argument('action', help='Main action to take', choices=actions)
+    parser.add_argument('--address', action="store", type=str, dest='address',
+                        help='Give a valid blockchain address')
+    parser.add_argument('--wallet', action="store", type=str, dest='wallet',
+                        help='Wallet file address')
+    """
     parser.add_argument('--start', help='Start a full node', action="store_true")
     parser.add_argument('--stop', help='Stop all the threads and shut down the node', action="store_true")
-    parser.add_argument('--spend', action="store", type=str, metavar="<addr>",
-                        help='Spends money, in satoshis, to an address <addr>. Example: spend 1000 '
-                             '11j9csj9802hc982c2h09ds')
     parser.add_argument('--blockcount', help='returns the number of blocks since the genesis block',
                         action="store_true")
     parser.add_argument('--txs', action="store_true",
@@ -70,16 +56,53 @@ if __name__ == '__main__':
                              '<addr>, if you want to know about yourself: info my_address')
     parser.add_argument('--myaddress', action="store_true", help='Tells you your own address')
     parser.add_argument('--peers', action="store_true", help='Your list of peers')
+    """
 
-    args = vars(parser.parse_args())
-    given_args = {}
-    for arg in args.keys():
-        if args[arg] is not None and args[arg] is not False:
-            given_args[arg] = args[arg]
-    if len(given_args) == 0:
-        parser.print_help()
-    elif len(given_args) > 1:
-        print("Too many arguments given. Only one argument should be specified per run")
+    args = parser.parse_args()
+
+    if args.action in ['balance', 'send'] and args.address is None:
+        print('You should specify an address when running {}'.format(args.action))
+        exit(1)
+    elif args.action in ['start', 'new_wallet'] and args.wallet is None:
+        print('You should specify a wallet to run {}'.format(args.action))
+        exit(1)
+
+    if args.action == 'start':
+        r = run_command({'action': 'blockcount'})
+        if r == 'Could not connect':
+            wallet_file = open(args.wallet, 'r')
+            wallet_encrypted_content = wallet_file.read()
+            from getpass import getpass
+
+            wallet_pw = getpass('Wallet password: ')
+            wallet = json.loads(tools.decrypt(wallet_pw, wallet_encrypted_content))
+
+            # TODO: Real configuration
+            tools.daemonize(lambda: engine.main(wallet, None))
+        else:
+            print('Halocoin is already running')
+    elif args.action == 'new_wallet':
+        from getpass import getpass
+
+        wallet_pw = 'w'
+        wallet_pw_2 = 'w2'
+        while wallet_pw != wallet_pw_2:
+            wallet_pw = getpass('New wallet password: ')
+            wallet_pw_2 = getpass('New wallet password(again): ')
+
+        init = ''.join(random.choice(string.lowercase) for i in range(64))
+        privkey = tools.det_hash(init)
+        pubkey = tools.privtopub(privkey)
+        address = tools.make_address([pubkey], 1)
+        wallet = {
+            'privkey': str(privkey),
+            'pubkey': str(pubkey),
+            'address': str(address)
+        }
+        wallet_content = json.dumps(wallet)
+        wallet_encrypted_content = tools.encrypt(wallet_pw, wallet_content)
+        with open(args.wallet, 'w') as f:
+            f.write(wallet_encrypted_content)
+        print('New wallet is created: {}'.format(args.wallet))
     else:
-        command = [given_args.keys()[0], given_args[given_args.keys()[0]]]
-        print(main(command))
+        print(run_command({'action': args.action}))

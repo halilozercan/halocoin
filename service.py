@@ -1,11 +1,10 @@
-import threading
 import Queue
+import sys
+import threading
 import warnings
 
-import dill
-import sys
-
-from ntwrk.message import Order, Response
+import tools
+from ntwrk.message import Order
 
 
 class Service:
@@ -15,7 +14,7 @@ class Service:
     TERMINATED = 3
 
     def __init__(self, name):
-        self.thread = threading.Thread()
+        self.event_thread = threading.Thread()
         self.into_service_queue = Queue.Queue()
         self.signals = {}
         self.service_responses = {}
@@ -40,10 +39,12 @@ class Service:
                             try:
                                 result = getattr(service, order.action)\
                                     ._original(service, *order.args, **order.kwargs)
-                                self.service_responses[order.id] = result
-                                self.signals[order.id].set()
                             except:
+                                tools.log(sys.exc_info())
+                                result = None
                                 service.set_state(Service.TERMINATED)
+                            self.service_responses[order.id] = result
+                            self.signals[order.id].set()
                 except Queue.Empty:
                     pass
                 except TypeError:
@@ -51,8 +52,10 @@ class Service:
                     self.service_responses[order.id] = True
                     self.signals[order.id].set()
 
-        self.thread = threading.Thread(target=service_target, args=(self,), name=self.name)
-        self.thread.start()
+        self.on_register()
+
+        self.event_thread = threading.Thread(target=service_target, args=(self,), name=self.name)
+        self.event_thread.start()
 
         for clsMember in self.__class__.__dict__.values():
             if hasattr(clsMember, "decorator"):
@@ -70,14 +73,34 @@ class Service:
                     self.__threads[clsMember._original.__name__] = [True, new_thread]
                     new_thread.start()
 
+    def on_register(self):
+        # Implemented by subclass
+        pass
+
+    def on_close(self):
+        # Implemented by subclass
+        pass
+
     def unregister(self):
         self.execute(None, True, args=(), kwargs={})
-        self.thread.join()
+        for key, thread in self.__threads.iteritems():
+            thread[1].join()
+
+        # If unregister is called from the service instance, there is no need to join.
+        # Thread wants to destory itself
+        if threading.current_thread().name != self.event_thread.name:
+            self.event_thread.join()
+        self.on_close()
 
     def execute(self, action, expect_result, args, kwargs):
         if self.get_state() != Service.RUNNING:
             result = getattr(self, action)._original(self, *args, **kwargs)
-            warnings.warn('You are running a background method on an unregistered service. ')
+            warnings.warn('You are running a background method on an unregistered service. {} {}'.format(action, self.__class__.__name__))
+            return result
+
+        # We are already in event thread and someone called a synced function. Just run it.
+        if threading.current_thread().name == self.event_thread.name:
+            result = getattr(self, action)._original(self, *args, **kwargs)
             return result
 
         result = None

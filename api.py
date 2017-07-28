@@ -1,22 +1,61 @@
 """This is the internal API. These are the words that are used to interact with a local node that you have the password to.
 """
 import copy
+import json
+import socket
+import sys
 
-import blockchain
-import services
-import target
+import ntwrk
 import tools
-from service import Service, sync
+from ntwrk import Message
+from service import Service, sync, threaded
 
 
 class ApiService(Service):
-    def __init__(self, config):
-        Service.__init__(self, target=self.target, name='api')
-        self.config = config
-        self.db = services.get('database')
+    def __init__(self, engine):
+        Service.__init__(self, name='api')
+        self.engine = engine
+        self.db = None
+        self.blockchain = None
 
-    def target(self):
-        pass
+    def on_register(self):
+        self.db = self.engine.db
+        self.blockchain = self.engine.blockchain
+
+        self.s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.s.settimeout(1)
+        self.s.bind(('localhost', self.engine.config['api.port']))
+        self.s.listen(5)
+
+    def on_close(self):
+        try:
+            self.s.close()
+        except:
+            print sys.exc_info()
+
+    @threaded
+    def listen(self):
+        try:
+            client_sock, address = self.s.accept()
+            response, leftover = ntwrk.receive(client_sock)
+            if response.getFlag():
+                message = Message.from_yaml(response.getData())
+                request = json.loads(message.get_body())
+                try:
+                    if hasattr(self, request['action']):
+                        kwargs = copy.deepcopy(request)
+                        del kwargs['action']
+                        result = getattr(self, request['action'])(**kwargs)
+                    else:
+                        result = 'Received action is not valid'
+                except:
+                    result = 'Something went wrong while evaluating.\n' + str(sys.exc_info())
+                response = Message(headers={'ack': message.get_header('id')},
+                                   body=result)
+                ntwrk.send(response, client_sock)
+                client_sock.close()
+        except:
+            pass
 
     @sync
     def easy_add_transaction(self, tx_orig, privkey='default'):
@@ -31,14 +70,14 @@ class ApiService(Service):
         address = tools.make_address([pubkey], 1)
         if 'count' not in tx:
             try:
-                tx['count'] = tools.count(address, {})
+                tx['count'] = tools.count(self.db.get(address), address, self.db.get('txs'))
             except:
                 tx['count'] = 1
         if 'pubkeys' not in tx:
             tx['pubkeys'] = [pubkey]
         if 'signatures' not in tx:
             tx['signatures'] = [tools.sign(tools.det_hash(tx), privkey)]
-        return blockchain.add_tx(tx)
+        return self.blockchain.tx_queue.put(tx)
 
     @sync
     def peers(self):
@@ -82,25 +121,27 @@ class ApiService(Service):
 
     @sync
     def difficulty(self):
-        return target.target()
+        return self.blockchain.target(self.db.get('length'))
 
     @sync
-    def mybalance(self, address='default'):
+    def balance(self, address='default'):
         if address == 'default':
             address = self.db.get('address')
-        return self.db.get(address)['amount'] - tools.cost_0(self.db.get('txs'), address)
-
-    @sync
-    def balance(self, address=None):
-        if address is None:
-            return 'what address do you want the balance for?'
+        account = self.db.get(address)
+        if account is None:
+            return 0
         else:
-            return self.mybalance()
+            return account['amount'] - tools.total_spendings_of_address(self.db.get('txs'), address)
 
     @sync
-    def stop_(self):
+    def mybalance(self):
+        return self.balance()
+
+    @sync
+    def stop(self):
         self.db.put('stop', True)
-        return 'turning off all services'
+        self.engine.stop()
+        return 'Shutting down'
 
     @sync
     def mine(self):

@@ -131,7 +131,7 @@ class SMProtocol:
             if self.connected_at == 0:
                 self.connected_at = time.time()
 
-            if response.is_successful():
+            if response.getFlag():
                 string = response.getData()
                 try:
                     received_message = Message.from_yaml(string)

@@ -3,100 +3,15 @@
 import Queue
 import copy
 import time
+
+from decimal import Decimal
+
 import custom
-import database
-import services
-import target
+import pt
 import tools
-import transactions
-import network
+from ntwrk import Response
 
 from service import Service, threaded, sync
-
-
-def add_tx(tx, DB=None):
-    def verify_count(tx):
-        return tx['count'] != tools.count(address, DB)
-
-    def type_check(tx):
-        if not tools.E_check(tx, 'type', [str, unicode]):
-            out[0] += 'blockchain type'
-            return False
-        if tx['type'] == 'mint':
-            return False
-        if tx['type'] not in transactions.tx_check:
-            out[0] += 'bad type'
-            return False
-        return True
-
-    def too_big_block(tx, txs):
-        return len(tools.package(txs + [tx])) > network.MAX_MESSAGE_SIZE - 5000
-
-    def verify_tx(tx, txs, out):
-        if not type_check(tx):
-            out[0] += 'type error'
-            return False
-        if tx in txs:
-            out[0] += 'no duplicates'
-            return False
-        if verify_count(tx):
-            out[0] += 'count error'
-            return False
-        if too_big_block(tx, txs):
-            out[0] += 'too many txs'
-            return False
-        if not transactions.tx_check[tx['type']](tx, txs, out, DB):
-            out[0] += 'tx: ' + str(tx)
-            return False
-        return True
-
-    if DB is None:
-        DB = {}
-
-    # Attempt to add a new transaction into the pool.
-    # print('top of add_tx')
-    out = ['']
-    if not isinstance(tx, dict):
-        return False
-    address = tools.make_address(tx['pubkeys'], len(tx['signatures']))
-
-    # tools.log('attempt to add tx: ' +str(tx))
-    T = tools.db_get('txs')
-    if verify_tx(tx, T, out):
-        T.append(tx)
-        tools.db_put('txs', T)
-        return 'added tx: ' + str(tx)
-    else:
-        return 'failed to add tx because: ' + out[0]
-
-
-def recent_blockthings(storage, size, length):
-    def get_val(length):
-        leng = str(length)
-        if not leng in storage:
-            block = tools.db_get(leng)
-            if block == database.default_entry():
-                if leng == tools.db_get('length'):
-                    tools.db_put('length', int(leng) - 1)
-                    block = tools.db_get(leng)
-                else:
-                    error()
-            # try:
-            storage[leng] = tools.db_get(leng)[key[:-1]]
-            tools.db_put(key, storage)
-        return storage[leng]
-
-    def clean_up(storage, end):
-        if end < 0: return
-        if not str(end) in storage:
-            return
-        else:
-            storage.pop(str(end))
-            return clean_up(storage, end - 1)
-
-    start = max((length - size), 0)
-    clean_up(storage, length - max(custom.mmm, custom.history_length) - 100)
-    return map(get_val, range(start, length))
 
 
 def hex_sum(a, b):
@@ -109,75 +24,50 @@ def hex_invert(n):
     return tools.buffer_(str(hex(int('f' * 128, 16) / int(n, 16)))[2: -1], 64)
 
 
-def delete_block(DB):
-    """ Removes the most recent block from the blockchain. """
-    length = tools.db_get('length')
-    if length < 0:
-        return
-    try:
-        ts = tools.db_get('targets')
-        ts.pop(str(length))
-        tools.db_put('targets', ts)
-    except:
-        pass
-    try:
-        ts = tools.db_get('times')
-        ts.pop(str(length))
-        tools.db_put('times', ts)
-    except:
-        pass
-    block = tools.db_get(length)
-    orphans = tools.db_get('txs')
-    tools.db_put('txs', [])
-    for tx in block['txs']:
-        orphans.append(tx)
-        tools.db_put('add_block', False)
-        transactions.update[tx['type']](tx, DB, False)
-    tools.db_delete(length)
-    length -= 1
-    tools.db_put('length', length)
-    if length == -1:
-        tools.db_put('diffLength', '0')
-    else:
-        block = tools.db_get(length)
-        tools.db_put('diffLength', block['diffLength'])
-    for orphan in sorted(orphans, key=lambda x: x['count']):
-        add_tx(orphan, DB)
-        # while tools.db_get('length')!=length:
-        #    time.sleep(0.0001)
-
-
-def profile(DB):
-    import cProfile
-    import pprint
-    p = cProfile.Profile()
-    p.run('blockchain.main(custom.DB)')
-    g = p.getstats()
-    # g=g.sorted(lambda x: x.inlinetime)
-    g = sorted(g, key=lambda x: x.totaltime)
-    g.reverse()
-    pprint.pprint(g)
-    # return f(DB['suggested_blocks'], DB['suggested_txs'])
-
-
 class BlockchainService(Service):
-    def __init__(self, config):
+    tx_types = ['spend', 'mint']
+
+    def __init__(self, engine):
         Service.__init__(self, name='blockchain')
-        self.config = config
+        self.engine = engine
         self.blocks_queue = Queue.Queue()
         self.tx_queue = Queue.Queue()
-        self.db = services.get('database')
+        self.db = None
+
+    def on_register(self):
+        self.db = self.engine.db
 
     @threaded
     def process(self):
-        if self.db.get('stop'):
-            self.close_threaded()
         if not self.blocks_queue.empty():
             candidate_block = self.blocks_queue.get()
             self.add_block(candidate_block)
         elif not self.tx_queue.empty():
             candidate_tx = self.tx_queue.get()
             self.add_tx(candidate_tx)
+        # Wait between each check. This way we wouldn't force CPU
+        time.sleep(1)
+
+    @sync
+    def add_tx(self, tx):
+
+        # Attempt to add a new transaction into the pool.
+        # print('top of add_tx')
+        out = ['']
+        if not isinstance(tx, dict):
+            return False
+
+        address = tools.tx_owner_address(tx)
+
+        # tools.log('attempt to add tx: ' +str(tx))
+        txs_in_pool = self.db.get('txs')
+        response = BlockchainService.tx_verify_for_pool(tx, txs_in_pool, self.db.get(address))
+        if response.getFlag():
+            txs_in_pool.append(tx)
+            self.db.put('txs', txs_in_pool)
+            return 'added tx in the pool: ' + str(tx)
+        else:
+            return 'failed to add tx because: ' + response.getData()
 
     @sync
     def add_block(self, block):
@@ -186,22 +76,17 @@ class BlockchainService(Service):
          hashpower. """
 
         def block_check(block):
-            def log_(txt):
-                pass  # return tools.log(txt)
 
-            def tx_check(txs):
-                start = copy.deepcopy(txs)
-                out = []
-                start_copy = []
-                while start != start_copy:
-                    if start == []:
-                        return False  # Block passes this test
-                    start_copy = copy.deepcopy(start)
-                    if transactions.tx_check[start[-1]['type']](start[-1], out, [''], DB):
-                        out.append(start.pop())
+            def tx_check(txs_in_block):
+                for tx in reversed(txs_in_block):
+                    address_of_tx = tools.tx_owner_address(tx)
+                    account_of_tx = self.db.get(address_of_tx)
+                    if BlockchainService.tx_integrity_check(tx, txs_in_block) \
+                            and tools.fee_check(tx, txs_in_block, account_of_tx):
+                        continue
                     else:
-                        return True  # Block is invalid
-                return True  # Block is invalid
+                        return False  # Block is invalid
+                return True  # Block is valid
 
             if not isinstance(block, dict):
                 return False
@@ -233,24 +118,26 @@ class BlockchainService(Service):
             if tools.det_hash(nonce_and_hash) > block['target']:
                 return False
 
-            if block['target'] != target.target(block['length']):
-                log_('block: ' + str(block))
-                log_('target: ' + str(target.target(block['length'])))
-                log_('wrong target')
+            if block['target'] != self.target(block['length']):
+                tools.log('block: ' + str(block))
+                tools.log('target: ' + str(self.target(block['length'])))
+                tools.log('wrong target')
                 return False
 
-            earliest = tools.median(recent_blockthings(self.db.get('times'), custom.mmm, self.db.get('length')))
+            earliest = tools.median(self.recent_blockthings(self.db.get('times'),
+                                                            custom.mmm,
+                                                            self.db.get('length')))
             if 'time' not in block:
-                log_('no time')
+                tools.log('no time')
                 return False
             if block['time'] > time.time() + 60 * 6:
-                log_('too late')
+                tools.log('Received block is coming from future. Call the feds')
                 return False
             if block['time'] < earliest:
-                log_('too early')
+                tools.log('Received block is generated earlier than median.')
                 return False
             if tx_check(block['txs']):
-                log_('tx check')
+                tools.log('Received block failed transactions check.')
                 return False
             return True
 
@@ -263,9 +150,274 @@ class BlockchainService(Service):
             orphans = self.db.get('txs')
             self.db.put('txs', [])
             for tx in block['txs']:
-                transactions.update[tx['type']](tx, True)
+                self.update_addresses_with_tx(tx, True)
             for tx in orphans:
                 self.add_tx(tx)
 
+    @sync
+    def delete_block(self):
+        """ Removes the most recent block from the blockchain. """
+        length = self.db.get('length')
+        if length < 0:
+            return
+        try:
+            targets = self.db.get('targets')
+            targets.pop(str(length))
+            self.db.put('targets', targets)
+        except:
+            pass
+        try:
+            times = self.db.get('times')
+            times.pop(str(length))
+            self.db.put('times', times)
+        except:
+            pass
 
+        block = self.db.get(length)
+        orphans = self.db.get('txs')
+        self.db.put('txs', [])
+
+        for tx in block['txs']:
+            orphans.append(tx)
+            self.db.put('add_block', False)
+            self.update_addresses_with_tx(tx, False)
+
+        self.db.delete(length)
+        length -= 1
+
+        self.db.put('length', length)
+        if length == -1:
+            self.db.put('diffLength', '0')
+        else:
+            block = self.db.get(length)
+            self.db.put('diffLength', block['diffLength'])
+
+        for orphan in sorted(orphans, key=lambda x: x['count']):
+            self.add_tx(orphan)
+
+    @sync
+    def recent_blockthings(self, key, size, length):
+
+        storage = self.db.get(key)
+        start = max((length - size), 0)
+        end = length - max(custom.mmm, custom.history_length) - 100
+
+        # Remove keys from storage in the range 0-end
+        while end >= 0:
+            if not str(end) in storage:
+                break
+            else:
+                storage.pop(str(end))
+                end -= 1
+
+        result = []
+        for i in range(start, length):
+            index = str(i)
+            if not index in storage:
+                block_exists = self.db.exists(index)
+                if not block_exists:
+                    if index == self.db.get('length'):
+                        self.db.put('length', i - 1)
+                        block = self.db.get(index)
+                # try:
+                storage[index] = self.db.get(index)[key[:-1]]
+                self.db.put(key, storage)
+            result.append(storage[index])
+
+        return result
+
+    @sync
+    def update_addresses_with_tx(self, tx, add_block_flag):
+        if tx['type'] == 'mint':
+            self.mint(tx, add_block_flag)
+        elif tx['type'] == 'spend':
+            self.spend(tx, add_block_flag)
+
+    @sync
+    def mint(self, tx, add_block_flag):
+        address = tools.tx_owner_address(tx)
+        account = self.db.get(address)
+        if add_block_flag:
+            account['amount'] += custom.block_reward
+            account['count'] += 1
+        else:
+            account['amount'] -= custom.block_reward
+            account['count'] -= 1
+        self.db.put(address, account)
+
+    @sync
+    def spend(self, tx, add_block_flag):
+        address = tools.tx_owner_address(tx)
+        account = self.db.get(address)
+        if add_block_flag:
+            account['amount'] += -tx['amount']
+            tx['to']['amount'] += tx['amount']
+            account['amount'] += -custom.fee
+            account['count'] += 1
+        else:
+            account['amount'] -= -tx['amount']
+            tx['to']['amount'] -= tx['amount']
+            account['amount'] -= -custom.fee
+            account['count'] -= 1
+        self.db.put(address, account)
+
+    @staticmethod
+    def sigs_match(_sigs, _pubs, msg):
+        pubs = copy.deepcopy(_pubs)
+        sigs = copy.deepcopy(_sigs)
+
+        def match(sig, pubs, msg):
+            for p in pubs:
+                if pt.ecdsa_verify(msg, sig, p):
+                    return {'bool': True, 'pub': p}
+            return {'bool': False}
+
+        for sig in sigs:
+            a = match(sig, pubs, msg)
+            if not a['bool']:
+                return False
+            sigs.remove(sig)
+            pubs.remove(a['pub'])
+        return True
+
+    @staticmethod
+    def tx_signature_check(tx):
+        tx_copy = copy.deepcopy(tx)
+        if 'signatures' not in tx or not isinstance(tx['signatures'], (list,)):
+            tools.log('no signatures')
+            return False
+        if 'pubkeys' not in tx or not isinstance(tx['pubkeys'], (list,)):
+            tools.log('no pubkeys')
+            return False
+
+        tx_copy.pop('signatures')
+        if len(tx['pubkeys']) == 0:
+            tools.log('pubkey error')
+            return False
+        if len(tx['signatures']) > len(tx['pubkeys']):
+            tools.log('there are more signatures then required')
+            return False
+
+        msg = tools.det_hash(tx_copy)
+        if not BlockchainService.sigs_match(copy.deepcopy(tx['signatures']),
+                                            copy.deepcopy(tx['pubkeys']), msg):
+            tools.log('sigs do not match')
+            return False
+        return True
+
+    @staticmethod
+    def tx_integrity_check(tx, txs_in_pool):
+        response = Response(True, None)
+        if tx['type'] == 'mint':
+            response.setFlag(0 == len(filter(lambda t: t['type'] == 'mint', txs_in_pool)))
+        elif tx['type'] == 'spend':
+            if 'to' not in tx or not isinstance(tx['to'], (str, unicode)):
+                response.setData('no to')
+                response.setFlag(False)
+            if not BlockchainService.tx_signature_check(tx):
+                response.setData('signature check')
+                response.setFlag(False)
+            if len(tx['to']) <= 30:
+                response.setData('that address is too short ' + 'tx: ' + str(tx))
+                response.setFlag(False)
+            if 'amount' not in tx or not isinstance(tx['amount'], (str, unicode)):
+                response.setData('no amount')
+                response.setFlag(False)
+            # TODO: This is new. Check this voting transactions
+            if 'vote_id' in tx:
+                if not tx['to'][:-29] == '11':
+                    response.setData('cannot hold votecoins in a multisig address')
+                    response.setFlag(False)
+            return response
+
+    @staticmethod
+    def tx_type_check(tx):
+        if 'type' not in tx:
+            return False
+        if not isinstance(tx['type'], (str, unicode)):
+            return False
+        if tx['type'] not in BlockchainService.tx_types:
+            return False
+        return True
+
+    @staticmethod
+    def tx_verify_for_pool(tx, txs_in_pool, account):
+        response = Response(True, None)
+        if not BlockchainService.tx_type_check(tx):
+            response.setData('type error')
+            response.setFlag(False)
+        if tx in txs_in_pool:
+            response.setData('no duplicates')
+            response.setFlag(False)
+        if not BlockchainService.tx_integrity_check(tx, txs_in_pool).getFlag():
+            response.setData('tx: ' + str(tx))
+            response.setFlag(False)
+        if tx['count'] != tools.count(account, tools.tx_owner_address(tx), txs_in_pool):
+            response.setData('count error')
+            response.setFlag(False)
+        if not tools.fee_check(tx, txs_in_pool, account):
+            response.setData('fee check error')
+            response.setFlag(False)
+        return response
+
+    @sync
+    def target(self, length):
+        memoized_weights = [custom.inflection ** i for i in range(1000)]
+        """ Returns the target difficulty at a particular blocklength. """
+        if length < 4:
+            return '0' * 4 + 'f' * 60  # Use same difficulty for first few blocks.
+
+        def targetTimesFloat(target, number):
+            a = int(str(target), 16)
+            b = int(a * number)  # this should be rational multiplication followed by integer estimation
+            return tools.buffer_(str(hex(b))[2: -1], 64)
+
+        def multiply_things(things):
+            out = 1
+            while len(things) > 0:
+                out = out * things[0]
+                things = things[1:]
+            return out
+
+        def weights(length):  # uses float
+            # returns from small to big
+            out = memoized_weights[:length]
+            out.reverse()
+            return out
+
+        def estimate_target():
+            """
+            We are actually interested in the average number of hashes required to
+            mine a block. number of hashes required is inversely proportional
+            to target. So we average over inverse-targets, and inverse the final
+            answer. """
+
+            def sumTargets(l):
+                if len(l) < 1:
+                    return 0
+                while len(l) > 1:
+                    l = [hex_sum(l[0], l[1])] + l[2:]
+                return l[0]
+
+            targets = self.recent_blockthings('targets', custom.history_length)
+            w = weights(len(targets))  # should be rat instead of float
+            tw = sum(w)
+            targets = map(hex_invert, targets)
+
+            def weighted_multiply(i):
+                return targetTimesFloat(targets[i], w[i] / tw)  # this should use rat division instead
+
+            weighted_targets = [weighted_multiply(i) for i in range(len(targets))]
+            return hex_invert(sumTargets(weighted_targets))
+
+        def estimate_time():
+            times = self.recent_blockthings('times', custom.history_length)
+            times = map(Decimal, times)
+            block_lengths = [times[i] - times[i - 1] for i in range(1, len(times))]
+            w = weights(len(block_lengths))  # Geometric weighting
+            tw = sum(w)
+            return sum([w[i] * block_lengths[i] / tw for i in range(len(block_lengths))])
+
+        retarget = estimate_time() / custom.blocktime
+        return targetTimesFloat(estimate_target(), retarget)
 
