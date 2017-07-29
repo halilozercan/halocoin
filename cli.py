@@ -21,7 +21,7 @@ def run_command(p):
 
 
 if __name__ == '__main__':
-    actions = ['start', 'stop', 'send', 'balance', 'mybalance', 'difficulty', 'info', 'myaddress',
+    actions = ['start', 'stop', 'spend', 'balance', 'mybalance', 'difficulty', 'info', 'myaddress',
                'peers', 'blockcount', 'txs', 'new_wallet', 'pubkey', 'block', 'mine']
     parser = argparse.ArgumentParser(description='CLI for halocoin application.')
     parser.add_argument('action', help='Main action to take', choices=actions)
@@ -33,6 +33,8 @@ if __name__ == '__main__':
                         help='Block number')
     parser.add_argument('--wallet', action="store", type=str, dest='wallet',
                         help='Wallet file address')
+    parser.add_argument('--no-database', action="store_true", dest='no_database',
+                        help='Do not use database information, look at blockchain')
     """
     parser.add_argument('--start', help='Start a full node', action="store_true")
     parser.add_argument('--stop', help='Stop all the threads and shut down the node', action="store_true")
@@ -106,4 +108,10 @@ if __name__ == '__main__':
         cmd = {'action': args.action}
         if args.action == 'block':
             cmd['number'] = args.number
+        elif args.action == 'balance':
+            cmd['address'] = args.address
+            cmd['no_database'] = args.no_database
+        elif args.action == 'spend':
+            cmd['address'] = args.address
+            cmd['amount'] = args.amount
         print(run_command(cmd))

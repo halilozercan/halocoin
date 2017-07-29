@@ -52,23 +52,64 @@ class BlockchainService(Service):
         time.sleep(1)
 
     @sync
+    def cache_process_tx(self, tx):
+        account = self.db.get(tools.tx_owner_address(tx))
+        if tx['type'] == 'mint':
+            account['amount'] += tx['amount']
+        elif tx['type'] == 'spend':
+            recv_account = self.db.get(tx['to'])
+            account['amount'] -= tx['amount']
+            account['amount'] -= custom.fee
+            account['count'] += 1
+            recv_account['amount'] += tx['amount']
+            recv_account['count'] += 1
+            self.db.put(tx['to'], recv_account)
+        self.db.put(tools.tx_owner_address(tx), account)
+
+    @sync
+    def tx_pool(self):
+        """
+        Return all the transactions waiting in the pool.
+        This method should be used instead of direct access to db
+        :return:
+        """
+        return self.db.get('txs')
+
+    @sync
+    def tx_pool_add(self, tx):
+        """
+        This is an atomic add operation for txs pool.
+        :param tx: Transaction to be added
+        :return: None
+        """
+        txs = self.db.get('txs')
+        txs.append(tx)
+        self.db.put('txs', txs)
+
+    @sync
+    def tx_pool_pop_all(self):
+        """
+        Atomic operation to pop everything
+        :return: transactions list
+        """
+        txs = self.db.get('txs')
+        self.db.put('txs', [])
+        return txs
+
+    @sync
     def add_tx(self, tx):
 
-        # Attempt to add a new transaction into the pool.
-        # print('top of add_tx')
-        out = ['']
         if not isinstance(tx, dict):
             return False
 
         address = tools.tx_owner_address(tx)
 
         # tools.log('attempt to add tx: ' +str(tx))
-        txs_in_pool = self.db.get('txs')
-        response = BlockchainService.tx_verify_for_pool(tx, txs_in_pool, self.db.get_account(address))
+        txs_in_pool = self.tx_pool()
+        response = BlockchainService.tx_verify_for_pool(tx, txs_in_pool, tools.get_account(self.db, address))
         if response.getFlag():
-            txs_in_pool.append(tx)
-            self.db.put('txs', txs_in_pool)
-            return 'added tx in the pool: ' + str(tx)
+            self.tx_pool_add(tx)
+            return 'added tx into the pool: ' + str(tx)
         else:
             return 'failed to add tx because: ' + response.getData()
 
@@ -83,7 +124,7 @@ class BlockchainService(Service):
             def tx_check(txs_in_block):
                 for tx in reversed(txs_in_block):
                     address_of_tx = tools.tx_owner_address(tx)
-                    account_of_tx = self.db.get_account(address_of_tx)
+                    account_of_tx = tools.get_account(self.db, address_of_tx)
                     if BlockchainService.tx_integrity_check(tx, txs_in_block) \
                             and tools.fee_check(tx, txs_in_block, account_of_tx):
                         continue
@@ -126,7 +167,6 @@ class BlockchainService(Service):
                 return False
 
             nonce_and_hash = tools.hash_without_nonce(block)
-            print 'Adding block with hash\n' + tools.det_hash(nonce_and_hash)
             if tools.det_hash(nonce_and_hash) > block['target']:
                 tools.log('hash is not applicable to target')
                 return False
@@ -161,12 +201,19 @@ class BlockchainService(Service):
             self.db.put(block['length'], block)
             self.db.put('length', block['length'])
             self.db.put('diffLength', block['diffLength'])
-            orphans = self.db.get('txs')
-            self.db.put('txs', [])
-            for tx in block['txs']:
-                self.update_addresses_with_tx(tx, True)
-            for tx in orphans:
-                self.add_tx(tx)
+
+            targets = self.db.get('targets')
+            targets.update({str(block['length']): block['target']})
+            self.db.put('targets', targets)
+
+            times = self.db.get('times')
+            times.update({str(block['length']): block['time']})
+            self.db.put('times', times)
+
+            orphans = self.tx_pool_pop_all()
+
+            for orphan in sorted(orphans, key=lambda x: x['amount']):
+                self.add_tx(orphan)
 
     @sync
     def delete_block(self):
@@ -188,13 +235,10 @@ class BlockchainService(Service):
             pass
 
         block = self.db.get(length)
-        orphans = self.db.get('txs')
-        self.db.put('txs', [])
+        orphans = self.tx_pool_pop_all()
 
         for tx in block['txs']:
             orphans.append(tx)
-            self.db.put('add_block', False)
-            self.update_addresses_with_tx(tx, False)
 
         self.db.delete(length)
         length -= 1
@@ -206,77 +250,55 @@ class BlockchainService(Service):
             block = self.db.get(length)
             self.db.put('diffLength', block['diffLength'])
 
-        for orphan in sorted(orphans, key=lambda x: x['count']):
+        for orphan in sorted(orphans, key=lambda x: x['amount']):
             self.add_tx(orphan)
 
     @sync
-    def recent_blockthings(self, key, size, length):
+    def recent_blockthings(self, key, size, length=0):
+
+        def get_val(length):
+            leng = str(length)
+            if not leng in storage:
+                block = self.db.get(leng)
+                if not block:
+                    if leng == self.db.get('length'):
+                        self.db.put('length', int(leng) - 1)
+                        block = self.db.get(leng)
+                    else:
+                        pass
+                        #error()
+                # try:
+                storage[leng] = self.db.get(leng)[key[:-1]]
+                self.db.put(key, storage)
+            return storage[leng]
+
+        def clean_up(storage, end):
+            if end < 0: return
+            if not str(end) in storage:
+                return
+            else:
+                storage.pop(str(end))
+                return clean_up(storage, end - 1)
+
+        if length == 0:
+            length = self.db.get('length')
 
         storage = self.db.get(key)
         start = max((length - size), 0)
         end = length - max(custom.mmm, custom.history_length) - 100
-
-        # Remove keys from storage in the range 0-end
-        while end >= 0:
-            if not str(end) in storage:
-                break
-            else:
-                storage.pop(str(end))
-                end -= 1
-
-        result = []
-        for i in range(start, length):
-            index = str(i)
-            if not index in storage:
-                block_exists = self.db.exists(index)
-                if not block_exists:
-                    if index == self.db.get('length'):
-                        self.db.put('length', i - 1)
-                        block = self.db.get(index)
-                # try:
-                storage[index] = self.db.get(index)[key[:-1]]
-                self.db.put(key, storage)
-            result.append(storage[index])
-
-        return result
+        clean_up(storage, length - end)
+        return map(get_val, range(start, length))
 
     @sync
-    def update_addresses_with_tx(self, tx, add_block_flag):
-        if tx['type'] == 'mint':
-            self.mint(tx, add_block_flag)
-        elif tx['type'] == 'spend':
-            self.spend(tx, add_block_flag)
-
-    @sync
-    def mint(self, tx, add_block_flag):
-        print("Updating with mint tx")
-        address = tools.tx_owner_address(tx)
-        print("Rewarding address:" + address)
-        account = self.db.get_account(address)
-        if add_block_flag:
-            account['amount'] += custom.block_reward
-            account['count'] += 1
-        else:
-            account['amount'] -= custom.block_reward
-            account['count'] -= 1
-        self.db.put(address, account)
-        print(account)
-
-    @sync
-    def spend(self, tx, add_block_flag):
-        address = tools.tx_owner_address(tx)
-        account = self.db.get_account(address)
-        if add_block_flag:
-            account['amount'] += -tx['amount']
-            tx['to']['amount'] += tx['amount']
-            account['amount'] += -custom.fee
-            account['count'] += 1
-        else:
-            account['amount'] -= -tx['amount']
-            tx['to']['amount'] -= tx['amount']
-            account['amount'] -= -custom.fee
-            account['count'] -= 1
-        self.db.put(address, account)
+    def cache_blockchain(self):
+        length = self.db.get('length')
+        last_cache_length = self.db.get('last_cache_length')
+        if length % custom.cache_length == 0 and length - last_cache_length >= custom.cache_length:
+            for i in range(last_cache_length, length):
+                block = self.db.get(str(i))
+                for tx in block['txs']:
+                    self.cache_process_tx(tx)
+        self.db.put('last_cache_length', length)
 
     @staticmethod
     def sigs_match(_sigs, _pubs, msg):
@@ -337,7 +359,7 @@ class BlockchainService(Service):
             if len(tx['to']) <= 30:
                 response.setData('that address is too short ' + 'tx: ' + str(tx))
                 response.setFlag(False)
-            if 'amount' not in tx or not isinstance(tx['amount'], (str, unicode)):
+            if 'amount' not in tx or not isinstance(tx['amount'], (int)):
                 response.setData('no amount')
                 response.setFlag(False)
             # TODO: This is new. Check this voting transactions
@@ -369,9 +391,11 @@ class BlockchainService(Service):
         if not BlockchainService.tx_integrity_check(tx, txs_in_pool).getFlag():
             response.setData('tx: ' + str(tx))
             response.setFlag(False)
-        if tx['count'] != tools.count(account, tools.tx_owner_address(tx), txs_in_pool):
+        """
+        if tx['count'] != tools.known_tx_count(account, tools.tx_owner_address(tx), txs_in_pool):
             response.setData('count error')
             response.setFlag(False)
+        """
         if not tools.fee_check(tx, txs_in_pool, account):
             response.setData('fee check error')
             response.setFlag(False)

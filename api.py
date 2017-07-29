@@ -5,6 +5,8 @@ import json
 import socket
 import sys
 
+import time
+
 import ntwrk
 import tools
 from ntwrk import Message
@@ -24,14 +26,17 @@ class ApiService(Service):
         self.blockchain = self.engine.blockchain
         self.miner = self.engine.miner
 
-        try:
-            self.s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            self.s.settimeout(1)
-            self.s.bind(('localhost', self.engine.config['api.port']))
-            self.s.listen(5)
-        except:
-            tools.log("Could not start API socket!")
-            return False
+        start = time.time()
+        while start + 60 > time.time():
+            try:
+                self.s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                self.s.settimeout(1)
+                self.s.bind(('localhost', self.engine.config['api.port']))
+                self.s.listen(5)
+                return True
+            except:
+                tools.log("Could not start API socket!")
+                time.sleep(2)
         return True
 
     def on_close(self):
@@ -78,16 +83,19 @@ class ApiService(Service):
                     tools.package(tx_orig).encode('base64').replace('\n', '')))
         pubkey = tools.privtopub(privkey)
         address = tools.make_address([pubkey], 1)
+        """
         if 'count' not in tx:
             try:
-                tx['count'] = tools.count(self.db.get_account(address), address, self.db.get('txs'))
+                tx['count'] = tools.known_tx_count(tools.get_account(self.db, address), address, self.blockchain.tx_pool())
             except:
                 tx['count'] = 1
+        """
         if 'pubkeys' not in tx:
             tx['pubkeys'] = [pubkey]
         if 'signatures' not in tx:
             tx['signatures'] = [tools.sign(tools.det_hash(tx), privkey)]
-        return self.blockchain.tx_queue.put(tx)
+        self.blockchain.tx_queue.put(tx)
+        return 'Tx amount:{} to:{} added to the pool'.format(tx['amount'], tx['to'])
 
     @sync
     def peers(self):
@@ -101,7 +109,7 @@ class ApiService(Service):
             address = self.db.get('address')
         else:
             address = subject
-        return self.db.get_account(address)
+        return tools.get_account(self.db, address)
 
     @sync
     def myaddress(self):
@@ -119,7 +127,7 @@ class ApiService(Service):
 
     @sync
     def txs(self):
-        return self.db.get('txs')
+        return self.blockchain.tx_pool()
 
     @sync
     def pubkey(self):
@@ -136,11 +144,12 @@ class ApiService(Service):
         return self.blockchain.target(self.db.get('length'))
 
     @sync
-    def balance(self, address='default'):
+    def balance(self, address='default', no_database=False):
         if address == 'default':
             address = self.db.get('address')
-        account = self.db.get_account(address)
-        return account['amount'] - tools.spendings_of_address_in_pool(self.db.get('txs'), address)
+        account = tools.get_account(self.db, address)
+        account = tools.update_account_with_txs(self.blockchain.tx_pool(), address, account)
+        return account['amount']
 
     @sync
     def mybalance(self):
@@ -156,8 +165,10 @@ class ApiService(Service):
     def mine(self):
         if self.miner.get_state() == Service.RUNNING:
             self.miner.unregister()
+            return 'Closed miner'
         else:
             self.miner.register()
+            return 'Running miner'
 
     @sync
     def pass_(self):

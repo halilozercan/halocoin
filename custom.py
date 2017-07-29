@@ -6,7 +6,7 @@ from decimal import Decimal
 DEBUG = False
 peers = [['139.179.21.17', 7900]]
 current_loc = os.path.dirname(os.path.abspath(__file__))
-database_name = os.path.join(current_loc, 'pickle_db')
+database_name = os.path.join(current_loc, 'db_2')
 log_file = os.path.join(current_loc, 'log')
 port = 7900
 api_port = 7899
@@ -21,6 +21,10 @@ mmm = 100
 # How far back in history do we look when we use statistics to guess at
 # the current blocktime and difficulty.
 history_length = 400
+# Any address information can be found by scanning whole blockchain. However,
+# this solution does not scale. By caching available information at every $cache_length
+# number of blocks, address information can be quickly found.
+cache_length = 10
 # This constant is selected such that the 50 most recent blocks count for 1/2 the
 # total weight.
 inflection = Decimal('0.985')

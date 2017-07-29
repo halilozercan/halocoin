@@ -8,7 +8,7 @@ import tools
 from service import Service, threaded, sync
 
 
-class PeersCheckService(Service):
+class PeerCheckService(Service):
     def __init__(self, engine, new_peers):
         # This logic might change. Here we add new peers while initializing the service
         Service.__init__(self, 'peers_check')
@@ -123,7 +123,7 @@ class PeersCheckService(Service):
             return -1
         for tx in txs:
             self.blockchain.tx_queue.put(tx)
-        T = self.db.get('txs')
+        T = self.blockchain.tx_pool()
         pushers = filter(lambda t: t not in txs, T)
         for push in pushers:
             ntwrk.command(peer, {'action': 'pushtx', 'tx': push})

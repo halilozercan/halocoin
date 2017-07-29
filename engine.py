@@ -8,8 +8,8 @@ from api import ApiService
 from blockchain import BlockchainService
 from database import DatabaseService
 from miner import MinerService
-from peer_receive import PeerReceiveService
-from peers_check import PeersCheckService
+from peer_listen import PeerListenService
+from peer_check import PeerCheckService
 from service import Service, async
 
 
@@ -41,8 +41,8 @@ class Engine(Service):
         self.db = DatabaseService(self)
         self.blockchain = BlockchainService(self)
         self.api = ApiService(self)
-        self.peers_check = PeersCheckService(self, custom.peers)
-        self.peer_receive = PeerReceiveService(self)
+        self.peers_check = PeerCheckService(self, custom.peers)
+        self.peer_receive = PeerListenService(self)
         self.miner = MinerService(self)
 
     def on_register(self):
@@ -69,6 +69,8 @@ class Engine(Service):
             self.db.put('times', {})
             self.db.put('mine', False)
             self.db.put('diffLength', '0')
+            self.db.put('last_cache_length', 0)
+            self.db.put('accounts', {})
         self.db.put('stop', False)
 
         self.db.put('privkey', self.wallet['privkey'])
@@ -122,9 +124,7 @@ class Engine(Service):
 
     @async
     def stop(self):
-        print 'Closing services'
         self.unregister_sub_services()
-        print "Closed everything"
         self.unregister()
 
 

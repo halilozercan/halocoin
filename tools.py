@@ -18,29 +18,55 @@ import pt
 
 
 # print(json.dumps(x, indent=3, sort_keys=True))  for pretty printing
-def spendings_of_address_in_pool(txs_in_pool, address):
-    # cost of the zeroth confirmation transactions
-    total_cost = []
-    for tx in filter(lambda t: address == tx_owner_address(t), txs_in_pool):
-        def spend_(total_cost=total_cost):
-            total_cost.append(custom.fee)
-            total_cost += [tx['amount']]
-
-        evauate = {'spend': spend_,
-                   'mint': (lambda: total_cost.append(-custom.block_reward))}
-        evauate[tx['type']]()
-    return sum(total_cost)
+def update_account_with_txs(txs, address, account):
+    for tx in txs:
+        owner = tx_owner_address(tx)
+        if tx['type'] == 'mint' and owner == address:
+            account['amount'] += custom.block_reward
+        elif tx['type'] == 'spend':
+            if owner == address:
+                account['amount'] -= tx['amount']
+                account['amount'] -= custom.fee
+                account['count'] += 1
+            elif tx['to'] == address:
+                account['amount'] += tx['amount']
+                account['count'] += 1
+    return account
 
 
 def fee_check(tx, txs_in_pool, acc):
     address = tx_owner_address(tx)
-    cost = spendings_of_address_in_pool(txs_in_pool + [tx], address)
-    if int(acc['amount']) < cost:
+    acc = update_account_with_txs(txs_in_pool + [tx], address, acc)
+    if int(acc['amount']) < 0:
         log('insufficient money')
         return False
     # if tx['amount'] + custom.fee > acc['amount']:
     #    return False
     return True
+
+
+def get_account(db, address):
+    account = {'count': 0, 'amount': 0}
+    current_length = int(db.get('length'))
+    last_cache_length = int(db.get('last_cache_length'))
+    last_blocks_indices = range(last_cache_length, current_length+1)
+    for i in last_blocks_indices:
+        block = db.get(str(i))
+        account = update_account_with_txs(block['txs'], address, account)
+    cached_account = db.get(address)
+    if cached_account:
+        account['count'] += cached_account['count']
+        account['amount'] += cached_account['amount']
+    return account
+
+
+def known_tx_count(account, address, txs_in_pool):
+    # TODO: address is a address object from database. Find the real address string inside
+    # Returns the number of transactions that pubkey has broadcast.
+    def number_of_unconfirmed_txs(address):
+        return len(filter(lambda t: address == tx_owner_address(t), txs_in_pool))
+
+    return account['count'] + number_of_unconfirmed_txs(address)
 
 
 def get_dict_nested(loc, dic):
@@ -147,17 +173,6 @@ def is_number(s):
         return True
     except:
         return False
-
-
-def count(account, address, txs_in_pool):
-    # TODO: address is a address object from database. Find the real address string inside
-    # Returns the number of transactions that pubkey has broadcast.
-    def number_of_unconfirmed_txs(address):
-        return len(filter(lambda t: address == tx_owner_address(t), txs_in_pool))
-
-    current = account['count']
-    zeroth = number_of_unconfirmed_txs(address)
-    return current + zeroth
 
 
 def fork_check(newblocks, length, block):

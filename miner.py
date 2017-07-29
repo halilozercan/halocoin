@@ -27,16 +27,17 @@ class MinerService(Service):
     @threaded
     def worker(self):
         length = self.db.get('length')
-        print 'Miner working', length
+        print 'Miner working for block', length
         if length == -1:
             candidate_block = self.genesis(self.db.get('pubkey'))
         else:
             prev_block = self.db.get(length)
-            candidate_block = self.make_block(prev_block, self.db.get('txs'), self.db.get('pubkey'))
+            candidate_block = self.make_block(prev_block, self.blockchain.tx_pool(), self.db.get('pubkey'))
 
         start = time.time()
         possible_block = None
-        while self.threaded_running() and time.time() < start + custom.blocktime / 3 and possible_block is None:
+        while self.threaded_running() and time.time() < start + custom.blocktime / 3 \
+                and possible_block is None:
             result = self.POW(candidate_block)
             if result.getFlag():
                 possible_block = result.getData()
@@ -49,7 +50,7 @@ class MinerService(Service):
     def make_block(self, prev_block, txs, pubkey):
         leng = int(prev_block['length']) + 1
         target_ = self.blockchain.target(leng)
-        print "target", target_
+        print 'target', target_
         diffLength = blockchain.hex_sum(prev_block['diffLength'],
                                         blockchain.hex_invert(target_))
         out = {'version': custom.version,
@@ -64,8 +65,7 @@ class MinerService(Service):
     def make_mint(self, pubkey):
         return {'type': 'mint',
                 'pubkeys': [pubkey],
-                'signatures': ['first_sig'],
-                'count': 0}
+                'signatures': ['first_sig']}
 
     def genesis(self, pubkey):
         target_ = self.blockchain.target(0)
@@ -89,8 +89,5 @@ class MinerService(Service):
             if count > 10000:
                 return Response(False, None)
             block['nonce'] += 1
-
-        print "Mining block with hash\n" + tools.det_hash({'nonce': block['nonce'],
-                                                           'halfHash': halfHash})
 
         return Response(True, block)

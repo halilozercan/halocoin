@@ -12,7 +12,7 @@ from ntwrk import Message
 from service import Service, threaded, sync
 
 
-class PeerReceiveService(Service):
+class PeerListenService(Service):
     def __init__(self, engine):
         Service.__init__(self, 'peer_receive')
         self.engine = engine
@@ -87,7 +87,7 @@ class PeerReceiveService(Service):
 
     @sync
     def txs(self):
-        return self.db.get('txs')
+        return self.blockchain.tx_pool()
 
     @sync
     def pushtx(self, tx):
