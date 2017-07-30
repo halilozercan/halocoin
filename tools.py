@@ -49,15 +49,29 @@ def fee_check(tx, txs_in_pool, acc):
 def get_account(db, address):
     account = {'count': 0, 'amount': 0}
     current_length = int(db.get('length'))
-    last_cache_length = int(db.get('last_cache_length'))
-    last_blocks_indices = range(last_cache_length, current_length+1)
-    for i in last_blocks_indices:
-        block = db.get(str(i))
-        account = update_account_with_txs(block['txs'], address, account)
+    last_cache_length = 0
+
     cached_account = db.get(address)
     if cached_account:
+        last_cache_length = int(cached_account['cache_length'])
+    else:
+        cached_account = copy.deepcopy(account)
+
+    if current_length >= last_cache_length:
+        last_blocks_indices = range(last_cache_length, current_length+1)
+        for i in last_blocks_indices:
+            block = db.get(str(i))
+            account = update_account_with_txs(block['txs'], address, account)
+
         account['count'] += cached_account['count']
         account['amount'] += cached_account['amount']
+    elif (current_length+1) == last_cache_length:
+        return cached_account
+    else:
+        last_blocks_indices = range(current_length + 1)
+        for i in last_blocks_indices:
+            block = db.get(str(i))
+            account = update_account_with_txs(block['txs'], address, account)
     return account
 
 
@@ -176,8 +190,8 @@ def is_number(s):
         return False
 
 
-def fork_check(newblocks, length, block):
-    recent_hash = det_hash(block)
+def fork_check(newblocks, length, top_block_on_chain):
+    recent_hash = det_hash(top_block_on_chain)
     their_hashes = map(lambda x: x['prevHash'] if x['length'] > 0 else 0, newblocks) + [det_hash(newblocks[-1])]
     b = (recent_hash not in their_hashes) and newblocks[0]['length'] - 1 < length < newblocks[-1]['length']
     return b

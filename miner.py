@@ -87,7 +87,7 @@ class MinerService(Service):
         while tools.det_hash({'nonce': block['nonce'],
                               'halfHash': halfHash}) > block['target']:
             count += 1
-            if count > 10000:
+            if count > 1000000:
                 return Response(False, None)
             block['nonce'] += 1
 

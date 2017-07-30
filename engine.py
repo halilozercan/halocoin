@@ -100,6 +100,13 @@ class Engine(Service):
             self.unregister_sub_services()
             return False
         print("Started Peers Check")
+        self.db.put('last_cache_length', 0)
+        self.db.put('txs', [])
+        self.db.delete('11fNtNPX8ruarfy6kc7Fg6RDb7SJxun')
+        self.db.delete('1144dJos5Dsm7CubWhzvo7EQn1RxF6u')
+        self.blockchain.cache_blockchain()
+        print self.db.get('1144dJos5Dsm7CubWhzvo7EQn1RxF6u')
+
         return True
 
     def unregister_sub_services(self):

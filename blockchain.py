@@ -248,10 +248,10 @@ class BlockchainService(Service):
 
         orphans = self.tx_pool_pop_all()
 
+        self.cache_blockchain()
+
         for orphan in sorted(orphans, key=lambda x: x['count']):
             self.add_tx(orphan)
-
-        self.cache_blockchain()
 
     @sync
     def delete_block(self):
@@ -287,6 +287,8 @@ class BlockchainService(Service):
         else:
             block = self.db.get(length)
             self.db.put('diffLength', block['diffLength'])
+
+        self.cache_blockchain()
 
         for orphan in sorted(orphans, key=lambda x: x['count']):
             self.add_tx(orphan)
@@ -331,7 +333,7 @@ class BlockchainService(Service):
     def cache_blockchain(self):
         length = self.db.get('length')
         last_cache_length = self.db.get('last_cache_length')
-        if length % custom.cache_length == 0 and length - last_cache_length >= custom.cache_length:
+        if length - last_cache_length >= custom.cache_length:
             cache_address_set = set()
             for i in range(last_cache_length, length):
                 block = self.db.get(str(i))
@@ -341,8 +343,12 @@ class BlockchainService(Service):
                         cache_address_set.add(tx['to'])
             for address in cache_address_set:
                 account = tools.get_account(self.db, address)
+                account['cache_length'] = length
                 self.db.put(address, account)
             self.db.put('last_cache_length', length)
+        elif last_cache_length > (length+1):  # We deleted a block involved in cache. Rerun cache routine.
+            #TODO: a better cache fallback
+            self.db.put('last_cache_length', 0)
 
     @staticmethod
     def sigs_match(_sigs, _pubs, msg):
