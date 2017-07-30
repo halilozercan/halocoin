@@ -251,6 +251,8 @@ class BlockchainService(Service):
         for orphan in sorted(orphans, key=lambda x: x['count']):
             self.add_tx(orphan)
 
+        self.cache_blockchain()
+
     @sync
     def delete_block(self):
         """ Removes the most recent block from the blockchain. """
@@ -330,11 +332,17 @@ class BlockchainService(Service):
         length = self.db.get('length')
         last_cache_length = self.db.get('last_cache_length')
         if length % custom.cache_length == 0 and length - last_cache_length >= custom.cache_length:
+            cache_address_set = set()
             for i in range(last_cache_length, length):
                 block = self.db.get(str(i))
                 for tx in block['txs']:
-                    self.cache_process_tx(tx)
-        self.db.put('last_cache_length', length)
+                    cache_address_set.add(tools.tx_owner_address(tx))
+                    if tx['type'] == 'spend':
+                        cache_address_set.add(tx['to'])
+            for address in cache_address_set:
+                account = tools.get_account(self.db, address)
+                self.db.put(address, account)
+            self.db.put('last_cache_length', length)
 
     @staticmethod
     def sigs_match(_sigs, _pubs, msg):

@@ -27,7 +27,7 @@ class MinerService(Service):
     @threaded
     def worker(self):
         length = self.db.get('length')
-        print 'Miner working for block', length
+        print 'Miner working for block', (length + 1)
         if length == -1:
             candidate_block = self.genesis(self.db.get('pubkey'))
         else:
