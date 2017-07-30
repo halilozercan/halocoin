@@ -4,6 +4,7 @@ import json
 import os
 import random
 import string
+from pprint import pprint
 
 import filelock
 import sys
@@ -114,4 +115,4 @@ if __name__ == '__main__':
         elif args.action == 'spend':
             cmd['address'] = args.address
             cmd['amount'] = args.amount
-        print(run_command(cmd))
+        pprint(run_command(cmd))

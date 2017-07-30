@@ -103,10 +103,29 @@ class BlockchainService(Service):
             return False
 
         address = tools.tx_owner_address(tx)
+        account = tools.get_account(self.db, address)
 
         # tools.log('attempt to add tx: ' +str(tx))
         txs_in_pool = self.tx_pool()
-        response = BlockchainService.tx_verify_for_pool(tx, txs_in_pool, tools.get_account(self.db, address))
+
+        response = Response(True, None)
+        if 'type' not in tx or not isinstance(tx['type'], (str, unicode)) \
+                or tx['type'] not in BlockchainService.tx_types:
+            response.setData('type error')
+            response.setFlag(False)
+        if tx in txs_in_pool:
+            response.setData('no duplicates')
+            response.setFlag(False)
+        if not BlockchainService.tx_integrity_check(tx).getFlag():
+            response.setData('tx: ' + str(tx))
+            response.setFlag(False)
+        if tx['count'] != tools.known_tx_count(account, tools.tx_owner_address(tx), txs_in_pool):
+            response.setData('count error')
+            response.setFlag(False)
+        if not tools.fee_check(tx, txs_in_pool, account):
+            response.setData('fee check error')
+            response.setFlag(False)
+
         if response.getFlag():
             self.tx_pool_add(tx)
             return 'added tx into the pool: ' + str(tx)
@@ -119,101 +138,118 @@ class BlockchainService(Service):
          Median is good for weeding out liars, so long as the liars don't have 51%
          hashpower. """
 
-        def block_check(block):
+        def tx_check(txs_in_block):
+            """
+            Checks transactions validity in a sandboxed environment where
+            accounts are simulated for the block.
+            :param txs_in_block: transactions inside candidate block
+            :return:
+            """
+            if 1 != len(filter(lambda t: t['type'] == 'mint', txs_in_block)):
+                return False
 
-            def tx_check(txs_in_block):
-                for tx in reversed(txs_in_block):
+            account_sandbox = {}
+            for tx in sorted(txs_in_block, key=lambda t: t['count']):
+                if tx['type'] == 'spend':
                     address_of_tx = tools.tx_owner_address(tx)
-                    account_of_tx = tools.get_account(self.db, address_of_tx)
-                    if BlockchainService.tx_integrity_check(tx, txs_in_block) \
-                            and tools.fee_check(tx, txs_in_block, account_of_tx):
+
+                    if address_of_tx not in account_sandbox:
+                        account_of_tx = tools.get_account(self.db, address_of_tx)
+                        account_sandbox[address_of_tx] = account_of_tx
+
+                    account_of_tx = account_sandbox[address_of_tx]
+                    integrity = BlockchainService.tx_integrity_check(tx).getFlag()
+                    fee_check = tools.fee_check(tx, [], account_of_tx)
+                    count_check = (account_of_tx['count'] == tx['count'])
+
+                    if integrity and fee_check and count_check:
+                        account_of_tx['amount'] -= tx['amount']
+                        account_of_tx['amount'] -= custom.fee
+                        account_of_tx['count'] += 1
+                        account_sandbox[address_of_tx] = account_of_tx
                         continue
                     else:
                         tools.log('tx not valid')
                         return False  # Block is invalid
-                return True  # Block is valid
+            return True  # Block is valid
 
-            if not isinstance(block, dict):
-                tools.log('Block is not a dict')
+        if not isinstance(block, dict):
+            tools.log('Block is not a dict')
+            return False
+
+        if 'error' in block:
+            tools.log('Errors in block')
+            return False
+
+        if not ('length' in block and isinstance(block['length'], int)):
+            tools.log('Length is not valid')
+            return False
+
+        length = self.db.get('length')
+
+        if int(block['length']) != int(length) + 1:
+            tools.log('Length is not valid')
+            return False
+
+        # TODO: understand what is going on here
+        if block['diffLength'] != hex_sum(self.db.get('diffLength'),
+                                          hex_invert(block['target'])):
+            tools.log('difflength is wrong')
+            return False
+
+        if length >= 0:
+            if tools.det_hash(self.db.get(length)) != block['prevHash']:
+                tools.log('prevhash different')
                 return False
 
-            if 'error' in block:
-                tools.log('Errors in block')
-                return False
+        if 'target' not in block:
+            tools.log('no target in block')
+            return False
 
-            if not ('length' in block and isinstance(block['length'], int)):
-                tools.log('Length is not valid')
-                return False
+        nonce_and_hash = tools.hash_without_nonce(block)
+        if tools.det_hash(nonce_and_hash) > block['target']:
+            tools.log('hash is not applicable to target')
+            return False
 
-            length = self.db.get('length')
+        if block['target'] != self.target(block['length']):
+            tools.log('block: ' + str(block))
+            tools.log('target: ' + str(self.target(block['length'])))
+            tools.log('wrong target')
+            return False
 
-            if int(block['length']) != int(length) + 1:
-                tools.log('Length is not valid')
-                return False
+        # earliest = tools.median(self.recent_blockthings(self.db.get('times'),
+        #                                                custom.mmm,
+        #                                                self.db.get('length')))
 
-            # TODO: understand what is going on here
-            if block['diffLength'] != hex_sum(self.db.get('diffLength'),
-                                              hex_invert(block['target'])):
-                tools.log('difflength is wrong')
-                return False
+        if 'time' not in block:
+            tools.log('no time')
+            return False
+        if block['time'] > time.time() + 60 * 6:
+            tools.log('Received block is coming from future. Call the feds')
+            return False
+        # if block['time'] < earliest:
+        #    tools.log('Received block is generated earlier than median.')
+        #    return False
+        if not tx_check(block['txs']):
+            tools.log('Received block failed transactions check.')
+            return False
 
-            if length >= 0:
-                if tools.det_hash(self.db.get(length)) != block['prevHash']:
-                    tools.log('prevhash different')
-                    return False
+        self.db.put(block['length'], block)
+        self.db.put('length', block['length'])
+        self.db.put('diffLength', block['diffLength'])
 
-            if 'target' not in block:
-                tools.log('no target in block')
-                return False
+        targets = self.db.get('targets')
+        targets.update({str(block['length']): block['target']})
+        self.db.put('targets', targets)
 
-            nonce_and_hash = tools.hash_without_nonce(block)
-            if tools.det_hash(nonce_and_hash) > block['target']:
-                tools.log('hash is not applicable to target')
-                return False
+        times = self.db.get('times')
+        times.update({str(block['length']): block['time']})
+        self.db.put('times', times)
 
-            if block['target'] != self.target(block['length']):
-                tools.log('block: ' + str(block))
-                tools.log('target: ' + str(self.target(block['length'])))
-                tools.log('wrong target')
-                return False
+        orphans = self.tx_pool_pop_all()
 
-            #earliest = tools.median(self.recent_blockthings(self.db.get('times'),
-            #                                                custom.mmm,
-            #                                                self.db.get('length')))
-
-            if 'time' not in block:
-                tools.log('no time')
-                return False
-            if block['time'] > time.time() + 60 * 6:
-                tools.log('Received block is coming from future. Call the feds')
-                return False
-            #if block['time'] < earliest:
-            #    tools.log('Received block is generated earlier than median.')
-            #    return False
-            if tx_check(block['txs']):
-                tools.log('Received block failed transactions check.')
-                return False
-            return True
-
-        # tools.log('attempt to add block: ' +str(block))
-        if block_check(block):
-            # tools.log('add_block: ' + str(block))
-            self.db.put(block['length'], block)
-            self.db.put('length', block['length'])
-            self.db.put('diffLength', block['diffLength'])
-
-            targets = self.db.get('targets')
-            targets.update({str(block['length']): block['target']})
-            self.db.put('targets', targets)
-
-            times = self.db.get('times')
-            times.update({str(block['length']): block['time']})
-            self.db.put('times', times)
-
-            orphans = self.tx_pool_pop_all()
-
-            for orphan in sorted(orphans, key=lambda x: x['amount']):
-                self.add_tx(orphan)
+        for orphan in sorted(orphans, key=lambda x: x['count']):
+            self.add_tx(orphan)
 
     @sync
     def delete_block(self):
@@ -250,7 +286,7 @@ class BlockchainService(Service):
             block = self.db.get(length)
             self.db.put('diffLength', block['diffLength'])
 
-        for orphan in sorted(orphans, key=lambda x: x['amount']):
+        for orphan in sorted(orphans, key=lambda x: x['count']):
             self.add_tx(orphan)
 
     @sync
@@ -345,11 +381,16 @@ class BlockchainService(Service):
         return True
 
     @staticmethod
-    def tx_integrity_check(tx, txs_in_pool):
+    def tx_integrity_check(tx):
+        """
+        This functions test whether a transaction has basic things right.
+        Does it have amount, recipient, right signatures and correct address types.
+        :param tx:
+        :param txs: These txs can come from both pool and block.
+        :return:
+        """
         response = Response(True, None)
-        if tx['type'] == 'mint':
-            response.setFlag(0 == len(filter(lambda t: t['type'] == 'mint', txs_in_pool)))
-        elif tx['type'] == 'spend':
+        if tx['type'] == 'spend':
             if 'to' not in tx or not isinstance(tx['to'], (str, unicode)):
                 response.setData('no to')
                 response.setFlag(False)
@@ -367,38 +408,9 @@ class BlockchainService(Service):
                 if not tx['to'][:-29] == '11':
                     response.setData('cannot hold votecoins in a multisig address')
                     response.setFlag(False)
-            return response
-
-    @staticmethod
-    def tx_type_check(tx):
-        if 'type' not in tx:
-            return False
-        if not isinstance(tx['type'], (str, unicode)):
-            return False
-        if tx['type'] not in BlockchainService.tx_types:
-            return False
-        return True
-
-    @staticmethod
-    def tx_verify_for_pool(tx, txs_in_pool, account):
-        response = Response(True, None)
-        if not BlockchainService.tx_type_check(tx):
-            response.setData('type error')
+        else:
             response.setFlag(False)
-        if tx in txs_in_pool:
-            response.setData('no duplicates')
-            response.setFlag(False)
-        if not BlockchainService.tx_integrity_check(tx, txs_in_pool).getFlag():
-            response.setData('tx: ' + str(tx))
-            response.setFlag(False)
-        """
-        if tx['count'] != tools.known_tx_count(account, tools.tx_owner_address(tx), txs_in_pool):
-            response.setData('count error')
-            response.setFlag(False)
-        """
-        if not tools.fee_check(tx, txs_in_pool, account):
-            response.setData('fee check error')
-            response.setFlag(False)
+            response.setData('only spend transactions can be cheched')
         return response
 
     @sync

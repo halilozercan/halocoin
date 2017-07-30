@@ -83,13 +83,13 @@ class ApiService(Service):
                     tools.package(tx_orig).encode('base64').replace('\n', '')))
         pubkey = tools.privtopub(privkey)
         address = tools.make_address([pubkey], 1)
-        """
         if 'count' not in tx:
             try:
-                tx['count'] = tools.known_tx_count(tools.get_account(self.db, address), address, self.blockchain.tx_pool())
+                account = tools.get_account(self.db, address)
+                txs_in_pool = self.blockchain.tx_pool()
+                tx['count'] = tools.known_tx_count(account, address, txs_in_pool)
             except:
-                tx['count'] = 1
-        """
+                tx['count'] = 0
         if 'pubkeys' not in tx:
             tx['pubkeys'] = [pubkey]
         if 'signatures' not in tx:

@@ -65,7 +65,8 @@ class MinerService(Service):
     def make_mint(self, pubkey):
         return {'type': 'mint',
                 'pubkeys': [pubkey],
-                'signatures': ['first_sig']}
+                'signatures': ['first_sig'],
+                'count': 0}
 
     def genesis(self, pubkey):
         target_ = self.blockchain.target(0)

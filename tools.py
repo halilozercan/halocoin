@@ -36,7 +36,8 @@ def update_account_with_txs(txs, address, account):
 
 def fee_check(tx, txs_in_pool, acc):
     address = tx_owner_address(tx)
-    acc = update_account_with_txs(txs_in_pool + [tx], address, acc)
+    copy_acc = copy.deepcopy(acc)
+    acc = update_account_with_txs(txs_in_pool + [tx], address, copy_acc)
     if int(acc['amount']) < 0:
         log('insufficient money')
         return False

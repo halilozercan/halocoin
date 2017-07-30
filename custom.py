@@ -6,7 +6,7 @@ from decimal import Decimal
 DEBUG = False
 peers = [['139.179.21.17', 7900]]
 current_loc = os.path.dirname(os.path.abspath(__file__))
-database_name = os.path.join(current_loc, 'db_2')
+database_name = os.path.join(current_loc, 'db_3')
 log_file = os.path.join(current_loc, 'log')
 port = 7900
 api_port = 7899

@@ -1,26 +1,12 @@
-Mc-Chain
+Halocoin
 =============
 
 *In production*
 
 ![this is real, ok?](http://i.imgur.com/lz7hOlC.gif)
 
-# Wallet
+# How?
 
-Encrypted file that includes
-
-- public keys
-- private keys
-
-Client can create many addresses by using different key pairs.
-
-# Account
-
-To keep track of transactions and money transfers, every address information is held in database in an account object.
-An account object is under database with its key being the address itself.
-
-Properties are:
-
-- tx count
-- balance
--
+- There are 5 different services that are controlled by a blockchain engine.
+- These services(excluding miner) are registered to run on startup.
+- Data on blockchain is cached on every 100 blocks into accounts.
