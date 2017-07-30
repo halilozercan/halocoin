@@ -24,10 +24,10 @@ history_length = 400
 # Any address information can be found by scanning whole blockchain. However,
 # this solution does not scale. By caching available information at every $cache_length
 # number of blocks, address information can be quickly found.
-cache_length = 5
+cache_length = 100
 # This constant is selected such that the 50 most recent blocks count for 1/2 the
 # total weight.
 inflection = Decimal('0.985')
 download_many = 50  # Max number of blocks to request from a peer at the same time.
 max_download = 58000
-blocktime = 10
+blocktime = 120

@@ -15,7 +15,7 @@ class Service:
 
     def __init__(self, name):
         self.event_thread = threading.Thread()
-        self.into_service_queue = Queue.Queue()
+        self.into_service_queue = Queue.Queue(20)
         self.signals = {}
         self.service_responses = {}
         self.name = name

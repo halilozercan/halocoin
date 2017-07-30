@@ -2,6 +2,7 @@
 """
 import Queue
 import copy
+import threading
 import time
 
 from decimal import Decimal
@@ -26,6 +27,8 @@ def hex_invert(n):
 
 class BlockchainService(Service):
     tx_types = ['spend', 'mint']
+    IDLE = 1
+    SYNCING = 2
 
     def __init__(self, engine):
         Service.__init__(self, name='blockchain')
@@ -33,6 +36,8 @@ class BlockchainService(Service):
         self.blocks_queue = Queue.Queue()
         self.tx_queue = Queue.Queue()
         self.db = None
+        self.idle_signal = threading.Event()
+        self.set_blockchain_state(BlockchainService.IDLE)
 
     def on_register(self):
         self.db = self.engine.db
@@ -40,31 +45,34 @@ class BlockchainService(Service):
 
     @threaded
     def process(self):
-        if not self.blocks_queue.empty():
+        while not self.blocks_queue.empty():
+            self.set_blockchain_state(BlockchainService.SYNCING)
             candidate_block = self.blocks_queue.get()
-            tools.log('Received block')
-            tools.log(candidate_block)
             self.add_block(candidate_block)
-        elif not self.tx_queue.empty():
+        self.set_blockchain_state(BlockchainService.IDLE)
+        while not self.tx_queue.empty():
             candidate_tx = self.tx_queue.get()
             self.add_tx(candidate_tx)
         # Wait between each check. This way we wouldn't force CPU
         time.sleep(1)
 
     @sync
-    def cache_process_tx(self, tx):
-        account = self.db.get(tools.tx_owner_address(tx))
-        if tx['type'] == 'mint':
-            account['amount'] += tx['amount']
-        elif tx['type'] == 'spend':
-            recv_account = self.db.get(tx['to'])
-            account['amount'] -= tx['amount']
-            account['amount'] -= custom.fee
-            account['count'] += 1
-            recv_account['amount'] += tx['amount']
-            recv_account['count'] += 1
-            self.db.put(tx['to'], recv_account)
-        self.db.put(tools.tx_owner_address(tx), account)
+    def set_blockchain_state(self, state):
+        self.__blockchain_state = state
+        if state == BlockchainService.IDLE:
+            self.idle_signal.set()
+        else:
+            self.idle_signal.clear()
+
+    @sync
+    def get_blockchain_state(self):
+        return self.__blockchain_state
+
+    def wait_for_idle(self):
+        if self.get_blockchain_state() == BlockchainService.IDLE:
+            return
+        else:
+            self.idle_signal.wait()
 
     @sync
     def tx_pool(self):
@@ -137,7 +145,7 @@ class BlockchainService(Service):
         """Attempts adding a new block to the blockchain.
          Median is good for weeding out liars, so long as the liars don't have 51%
          hashpower. """
-
+        print 'started adding block', block['length']
         def tx_check(txs_in_block):
             """
             Checks transactions validity in a sandboxed environment where
@@ -252,6 +260,8 @@ class BlockchainService(Service):
 
         for orphan in sorted(orphans, key=lambda x: x['count']):
             self.add_tx(orphan)
+
+        print 'finished adding block', block['length']
 
     @sync
     def delete_block(self):

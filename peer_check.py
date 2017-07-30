@@ -5,6 +5,7 @@ import time
 
 import ntwrk
 import tools
+from blockchain import BlockchainService
 from service import Service, threaded, sync
 
 
@@ -35,12 +36,6 @@ class PeerCheckService(Service):
             # Reverse because high rank number means lower quality
             pr.reverse()
 
-            if self.blockchain.blocks_queue.empty() and self.db.get('length') > 3:
-                time.sleep(1)
-
-            while not self.blockchain.blocks_queue.empty():
-                time.sleep(0.1)
-
             i = tools.exponential_random(3.0 / 4) % len(pr)
             t1 = time.time()
             r = self.peer_check(i, pr)
@@ -58,6 +53,7 @@ class PeerCheckService(Service):
 
     @sync
     def peer_check(self, i, peers):
+        self.blockchain.wait_for_idle()
         peer = peers[i][0]
         block_count = ntwrk.command(peer, {'action': 'block_count'})
 
@@ -80,11 +76,7 @@ class PeerCheckService(Service):
         if them < us:
             self.give_block(peer, block_count['length'])
         elif us == them:
-            try:
-                self.ask_for_txs(peer)
-            except Exception as exc:
-                tools.log('ask for tx error')
-                tools.log(exc)
+            self.ask_for_txs(peer)
         else:
             self.download_blocks(peer, block_count, length)
         flag = False

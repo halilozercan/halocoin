@@ -26,6 +26,7 @@ class MinerService(Service):
 
     @threaded
     def worker(self):
+        self.blockchain.wait_for_idle()
         length = self.db.get('length')
         print 'Miner working for block', (length + 1)
         if length == -1:
