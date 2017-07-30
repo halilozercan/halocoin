@@ -26,7 +26,7 @@ class PeerListenService(Service):
         try:
             self.s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             self.s.settimeout(1)
-            self.s.bind(('localhost', self.engine.config['peer.port']))
+            self.s.bind(('0.0.0.0', self.engine.config['peer.port']))
             self.s.listen(10)
         except:
             tools.log("Could not start Peer Receive socket!")
@@ -77,10 +77,9 @@ class PeerListenService(Service):
     def range_request(self, range):
         out = []
         counter = 0
-        while (len(tools.package(out)) < custom.max_download
-               and range[0] + counter <= range[1]):
+        while range[0] + counter <= range[1]:
             block = self.db.get(range[0] + counter)
-            if 'length' in block:
+            if block and 'length' in block:
                 out.append(block)
             counter += 1
         return out

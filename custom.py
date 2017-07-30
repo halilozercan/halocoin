@@ -4,7 +4,7 @@ import os
 from decimal import Decimal
 
 DEBUG = False
-peers = [['139.179.21.17', 7900]]
+peers = [['188.166.65.249', 7900]]
 current_loc = os.path.dirname(os.path.abspath(__file__))
 database_name = os.path.join(current_loc, 'db_4')
 log_file = os.path.join(current_loc, 'log')
