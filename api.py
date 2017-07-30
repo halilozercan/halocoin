@@ -144,7 +144,7 @@ class ApiService(Service):
         return self.blockchain.target(self.db.get('length'))
 
     @sync
-    def balance(self, address='default', no_database=False):
+    def balance(self, address='default'):
         if address == 'default':
             address = self.db.get('address')
         account = tools.get_account(self.db, address)
@@ -169,13 +169,3 @@ class ApiService(Service):
         else:
             self.miner.register()
             return 'Running miner'
-
-    @sync
-    def pass_(self):
-        return ' '
-
-    @sync
-    def error_(self):
-        # return error
-        # Previously an error object was returned. No idea what it was about
-        return "error"
