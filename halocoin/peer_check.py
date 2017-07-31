@@ -53,7 +53,6 @@ class PeerCheckService(Service):
 
     @sync
     def peer_check(self, i, peers):
-        self.blockchain.blocks_queue.join()
         peer = peers[i][0]
         block_count = ntwrk.command(peer, {'action': 'block_count'})
 
@@ -104,8 +103,7 @@ class PeerCheckService(Service):
             if tools.fork_check(blocks, length, block):
                 self.blockchain.delete_block()
                 length -= 1
-        for block in blocks:
-            self.blockchain.blocks_queue.put(block)
+        self.blockchain.blocks_queue.put(blocks)
         return 0
 
     def ask_for_txs(self, peer):
