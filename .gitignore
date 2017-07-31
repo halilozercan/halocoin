@@ -4,3 +4,6 @@ log*
 DB/
 venv/
 todo
+build/
+dist/
+*egg-info*
