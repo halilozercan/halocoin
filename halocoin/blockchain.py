@@ -48,10 +48,9 @@ class BlockchainService(Service):
             if isinstance(candidate_block, list):
                 for block in candidate_block:
                     self.add_block(block)
-                    self.blocks_queue.task_done()
             else:
                 self.add_block(candidate_block)
-                self.blocks_queue.task_done()
+            self.blocks_queue.task_done()
 
         while not self.tx_queue.empty():
             candidate_tx = self.tx_queue.get()
