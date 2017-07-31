@@ -98,11 +98,6 @@ class PeerCheckService(Service):
         blocks = ntwrk.command(peer, {'action': 'range_request', 'range': b})
         if not isinstance(blocks, list):
             return []
-        for i in range(10):  # this part should be re-written so badly
-            block = self.db.get(length)
-            if tools.fork_check(blocks, length, block):
-                self.blockchain.delete_block()
-                length -= 1
         self.blockchain.blocks_queue.put(blocks)
         return 0
 

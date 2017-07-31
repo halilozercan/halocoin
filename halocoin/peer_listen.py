@@ -95,15 +95,5 @@ class PeerListenService(Service):
 
     @sync
     def pushblock(self, blocks):
-        print 'pushing blocks', len(blocks)
-        length = self.db.get('length')
-        for i in range(20):
-            block = self.db.get(length)
-            if tools.fork_check(blocks, length, block):
-                print 'removing', length
-                self.blockchain.delete_block()
-                length -= 1
-            else:
-                break
         self.blockchain.blocks_queue.put(blocks)
         return 'success'

@@ -46,6 +46,17 @@ class BlockchainService(Service):
         while not self.blocks_queue.empty():
             candidate_block = self.blocks_queue.get()
             if isinstance(candidate_block, list):
+                blocks = candidate_block  # This is just aliasing
+                print 'pushing blocks', len(blocks)
+                length = self.db.get('length')
+                for i in range(20):
+                    block = self.db.get(length)
+                    if tools.fork_check(blocks, length, block):
+                        print 'removing', length
+                        self.delete_block()
+                        length -= 1
+                    else:
+                        break
                 for block in candidate_block:
                     self.add_block(block)
             else:
