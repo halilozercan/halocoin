@@ -125,3 +125,7 @@ def main():
     else:
         argv = sys.stdin.read().split(' ')
         run(argv)
+
+
+if __name__ == '__main__':
+    run(sys.argv)

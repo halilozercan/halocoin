@@ -103,5 +103,7 @@ class PeerListenService(Service):
                 print 'removing', length
                 self.blockchain.delete_block()
                 length -= 1
+            else:
+                break
         self.blockchain.blocks_queue.put(blocks)
         return 'success'
