@@ -38,6 +38,7 @@ class PeerListenService(Service):
         try:
             client_sock, address = self.s.accept()
             response, leftover = ntwrk.receive(client_sock)
+            self.blockchain.blocks_queue.join()
             if response.getFlag():
                 message = Message.from_yaml(response.getData())
                 request = json.loads(message.get_body())
@@ -95,13 +96,15 @@ class PeerListenService(Service):
 
     @sync
     def pushblock(self, blocks):
+        print 'pushing blocks', len(blocks)
         length = self.db.get('length')
-        block = self.db.get(length)
-
         for i in range(20):
+            block = self.db.get(length)
             if tools.fork_check(blocks, length, block):
+                print 'removing', length
                 self.blockchain.delete_block()
                 length -= 1
         for block in blocks:
+            print 'adding', block['length']
             self.blockchain.blocks_queue.put(block)
         return 'success'
