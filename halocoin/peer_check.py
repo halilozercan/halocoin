@@ -100,8 +100,8 @@ class PeerCheckService(Service):
         if not isinstance(blocks, list):
             return []
         length = self.db.get('length')
-        block = self.db.get(length)
-        for i in range(10):  # this part should be re-written so badly
+        for i in range(20):  # this part should be re-written so badly
+            block = self.db.get(length)
             if tools.fork_check(blocks, length, block):
                 self.blockchain.delete_block()
                 length -= 1
