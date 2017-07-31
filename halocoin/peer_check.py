@@ -53,7 +53,7 @@ class PeerCheckService(Service):
 
     @sync
     def peer_check(self, i, peers):
-        self.blockchain.wait_for_idle()
+        self.blockchain.blocks_queue.join()
         peer = peers[i][0]
         block_count = ntwrk.command(peer, {'action': 'block_count'})
 

@@ -17,6 +17,18 @@ import logging
 import pt
 
 
+def init_logging(working_dir):
+    if custom.DEBUG:
+        logging.basicConfig(level=logging.INFO,
+                            format='%(levelname)s on %(asctime)s\n%(message)s',
+                            datefmt='%m/%d/%Y %I:%M:%S %p')
+    else:
+        logging.basicConfig(filename=os.path.join(working_dir, custom.log_file),
+                            level=logging.DEBUG,
+                            format='%(levelname)s on %(asctime)s\n%(message)s',
+                            datefmt='%m/%d/%Y %I:%M:%S %p')
+
+
 # print(json.dumps(x, indent=3, sort_keys=True))  for pretty printing
 def update_account_with_txs(txs, address, account):
     for tx in txs:
@@ -84,15 +96,10 @@ def known_tx_count(account, address, txs_in_pool):
     return account['count'] + number_of_unconfirmed_txs(address)
 
 
-def get_dict_nested(loc, dic):
-    if loc == []:
-        return dic
-    return get_dict_nested(loc[1:], dic[loc[0]])
-
-
-def set_dict_nested(loc, dic, val):
-    get_dict_nested(loc[:-1], dic)[loc[-1]] = val
-    return dic
+def get_default_dir():
+    from os.path import expanduser
+    home = expanduser("~")
+    return os.path.join(home, '.halocoin')
 
 
 def add_peer(peer, current_peers):
@@ -102,31 +109,11 @@ def add_peer(peer, current_peers):
     return current_peers
 
 
-def dump_out(queue):
-    while not queue.empty():
-        try:
-            queue.get(False)
-        except:
-            pass
-
-
-if not custom.DEBUG:
-    logging.basicConfig(filename=custom.log_file, level=logging.INFO)
-
-
-def log(junk):
-    if isinstance(junk, Exception):
-        logging.exception(junk)
+def log(message):
+    if isinstance(message, Exception):
+        logging.exception(message)
     else:
-        logging.info(str(junk))
-
-
-def can_unpack(o):
-    try:
-        unpackage(o)
-        return True
-    except:
-        return False
+        logging.info('{}'.format(message))
 
 
 def tx_owner_address(tx):

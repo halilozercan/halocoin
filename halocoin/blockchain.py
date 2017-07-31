@@ -36,8 +36,6 @@ class BlockchainService(Service):
         self.blocks_queue = Queue.Queue()
         self.tx_queue = Queue.Queue()
         self.db = None
-        self.idle_signal = threading.Event()
-        self.set_blockchain_state(BlockchainService.IDLE)
 
     def on_register(self):
         self.db = self.engine.db
@@ -46,33 +44,14 @@ class BlockchainService(Service):
     @threaded
     def process(self):
         while not self.blocks_queue.empty():
-            self.set_blockchain_state(BlockchainService.SYNCING)
             candidate_block = self.blocks_queue.get()
             self.add_block(candidate_block)
-        self.set_blockchain_state(BlockchainService.IDLE)
+            self.blocks_queue.task_done()
+
         while not self.tx_queue.empty():
             candidate_tx = self.tx_queue.get()
             self.add_tx(candidate_tx)
-        # Wait between each check. This way we wouldn't force CPU
-        time.sleep(1)
-
-    @sync
-    def set_blockchain_state(self, state):
-        self.__blockchain_state = state
-        if state == BlockchainService.IDLE:
-            self.idle_signal.set()
-        else:
-            self.idle_signal.clear()
-
-    @sync
-    def get_blockchain_state(self):
-        return self.__blockchain_state
-
-    def wait_for_idle(self):
-        if self.get_blockchain_state() == BlockchainService.IDLE:
-            return
-        else:
-            self.idle_signal.wait()
+            self.tx_queue.task_done()
 
     @sync
     def tx_pool(self):
@@ -145,7 +124,7 @@ class BlockchainService(Service):
         """Attempts adding a new block to the blockchain.
          Median is good for weeding out liars, so long as the liars don't have 51%
          hashpower. """
-        print 'started adding block', block['length']
+
         def tx_check(txs_in_block):
             """
             Checks transactions validity in a sandboxed environment where
@@ -190,13 +169,13 @@ class BlockchainService(Service):
             return False
 
         if not ('length' in block and isinstance(block['length'], int)):
-            tools.log('Length is not valid')
+            #tools.log('Length is not valid')
             return False
 
         length = self.db.get('length')
 
         if int(block['length']) != int(length) + 1:
-            tools.log('Length is not valid')
+            #tools.log('Length is not valid')
             return False
 
         # TODO: understand what is going on here
@@ -260,8 +239,6 @@ class BlockchainService(Service):
 
         for orphan in sorted(orphans, key=lambda x: x['count']):
             self.add_tx(orphan)
-
-        print 'finished adding block', block['length']
 
     @sync
     def delete_block(self):

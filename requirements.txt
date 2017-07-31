@@ -1,0 +1,9 @@
+certifi==2017.7.27.1
+chardet==3.0.4
+filelock==2.0.11
+idna==2.5
+leveldb==0.194
+pycrypto==2.6.1
+PyYAML==3.12
+requests==2.18.2
+urllib3==1.22

@@ -9,6 +9,8 @@ from pprint import pprint
 import filelock
 import sys
 
+import signal
+
 import custom
 import engine
 
@@ -21,7 +23,7 @@ def run_command(p):
     return response
 
 
-if __name__ == '__main__':
+def run(argv):
     actions = ['start', 'stop', 'spend', 'balance', 'mybalance', 'difficulty', 'info', 'myaddress',
                'peers', 'blockcount', 'txs', 'new_wallet', 'pubkey', 'block', 'mine']
     parser = argparse.ArgumentParser(description='CLI for halocoin application.')
@@ -36,28 +38,10 @@ if __name__ == '__main__':
                         help='Wallet file address')
     parser.add_argument('--no-database', action="store_true", dest='no_database',
                         help='Do not use database information, look at blockchain')
-    """
-    parser.add_argument('--start', help='Start a full node', action="store_true")
-    parser.add_argument('--stop', help='Stop all the threads and shut down the node', action="store_true")
-    parser.add_argument('--blockcount', help='returns the number of blocks since the genesis block',
-                        action="store_true")
-    parser.add_argument('--txs', action="store_true",
-                        help='A list of the zeroth confirmation transactions that are expected to be included '
-                             'in the next block')
-    parser.add_argument('--balance', action="store", type=str, metavar="<addr>",
-                        help='Balance of the given address. Example: balance 11j9csj9802hc982c2h09ds')
-    parser.add_argument('--mybalance', action="store_true",
-                        help='The amount of satoshis that you own')
-    parser.add_argument('--difficulty', action="store_true", help='Current difficulty')
-    parser.add_argument('--info', action="store_true",
-                        help='The contents of an entry in the hashtable. If you want to know what the first '
-                             'block was: info 0, if you want to know about a particular address <addr>: info '
-                             '<addr>, if you want to know about yourself: info my_address')
-    parser.add_argument('--myaddress', action="store_true", help='Tells you your own address')
-    parser.add_argument('--peers', action="store_true", help='Your list of peers')
-    """
+    parser.add_argument('--dir', action="store", type=str, dest='dir',
+                        help='Directory for halocoin to use.')
 
-    args = parser.parse_args()
+    args = parser.parse_args(argv[1:])
 
     if args.action in ['balance', 'send'] and args.address is None:
         print('You should specify an address when running {}'.format(args.action))
@@ -66,8 +50,27 @@ if __name__ == '__main__':
         print('You should specify a wallet to run {}'.format(args.action))
         exit(1)
 
+    if args.dir is None:
+        working_dir = tools.get_default_dir()
+    else:
+        working_dir = args.dir
+
+    if os.path.exists(working_dir) and not os.path.isdir(working_dir):
+        print("Given path {} is not a directory.".format(working_dir))
+        exit(1)
+    elif not os.path.exists(working_dir):
+        print("Given path {} does not exist. Attempting to create...".format(working_dir))
+        try:
+            os.makedirs(working_dir)
+            print("Successful")
+        except OSError:
+            print("Could not create a directory!")
+            exit(1)
+
+    tools.init_logging(working_dir)
+
     if args.action == 'start':
-        lock = filelock.FileLock('engine_lock')
+        lock = filelock.FileLock(os.path.join(working_dir, 'engine_lock'))
         try:
             with lock.acquire(timeout=2):
                 wallet_file = open(args.wallet, 'r')
@@ -78,8 +81,7 @@ if __name__ == '__main__':
                 wallet = json.loads(tools.decrypt(wallet_pw, wallet_encrypted_content))
 
                 # TODO: Real configuration
-                #tools.daemonize(lambda: engine.main(wallet, None))
-                engine.main(wallet, None)
+                engine.main(wallet, None, working_dir)
         except:
             print('Halocoin is already running')
     elif args.action == 'new_wallet':
@@ -111,8 +113,15 @@ if __name__ == '__main__':
             cmd['number'] = args.number
         elif args.action == 'balance':
             cmd['address'] = args.address
-            cmd['no_database'] = args.no_database
         elif args.action == 'spend':
             cmd['address'] = args.address
             cmd['amount'] = args.amount
-        pprint(run_command(cmd))
+        print(run_command(cmd))
+
+
+def main():
+    if sys.stdin.isatty():
+        run(sys.argv)
+    else:
+        argv = sys.stdin.read().split(' ')
+        run(argv)

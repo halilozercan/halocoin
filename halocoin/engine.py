@@ -1,5 +1,6 @@
 """This program starts all the threads going. When it hears a kill signal, it kills all the threads.
 """
+import os
 import time
 
 import custom
@@ -25,14 +26,15 @@ def test_database(db):
 
 
 class Engine(Service):
-    def __init__(self, wallet, config):
+    def __init__(self, wallet, config, working_dir):
         Service.__init__(self, 'engine')
         self.wallet = wallet
         self.config = config
+        self.working_dir = working_dir
 
         # TODO: remove
         self.config = {
-            'database.name': custom.database_name,
+            'database.name': os.path.join(self.working_dir, custom.database_name),
             'api.port': custom.api_port,
             'peer.block_request_limit': 50,
             'peer.port': custom.port
@@ -100,14 +102,6 @@ class Engine(Service):
             self.unregister_sub_services()
             return False
         print("Started Peers Check")
-        """
-        self.db.put('last_cache_length', 0)
-        self.db.put('txs', [])
-        self.db.delete('11fNtNPX8ruarfy6kc7Fg6RDb7SJxun')
-        self.db.delete('1144dJos5Dsm7CubWhzvo7EQn1RxF6u')
-        self.blockchain.cache_blockchain()
-        print self.db.get('1144dJos5Dsm7CubWhzvo7EQn1RxF6u')
-        """
         return True
 
     def unregister_sub_services(self):
@@ -136,8 +130,8 @@ class Engine(Service):
         self.unregister()
 
 
-def main(wallet, config):
-    new_service = Engine(wallet, config)
+def main(wallet, config, working_dir):
+    new_service = Engine(wallet, config, working_dir)
     if new_service.register():
         new_service.join()
         print("Exiting gracefully")

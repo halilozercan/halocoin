@@ -5,12 +5,10 @@ from decimal import Decimal
 
 DEBUG = False
 peers = [['188.166.65.249', 7900], ['139.179.21.17', 7900]]
-current_loc = os.path.dirname(os.path.abspath(__file__))
-database_name = os.path.join(current_loc, 'db_4')
-log_file = os.path.join(current_loc, 'log')
+database_name = 'db_4'
+log_file = 'log'
 port = 7900
 api_port = 7899
-database_port = 7898
 version = "0.0001"
 max_key_length = 6 ** 4
 block_reward = 10 ** 5

@@ -26,7 +26,7 @@ class MinerService(Service):
 
     @threaded
     def worker(self):
-        self.blockchain.wait_for_idle()
+        self.blockchain.blocks_queue.join()
         length = self.db.get('length')
         print 'Miner working for block', (length + 1)
         if length == -1:
@@ -39,7 +39,7 @@ class MinerService(Service):
         possible_block = None
         while self.threaded_running() and time.time() < start + custom.blocktime / 3 \
                 and possible_block is None:
-            result = self.POW(candidate_block)
+            result = self.proof_of_work(candidate_block)
             if result.getFlag():
                 possible_block = result.getData()
 
@@ -79,17 +79,19 @@ class MinerService(Service):
                'txs': [self.make_mint(pubkey)]}
         return out
 
-    def POW(self, block):
+    def proof_of_work(self, block):
         if 'nonce' in block:
             block.pop('nonce')
         halfHash = tools.det_hash(block)
         block['nonce'] = random.randint(0, 10000000000000000000000000000000000000000)
         count = 0
-        while tools.det_hash({'nonce': block['nonce'],
-                              'halfHash': halfHash}) > block['target']:
+        current_hash = tools.det_hash({'nonce': block['nonce'], 'halfHash': halfHash})
+        while current_hash > block['target'] and self.threaded_running() and count < 100000:
             count += 1
-            if count > 1000000:
-                return Response(False, None)
             block['nonce'] += 1
+            current_hash = tools.det_hash({'nonce': block['nonce'], 'halfHash': halfHash})
 
-        return Response(True, block)
+        if current_hash <= block['target']:
+            return Response(True, block)
+        else:
+            return Response(False, None)
