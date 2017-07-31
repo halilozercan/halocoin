@@ -35,7 +35,6 @@ class ApiService(Service):
                 self.s.listen(5)
                 return True
             except:
-                tools.log("Could not start API socket!")
                 time.sleep(2)
         return True
 

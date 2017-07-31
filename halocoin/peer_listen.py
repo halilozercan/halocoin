@@ -5,6 +5,8 @@ import json
 import socket
 import sys
 
+import time
+
 import custom
 import ntwrk
 import tools
@@ -23,14 +25,16 @@ class PeerListenService(Service):
         self.db = self.engine.db
         self.blockchain = self.engine.blockchain
 
-        try:
-            self.s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            self.s.settimeout(1)
-            self.s.bind(('0.0.0.0', self.engine.config['peer.port']))
-            self.s.listen(10)
-        except:
-            tools.log("Could not start Peer Receive socket!")
-            return False
+        start = time.time()
+        while start + 60 > time.time():
+            try:
+                self.s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                self.s.settimeout(1)
+                self.s.bind(('0.0.0.0', self.engine.config['peer.port']))
+                self.s.listen(10)
+            except:
+                tools.log("Could not start Peer Receive socket!")
+                time.sleep(2)
         return True
 
     @threaded

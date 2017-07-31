@@ -4,7 +4,7 @@ import os
 from decimal import Decimal
 
 DEBUG = False
-peers = [['188.166.65.249', 7900], ['139.179.21.17', 7900]]
+peers = [['188.166.65.249', 7900], ['139.179.21.17', 7900], ['188.226.189.108', 7900]]
 database_name = 'db_4'
 log_file = 'log'
 port = 7900
