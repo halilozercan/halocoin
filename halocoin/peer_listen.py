@@ -32,10 +32,11 @@ class PeerListenService(Service):
                 self.s.settimeout(1)
                 self.s.bind(('0.0.0.0', self.engine.config['peer.port']))
                 self.s.listen(10)
+                return True
             except:
                 tools.log("Could not start Peer Receive socket!")
                 time.sleep(2)
-        return True
+        return False
 
     @threaded
     def listen(self):
@@ -57,6 +58,7 @@ class PeerListenService(Service):
                     tools.log(sys.exc_info())
                 response = Message(headers={'ack': message.get_header('id')},
                                    body=result)
+                new_peer = [address]
                 ntwrk.send(response, client_sock)
                 client_sock.close()
         except:
@@ -66,7 +68,7 @@ class PeerListenService(Service):
     def receive_peer(self, peer):
         ps = self.db.get('peers_ranked')
         if peer[0] not in map(lambda x: x[0][0], ps):
-            ps = tools.add_peer(peer, ps)
+            ps = tools.add_peer_ranked(peer, ps)
         self.db.put('peers_ranked', ps)
 
     @sync
@@ -87,6 +89,10 @@ class PeerListenService(Service):
                 out.append(block)
             counter += 1
         return out
+
+    @sync
+    def peers(self):
+        return self.db.get('peers_ranked')
 
     @sync
     def txs(self):
