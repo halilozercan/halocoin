@@ -32,6 +32,7 @@ class PeerListenService(Service):
                 self.s.settimeout(1)
                 self.s.bind(('0.0.0.0', self.engine.config['peer.port']))
                 self.s.listen(10)
+                return True
             except:
                 tools.log("Could not start Peer Receive socket!")
                 time.sleep(2)

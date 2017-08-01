@@ -184,6 +184,22 @@ def fork_check(newblocks, length, top_block_on_chain):
     return b
 
 
+def tx_history(db, address):
+    length = db.get('length')
+    txs = []
+
+    for i in reversed(range(length+1)):
+        block = db.get(str(i))
+        for tx in block['txs']:
+            tx['block'] = str(i)
+            if tx['type'] == 'spend':
+                send_address = tx_owner_address(tx)
+                recv_address = tx['to']
+                if address == send_address or address == recv_address:
+                    txs.append(tx)
+    return txs
+
+
 def exponential_random(r, i=0):
     if random.random() < r:
         return i

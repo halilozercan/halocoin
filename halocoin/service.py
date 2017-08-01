@@ -7,6 +7,17 @@ import tools
 from ntwrk.message import Order
 
 
+class NoExceptionQueue(Queue.Queue):
+    def __init__(self, maxsize=0):
+        Queue.Queue.__init__(self, maxsize)
+
+    def put(self, item, block=True, timeout=None):
+        try:
+            Queue.Queue.put(self, item, block, timeout)
+        except Queue.Full:
+            pass
+
+
 class Service:
     INIT = 0
     RUNNING = 1
@@ -15,7 +26,7 @@ class Service:
 
     def __init__(self, name):
         self.event_thread = threading.Thread()
-        self.into_service_queue = Queue.Queue(20)
+        self.into_service_queue = NoExceptionQueue(20)
         self.signals = {}
         self.service_responses = {}
         self.name = name

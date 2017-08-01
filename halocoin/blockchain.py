@@ -12,7 +12,7 @@ import pt
 import tools
 from ntwrk import Response
 
-from service import Service, threaded, sync
+from service import Service, threaded, sync, NoExceptionQueue
 
 
 def hex_sum(a, b):
@@ -33,8 +33,8 @@ class BlockchainService(Service):
     def __init__(self, engine):
         Service.__init__(self, name='blockchain')
         self.engine = engine
-        self.blocks_queue = Queue.Queue()
-        self.tx_queue = Queue.Queue()
+        self.blocks_queue = NoExceptionQueue(100)
+        self.tx_queue = NoExceptionQueue(100)
         self.db = None
 
     def on_register(self):
@@ -47,12 +47,10 @@ class BlockchainService(Service):
             candidate_block = self.blocks_queue.get()
             if isinstance(candidate_block, list):
                 blocks = candidate_block  # This is just aliasing
-                print 'pushing blocks', len(blocks)
                 length = self.db.get('length')
                 for i in range(20):
                     block = self.db.get(length)
                     if tools.fork_check(blocks, length, block):
-                        print 'removing', length
                         self.delete_block()
                         length -= 1
                     else:

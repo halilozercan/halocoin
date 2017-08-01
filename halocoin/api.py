@@ -133,6 +133,10 @@ class ApiService(Service):
         return self.db.get('pubkey')
 
     @sync
+    def history(self, address):
+        return tools.tx_history(self.db, address)
+
+    @sync
     def block(self, number=-1):
         if number == -1:
             number = self.db.get('length')
