@@ -102,9 +102,8 @@ def get_default_dir():
     return os.path.join(home, '.halocoin')
 
 
-def add_peer(peer, current_peers):
-    if peer[0][0] not in map(lambda x: x[0][0], current_peers):
-        log('add peer: ' + str(peer))
+def add_peer_ranked(peer, current_peers):
+    if peer[0] not in map(lambda x: x[0][0], current_peers):
         current_peers.append([peer, 5, '0', 0])
     return current_peers
 

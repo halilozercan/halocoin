@@ -77,12 +77,17 @@ def run(argv):
                 wallet_encrypted_content = wallet_file.read()
                 from getpass import getpass
 
-                wallet_pw = getpass('Wallet password: ')
-                wallet = json.loads(tools.decrypt(wallet_pw, wallet_encrypted_content))
+                while True:
+                    try:
+                        wallet_pw = getpass('Wallet password: ')
+                        wallet = json.loads(tools.decrypt(wallet_pw, wallet_encrypted_content))
+                        break
+                    except ValueError:
+                        print('Wrong password')
 
                 # TODO: Real configuration
                 engine.main(wallet, None, working_dir)
-        except:
+        except filelock.Timeout:
             print('Halocoin is already running')
     elif args.action == 'new_wallet':
         from getpass import getpass

@@ -24,7 +24,7 @@ class PeerCheckService(Service):
         self.blockchain = self.engine.blockchain
         self.old_peers = self.db.get('peers_ranked')
         for peer in self.new_peers:
-            self.old_peers = tools.add_peer(peer, self.old_peers)
+            self.old_peers = tools.add_peer_ranked(peer, self.old_peers)
         self.db.put('peers_ranked', self.old_peers)
         return True
 
