@@ -384,7 +384,6 @@ def num_to_var_int(x):
         return chr(255) + encode(x, 256, 8)[::-1]
 
 
-# WTF, Electrum?
 def electrum_sig_hash(message):
     padded = "\x18Bitcoin Signed Message:\n" + num_to_var_int(len(message)) + message
     return bin_dbl_sha256(padded)

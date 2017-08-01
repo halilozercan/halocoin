@@ -33,7 +33,7 @@ class BlockchainService(Service):
     def __init__(self, engine):
         Service.__init__(self, name='blockchain')
         self.engine = engine
-        self.blocks_queue = NoExceptionQueue(100)
+        self.blocks_queue = NoExceptionQueue(3)
         self.tx_queue = NoExceptionQueue(100)
         self.db = None
 
@@ -55,7 +55,7 @@ class BlockchainService(Service):
                         length -= 1
                     else:
                         break
-                for block in candidate_block:
+                for block in blocks:
                     self.add_block(block)
             else:
                 self.add_block(candidate_block)
@@ -252,6 +252,8 @@ class BlockchainService(Service):
 
         for orphan in sorted(orphans, key=lambda x: x['count']):
             self.add_tx(orphan)
+
+        return True
 
     @sync
     def delete_block(self):

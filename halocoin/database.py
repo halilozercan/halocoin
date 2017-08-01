@@ -32,13 +32,6 @@ class DatabaseService(Service):
             return None
 
     @sync
-    def get_account(self, address):
-        try:
-            return json.loads(self.DB.Get(self.salt + str(address)))
-        except KeyError:
-            return {'amount': 0, 'count': 0}
-
-    @sync
     def put(self, key, value):
         """
         Puts the val in args[1] under the key in args[0] with the salt

@@ -15,6 +15,7 @@ class NoExceptionQueue(Queue.Queue):
         try:
             Queue.Queue.put(self, item, block, timeout)
         except Queue.Full:
+            print "Exception handled"
             pass
 
 

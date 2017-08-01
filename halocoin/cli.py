@@ -30,6 +30,8 @@ def run(argv):
     parser.add_argument('action', help='Main action to take', choices=actions)
     parser.add_argument('--address', action="store", type=str, dest='address',
                         help='Give a valid blockchain address')
+    parser.add_argument('--message', action="store", type=str, dest='message',
+                        help='Message to send with transaction')
     parser.add_argument('--amount', action="store", type=int, dest='amount',
                         help='Amount of coins that are going to be used')
     parser.add_argument('--number', action="store", type=int, dest='number',
@@ -116,19 +118,24 @@ def run(argv):
         cmd = {'action': args.action}
         if args.action == 'block':
             cmd['number'] = args.number
+            print(run_command(cmd))
         elif args.action == 'balance':
             cmd['address'] = args.address
+            print(run_command(cmd))
         elif args.action == 'spend':
             cmd['address'] = args.address
             cmd['amount'] = args.amount
+            if args.message is not None:
+                cmd['message'] = args.message
+            print(run_command(cmd))
         elif args.action == 'history':
             cmd['address'] = args.address
             history = run_command(cmd)
             for tx in history:
                 print("In Block {} {} => {} for amount {}"
                       .format(tx['block'], tools.tx_owner_address(tx), tx['to'], tx['amount']))
-            return
-        print(run_command(cmd))
+        else:
+            print(run_command(cmd))
 
 
 def main():

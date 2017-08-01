@@ -30,6 +30,8 @@ class ApiService(Service):
         while start + 60 > time.time():
             try:
                 self.s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                self.s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+                self.s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
                 self.s.settimeout(1)
                 self.s.bind(('localhost', self.engine.config['api.port']))
                 self.s.listen(5)
@@ -115,10 +117,11 @@ class ApiService(Service):
         return self.db.get('address')
 
     @sync
-    def spend(self, amount=0, address=None):
+    def spend(self, amount=0, address=None, message=''):
         if amount == 0 and address is None:
             return 'not enough inputs'
-        return self.easy_add_transaction({'type': 'spend', 'amount': int(amount), 'to': address})
+        return self.easy_add_transaction({'type': 'spend', 'amount': int(amount),
+                                          'to': address, 'message': message})
 
     @sync
     def blockcount(self):

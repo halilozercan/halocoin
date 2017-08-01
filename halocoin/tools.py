@@ -84,6 +84,8 @@ def get_account(db, address):
         for i in last_blocks_indices:
             block = db.get(str(i))
             account = update_account_with_txs(block['txs'], address, account)
+    account['cache_length'] = current_length + 1
+    db.put(address, account)
     return account
 
 
