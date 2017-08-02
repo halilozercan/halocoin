@@ -42,13 +42,15 @@ class BlockchainService(Service):
 
     @threaded
     def process(self):
-        while not self.blocks_queue.empty():
+        while not self.blocks_queue.empty() and self.threaded_running():
             self.set_chain_state(BlockchainService.SYNCING)
             candidate_block = self.blocks_queue.get()
             if isinstance(candidate_block, list):
                 blocks = candidate_block  # This is just aliasing
                 length = self.db.get('length')
                 for i in range(20):
+                    if not self.threaded_running():
+                        break
                     block = self.db.get(length)
                     if tools.fork_check(blocks, length, block):
                         self.delete_block()
@@ -63,7 +65,7 @@ class BlockchainService(Service):
 
         self.set_chain_state(BlockchainService.IDLE)
 
-        while not self.tx_queue.empty():
+        while not self.tx_queue.empty() and self.threaded_running():
             candidate_tx = self.tx_queue.get()
             self.add_tx(candidate_tx)
             self.tx_queue.task_done()

@@ -139,13 +139,19 @@ class Service:
         if expect_result:
             try:
                 if self.signals[new_order.id].wait():
-                    response = self.service_responses.pop(new_order.id)
+                    response = self.service_responses[new_order.id]
+                    del self.signals[new_order.id]
+                    del self.service_responses[new_order.id]
                     result = response
                 else:
                     print 'Service wait timed out', self.__class__.__name__
             except:
                 print sys.exc_info()
                 pass
+        print '{} has called {}, signals {}, responses {}'.format(self.__class__.__name__,
+                                                                  action,
+                                                                  self.signals,
+                                                                  self.service_responses)
         return result
 
     def set_state(self, state):  # (INIT|RUNNING|STOPPED|TERMINATED) -> ()
