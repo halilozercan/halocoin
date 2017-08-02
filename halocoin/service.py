@@ -123,7 +123,8 @@ class Service:
     def execute(self, action, expect_result, args, kwargs):
         if self.get_state() != Service.RUNNING:
             result = getattr(self, action)._original(self, *args, **kwargs)
-            warnings.warn('You are running a background method on an unregistered service. {} {}'.format(action, self.__class__.__name__))
+            warnings.warn('You are running a background method on an unregistered service. {} {}'.format(
+                action, self.__class__.__name__))
             return result
 
         result = None
@@ -134,9 +135,9 @@ class Service:
             result = Service.execute_order(self, new_order)
             return result
 
-        self.signals[new_order.id] = threading.Event()
-        self.into_service_queue.put(new_order)
         if expect_result:
+            self.signals[new_order.id] = threading.Event()
+            self.into_service_queue.put(new_order)
             try:
                 if self.signals[new_order.id].wait():
                     response = self.service_responses[new_order.id]

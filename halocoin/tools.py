@@ -101,37 +101,6 @@ def buffer_(str_to_pad, size):
     return str_to_pad.rjust(size, '0')
 
 
-def is_number(s):
-    try:
-        int(s)
-        return True
-    except:
-        return False
-
-
-def fork_check(newblocks, length, top_block_on_chain):
-    recent_hash = det_hash(top_block_on_chain)
-    their_hashes = map(lambda x: x['prevHash'] if x['length'] > 0 else 0, newblocks) + [det_hash(newblocks[-1])]
-    b = (recent_hash not in their_hashes) and newblocks[0]['length'] - 1 < length < newblocks[-1]['length']
-    return b
-
-
-def tx_history(db, address):
-    length = db.get('length')
-    txs = []
-
-    for i in reversed(range(length+1)):
-        block = db.get(str(i))
-        for tx in block['txs']:
-            tx['block'] = str(i)
-            if tx['type'] == 'spend':
-                send_address = tx_owner_address(tx)
-                recv_address = tx['to']
-                if address == send_address or address == recv_address:
-                    txs.append(tx)
-    return txs
-
-
 def exponential_random(r, i=0):
     if random.random() < r:
         return i

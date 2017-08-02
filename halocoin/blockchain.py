@@ -52,7 +52,7 @@ class BlockchainService(Service):
                     if not self.threaded_running():
                         break
                     block = self.db.get(length)
-                    if tools.fork_check(blocks, length, block):
+                    if BlockchainService.fork_check(blocks, length, block):
                         self.delete_block()
                         length -= 1
                     else:
@@ -346,6 +346,14 @@ class BlockchainService(Service):
             tools.log('sigs do not match')
             return False
         return True
+
+    @staticmethod
+    def fork_check(newblocks, length, top_block_on_chain):
+        recent_hash = tools.det_hash(top_block_on_chain)
+        their_hashes = map(lambda x: x['prevHash'] if x['length'] > 0 else 0, newblocks) + \
+                       [tools.det_hash(newblocks[-1])]
+        b = (recent_hash not in their_hashes) and newblocks[0]['length'] - 1 < length < newblocks[-1]['length']
+        return b
 
     @staticmethod
     def tx_integrity_check(tx):

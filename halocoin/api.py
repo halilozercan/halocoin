@@ -141,10 +141,6 @@ class ApiService(Service):
     def pubkey(self):
         return self.db.get('pubkey')
 
-    @blockchain_synced
-    def history(self, address):
-        return tools.tx_history(self.db, address)
-
     def block(self, number=-1):
         if number == -1:
             number = self.db.get('length')
