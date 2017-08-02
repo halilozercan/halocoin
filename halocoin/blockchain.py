@@ -1,17 +1,13 @@
 """ This file explains explains the rules for adding and removing blocks from the local chain.
 """
-import Queue
 import copy
-import threading
 import time
-
 from decimal import Decimal
 
 import custom
 import pt
 import tools
 from ntwrk import Response
-
 from service import Service, threaded, sync, NoExceptionQueue
 
 
@@ -36,14 +32,18 @@ class BlockchainService(Service):
         self.blocks_queue = NoExceptionQueue(3)
         self.tx_queue = NoExceptionQueue(100)
         self.db = None
+        self.account = None
+        self.__state = BlockchainService.IDLE
 
     def on_register(self):
         self.db = self.engine.db
+        self.account = self.engine.account
         return True
 
     @threaded
     def process(self):
         while not self.blocks_queue.empty():
+            self.set_chain_state(BlockchainService.SYNCING)
             candidate_block = self.blocks_queue.get()
             if isinstance(candidate_block, list):
                 blocks = candidate_block  # This is just aliasing
@@ -61,10 +61,20 @@ class BlockchainService(Service):
                 self.add_block(candidate_block)
             self.blocks_queue.task_done()
 
+        self.set_chain_state(BlockchainService.IDLE)
+
         while not self.tx_queue.empty():
             candidate_tx = self.tx_queue.get()
             self.add_tx(candidate_tx)
             self.tx_queue.task_done()
+
+    @sync
+    def set_chain_state(self, new_state):
+        self.__state = new_state
+
+    @sync
+    def get_chain_state(self):
+        return self.__state
 
     @sync
     def tx_pool(self):
@@ -96,14 +106,12 @@ class BlockchainService(Service):
         self.db.put('txs', [])
         return txs
 
-    @sync
     def add_tx(self, tx):
 
         if not isinstance(tx, dict):
             return False
 
         address = tools.tx_owner_address(tx)
-        account = tools.get_account(self.db, address)
 
         # tools.log('attempt to add tx: ' +str(tx))
         txs_in_pool = self.tx_pool()
@@ -119,10 +127,10 @@ class BlockchainService(Service):
         if not BlockchainService.tx_integrity_check(tx).getFlag():
             response.setData('tx: ' + str(tx))
             response.setFlag(False)
-        if tx['count'] != tools.known_tx_count(account, tools.tx_owner_address(tx), txs_in_pool):
+        if tx['count'] != self.account.known_tx_count(tools.tx_owner_address(tx)):
             response.setData('count error')
             response.setFlag(False)
-        if not tools.fee_check(tx, txs_in_pool, account):
+        if not self.account.is_tx_affordable(address, tx):
             response.setData('fee check error')
             response.setFlag(False)
 
@@ -132,46 +140,10 @@ class BlockchainService(Service):
         else:
             return 'failed to add tx because: ' + response.getData()
 
-    @sync
     def add_block(self, block):
         """Attempts adding a new block to the blockchain.
          Median is good for weeding out liars, so long as the liars don't have 51%
          hashpower. """
-
-        def tx_check(txs_in_block):
-            """
-            Checks transactions validity in a sandboxed environment where
-            accounts are simulated for the block.
-            :param txs_in_block: transactions inside candidate block
-            :return:
-            """
-            if 1 != len(filter(lambda t: t['type'] == 'mint', txs_in_block)):
-                return False
-
-            account_sandbox = {}
-            for tx in sorted(txs_in_block, key=lambda t: t['count']):
-                if tx['type'] == 'spend':
-                    address_of_tx = tools.tx_owner_address(tx)
-
-                    if address_of_tx not in account_sandbox:
-                        account_of_tx = tools.get_account(self.db, address_of_tx)
-                        account_sandbox[address_of_tx] = account_of_tx
-
-                    account_of_tx = account_sandbox[address_of_tx]
-                    integrity = BlockchainService.tx_integrity_check(tx).getFlag()
-                    fee_check = tools.fee_check(tx, [], account_of_tx)
-                    count_check = (account_of_tx['count'] == tx['count'])
-
-                    if integrity and fee_check and count_check:
-                        account_of_tx['amount'] -= tx['amount']
-                        account_of_tx['amount'] -= custom.fee
-                        account_of_tx['count'] += 1
-                        account_sandbox[address_of_tx] = account_of_tx
-                        continue
-                    else:
-                        tools.log('tx not valid')
-                        return False  # Block is invalid
-            return True  # Block is valid
 
         if not isinstance(block, dict):
             tools.log('Block is not a dict')
@@ -230,7 +202,7 @@ class BlockchainService(Service):
         # if block['time'] < earliest:
         #    tools.log('Received block is generated earlier than median.')
         #    return False
-        if not tx_check(block['txs']):
+        if not self.account.update_accounts_with_block(block, add_flag=True, simulate=True):
             tools.log('Received block failed transactions check.')
             return False
 
@@ -248,14 +220,13 @@ class BlockchainService(Service):
 
         orphans = self.tx_pool_pop_all()
 
-        self.cache_blockchain()
+        self.account.update_accounts_with_block(block, add_flag=True)
 
         for orphan in sorted(orphans, key=lambda x: x['count']):
             self.add_tx(orphan)
 
         return True
 
-    @sync
     def delete_block(self):
         """ Removes the most recent block from the blockchain. """
         length = self.db.get('length')
@@ -275,6 +246,8 @@ class BlockchainService(Service):
             pass
 
         block = self.db.get(length)
+        self.account.update_accounts_with_block(block, add_flag=False)
+
         orphans = self.tx_pool_pop_all()
 
         for tx in block['txs']:
@@ -290,12 +263,9 @@ class BlockchainService(Service):
             block = self.db.get(length)
             self.db.put('diffLength', block['diffLength'])
 
-        self.cache_blockchain()
-
         for orphan in sorted(orphans, key=lambda x: x['count']):
             self.add_tx(orphan)
 
-    @sync
     def recent_blockthings(self, key, size, length=0):
 
         def get_val(length):
@@ -330,27 +300,6 @@ class BlockchainService(Service):
         end = length - max(custom.mmm, custom.history_length) - 100
         clean_up(storage, length - end)
         return map(get_val, range(start, length))
-
-    @sync
-    def cache_blockchain(self):
-        length = self.db.get('length')
-        last_cache_length = self.db.get('last_cache_length')
-        if length - last_cache_length >= custom.cache_length:
-            cache_address_set = set()
-            for i in range(last_cache_length, length):
-                block = self.db.get(str(i))
-                for tx in block['txs']:
-                    cache_address_set.add(tools.tx_owner_address(tx))
-                    if tx['type'] == 'spend':
-                        cache_address_set.add(tx['to'])
-            for address in cache_address_set:
-                account = tools.get_account(self.db, address)
-                account['cache_length'] = length
-                self.db.put(address, account)
-            self.db.put('last_cache_length', length)
-        elif last_cache_length > (length+1):  # We deleted a block involved in cache. Rerun cache routine.
-            #TODO: a better cache fallback
-            self.db.put('last_cache_length', 0)
 
     @staticmethod
     def sigs_match(_sigs, _pubs, msg):
@@ -429,7 +378,6 @@ class BlockchainService(Service):
             response.setData('only spend transactions can be cheched')
         return response
 
-    @sync
     def target(self, length):
         memoized_weights = [custom.inflection ** i for i in range(1000)]
         """ Returns the target difficulty at a particular blocklength. """

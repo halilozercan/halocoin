@@ -4,13 +4,25 @@ import copy
 import json
 import socket
 import sys
-
 import time
 
 import ntwrk
 import tools
+from account import AccountService
+from blockchain import BlockchainService
 from ntwrk import Message
-from service import Service, sync, threaded
+from service import Service, threaded
+
+
+def blockchain_synced(func):
+
+    def wrapper(self, *args, **kwargs):
+        if self.blockchain.get_chain_state() == BlockchainService.IDLE:
+            return func(self, *args, **kwargs)
+        else:
+            return 'Blockchain is syncing. This method is not reliable while operation continues.'
+
+    return wrapper
 
 
 class ApiService(Service):
@@ -19,11 +31,13 @@ class ApiService(Service):
         self.engine = engine
         self.db = None
         self.blockchain = None
+        self.account = None
         self.miner = None
 
     def on_register(self):
         self.db = self.engine.db
         self.blockchain = self.engine.blockchain
+        self.account = self.engine.account
         self.miner = self.engine.miner
 
         start = time.time()
@@ -73,7 +87,6 @@ class ApiService(Service):
         except:
             pass
 
-    @sync
     def easy_add_transaction(self, tx_orig, privkey='default'):
         tx = copy.deepcopy(tx_orig)
         if privkey in ['default', 'Default']:
@@ -86,9 +99,7 @@ class ApiService(Service):
         address = tools.make_address([pubkey], 1)
         if 'count' not in tx:
             try:
-                account = tools.get_account(self.db, address)
-                txs_in_pool = self.blockchain.tx_pool()
-                tx['count'] = tools.known_tx_count(account, address, txs_in_pool)
+                tx['count'] = self.account.known_tx_count(address)
             except:
                 tx['count'] = 0
         if 'pubkeys' not in tx:
@@ -98,11 +109,10 @@ class ApiService(Service):
         self.blockchain.tx_queue.put(tx)
         return 'Tx amount:{} to:{} added to the pool'.format(tx['amount'], tx['to'])
 
-    @sync
     def peers(self):
         return self.db.get('peers_ranked')
 
-    @sync
+    @blockchain_synced
     def info(self, subject=None):
         if subject is None:
             return 'not enough inputs'
@@ -110,64 +120,60 @@ class ApiService(Service):
             address = self.db.get('address')
         else:
             address = subject
-        return tools.get_account(self.db, address)
+        return self.account.get_account(address)
 
-    @sync
     def myaddress(self):
         return self.db.get('address')
 
-    @sync
+    @blockchain_synced
     def spend(self, amount=0, address=None, message=''):
         if amount == 0 and address is None:
             return 'not enough inputs'
         return self.easy_add_transaction({'type': 'spend', 'amount': int(amount),
                                           'to': address, 'message': message})
 
-    @sync
     def blockcount(self):
         return self.db.get('length')
 
-    @sync
     def txs(self):
         return self.blockchain.tx_pool()
 
-    @sync
     def pubkey(self):
         return self.db.get('pubkey')
 
-    @sync
+    @blockchain_synced
     def history(self, address):
         return tools.tx_history(self.db, address)
 
-    @sync
     def block(self, number=-1):
         if number == -1:
             number = self.db.get('length')
         return self.db.get(str(number))
 
-    @sync
+    @blockchain_synced
     def difficulty(self):
         return self.blockchain.target(self.db.get('length'))
 
-    @sync
+    @blockchain_synced
     def balance(self, address='default'):
         if address == 'default':
             address = self.db.get('address')
-        account = tools.get_account(self.db, address)
-        account = tools.update_account_with_txs(self.blockchain.tx_pool(), address, account)
+        account = self.account.get_account(address)
+        account = AccountService.update_account_with_txs(address,
+                                                         account,
+                                                         self.blockchain.tx_pool(),
+                                                         only_outgoing=True)
         return account['amount']
 
-    @sync
+    @blockchain_synced
     def mybalance(self):
         return self.balance()
 
-    @sync
     def stop(self):
         self.db.put('stop', True)
         self.engine.stop()
         return 'Shutting down'
 
-    @sync
     def mine(self):
         if self.miner.get_state() == Service.RUNNING:
             self.miner.unregister()

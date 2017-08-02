@@ -8,6 +8,7 @@ import tools
 from api import ApiService
 from blockchain import BlockchainService
 from database import DatabaseService
+from account import AccountService
 from miner import MinerService
 from peer_listen import PeerListenService
 from peer_check import PeerCheckService
@@ -45,6 +46,7 @@ class Engine(Service):
         self.api = ApiService(self)
         self.peers_check = PeerCheckService(self, custom.peers)
         self.peer_receive = PeerListenService(self)
+        self.account = AccountService(self)
         self.miner = MinerService(self)
 
     def on_register(self):
@@ -102,6 +104,13 @@ class Engine(Service):
             self.unregister_sub_services()
             return False
         print("Started Peers Check")
+
+        if not self.account.register():
+            print("Account service has failed. Exiting!")
+            self.unregister_sub_services()
+            return False
+        print("Started Account")
+        self.db.put('peers_ranked', [])
         return True
 
     def unregister_sub_services(self):
