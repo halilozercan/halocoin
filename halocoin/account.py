@@ -152,6 +152,6 @@ class AccountService(Service):
     def is_tx_affordable(self, address, tx):
         account = AccountService.update_account_with_txs(address,
                                                          self.get_account(address),
-                                                         tx + self.blockchain.tx_pool(),
+                                                         [tx] + self.blockchain.tx_pool(),
                                                          add_flag=True)
         return account['amount'] >= 0

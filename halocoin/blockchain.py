@@ -389,13 +389,6 @@ class BlockchainService(Service):
             b = int(a * number)  # this should be rational multiplication followed by integer estimation
             return tools.buffer_(str(hex(b))[2: -1], 64)
 
-        def multiply_things(things):
-            out = 1
-            while len(things) > 0:
-                out = out * things[0]
-                things = things[1:]
-            return out
-
         def weights(length):  # uses float
             # returns from small to big
             out = memoized_weights[:length]
