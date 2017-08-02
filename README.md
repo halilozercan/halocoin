@@ -59,7 +59,7 @@ Then you can use ```cli.py``` to query your blockchain engine for simple stuff l
 
 ### TODO:
 
-- [] Add more information on README
-- [] Prepare wiki pages to detail implementation and choices
-- [] True p2p
-- [] Unit tests to simulate peer interactions
+- [ ] Add more information on README
+- [ ] Prepare wiki pages to detail implementation and choices
+- [ ] True p2p
+- [ ] Unit tests to simulate peer interactions
