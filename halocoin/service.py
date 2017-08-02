@@ -148,10 +148,6 @@ class Service:
             except:
                 print sys.exc_info()
                 pass
-        print '{} has called {}, signals {}, responses {}'.format(self.__class__.__name__,
-                                                                  action,
-                                                                  self.signals,
-                                                                  self.service_responses)
         return result
 
     def set_state(self, state):  # (INIT|RUNNING|STOPPED|TERMINATED) -> ()

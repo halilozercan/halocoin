@@ -141,13 +141,6 @@ class Engine(Service):
 def main(wallet, config, working_dir):
     new_service = Engine(wallet, config, working_dir)
     if new_service.register():
-        if not custom.DEBUG:
-            from pympler import muppy, summary, tracker
-            tr = tracker.SummaryTracker()
-            while True:
-                tr.print_diff()
-                time.sleep(5)
-
         new_service.join()
         print("Exiting gracefully")
     else:
