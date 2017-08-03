@@ -6,11 +6,10 @@ from decimal import Decimal
 DEBUG = False
 peers = [['188.166.65.249', 7900], ['46.101.107.152', 7900]]
 database_name = 'db_4'
-genesis = '221f2a27d3faff2febddb859d0ad6b70258d70fa13db4558655e0fa1a31f3b4e'
 log_file = 'log'
 port = 7900
 api_port = 7899
-version = "0.0001"
+version = "0.0002"
 max_key_length = 6 ** 4
 block_reward = 10 ** 5
 fee = 10 ** 3

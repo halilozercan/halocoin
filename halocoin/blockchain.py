@@ -165,9 +165,8 @@ class BlockchainService(Service):
             #tools.log('Length is not valid')
             return False
 
-        if int(block['length']) == 0:
-            if tools.det_hash(block) != custom.genesis:
-                return False
+        if 'version' not in block or block['version'] != custom.version:
+            return False
 
         # TODO: understand what is going on here
         if block['diffLength'] != hex_sum(self.db.get('diffLength'),
@@ -347,10 +346,15 @@ class BlockchainService(Service):
 
     @staticmethod
     def fork_check(newblocks, length, top_block_on_chain):
+        """
+        Check whether a fork happens while adding these blocks.
+        If a fork is detected, return the index of last matched block.
+        :param newblocks: Received blocks.
+        :param length:
+        :param top_block_on_chain:
+        :return:
+        """
         recent_hash = tools.det_hash(top_block_on_chain)
-        first_new_block = newblocks[0]
-        if first_new_block['length'] == 0 and tools.det_hash(first_new_block) != custom.genesis:
-            return False
         their_hashes = map(lambda x: x['prevHash'] if x['length'] > 0 else 0, newblocks)
         their_hashes += [tools.det_hash(newblocks[-1])]
         b = (recent_hash not in their_hashes) and newblocks[0]['length'] - 1 < length < newblocks[-1]['length']
