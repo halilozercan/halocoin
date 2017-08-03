@@ -47,6 +47,16 @@ class BlockchainService(Service):
             candidate_block = self.blocks_queue.get()
             if isinstance(candidate_block, list):
                 blocks = candidate_block  # This is just aliasing
+
+                integrity_flag = True
+                for block in blocks:
+                    if not BlockchainService.block_integrity_check(block):
+                        integrity_flag = False
+                        break
+
+                if not integrity_flag:
+                    continue
+
                 length = self.db.get('length')
                 for i in range(20):
                     if not self.threaded_running():
@@ -147,25 +157,10 @@ class BlockchainService(Service):
          Median is good for weeding out liars, so long as the liars don't have 51%
          hashpower. """
 
-        if not isinstance(block, dict):
-            tools.log('Block is not a dict')
-            return False
-
-        if 'error' in block:
-            tools.log('Errors in block')
-            return False
-
-        if not ('length' in block and isinstance(block['length'], int)):
-            #tools.log('Length is not valid')
-            return False
-
         length = self.db.get('length')
 
         if int(block['length']) != int(length) + 1:
-            #tools.log('Length is not valid')
-            return False
-
-        if 'version' not in block or block['version'] != custom.version:
+            # tools.log('Length is not valid')
             return False
 
         # TODO: understand what is going on here
@@ -182,10 +177,6 @@ class BlockchainService(Service):
                 tools.log('prevhash different')
                 return False
 
-        if 'target' not in block:
-            tools.log('no target in block')
-            return False
-
         nonce_and_hash = tools.hash_without_nonce(block)
         if tools.det_hash(nonce_and_hash) > block['target']:
             tools.log('hash is not applicable to target')
@@ -201,12 +192,6 @@ class BlockchainService(Service):
         #                                                custom.mmm,
         #                                                self.db.get('length')))
 
-        if 'time' not in block:
-            tools.log('no time')
-            return False
-        if block['time'] > time.time() + 60 * 6:
-            tools.log('Received block is coming from future. Call the feds')
-            return False
         # if block['time'] < earliest:
         #    tools.log('Received block is generated earlier than median.')
         #    return False
@@ -273,6 +258,36 @@ class BlockchainService(Service):
 
         for orphan in sorted(orphans, key=lambda x: x['count']):
             self.add_tx(orphan)
+
+    @staticmethod
+    def block_integrity_check(block):
+        if not isinstance(block, dict):
+            tools.log('Block is not a dict')
+            return False
+
+        if 'error' in block:
+            tools.log('Errors in block')
+            return False
+
+        if not ('length' in block and isinstance(block['length'], int)):
+            return False
+
+        if 'version' not in block or block['version'] != custom.version:
+            return False
+
+        if 'target' not in block:
+            tools.log('no target in block')
+            return False
+
+        if 'time' not in block:
+            tools.log('no time')
+            return False
+
+        if block['time'] > time.time() + 60 * 6:
+            tools.log('Received block is coming from future. Call the feds')
+            return False
+
+        return True
 
     def recent_blockthings(self, key, size, length=0):
 
