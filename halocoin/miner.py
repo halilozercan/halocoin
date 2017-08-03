@@ -1,7 +1,6 @@
 """ This file mines blocks and talks to peers. It maintains consensus of the
     blockchain.
 """
-import multiprocessing
 import random
 import time
 
@@ -9,7 +8,7 @@ import blockchain
 import custom
 import tools
 from ntwrk import Response
-from service import Service, threaded, sync
+from service import Service, threaded
 
 
 class MinerService(Service):
@@ -26,7 +25,10 @@ class MinerService(Service):
 
     @threaded
     def worker(self):
-        self.blockchain.blocks_queue.join()
+        if self.blockchain.get_chain_state() == blockchain.BlockchainService.SYNCING:
+            time.sleep(0.1)
+            return
+
         length = self.db.get('length')
         print 'Miner working for block', (length + 1)
         if length == -1:
