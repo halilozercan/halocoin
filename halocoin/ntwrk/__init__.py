@@ -16,16 +16,13 @@ def receive(sock, **kwargs):
     :return:
     """
     args = dict(
-        timeout=-1,
+        timeout=10,
         leftover=''
     )
     args.update(kwargs)
 
     try:
-        if args['timeout'] != -1:
-            sock.settimeout(args['timeout'])
-        else:
-            sock.settimeout(10)
+        sock.settimeout(args['timeout'])
 
         string = args['leftover']
         while string == '':
@@ -111,7 +108,7 @@ def command(peer, message):
         message_id = uuid.uuid4()
         result = send(Message(headers={'id': message_id}, body=json.dumps(message)), sock)
         if result:
-            response, leftover = receive(sock)
+            response, leftover = receive(sock, timeout=20)
             if response.getFlag():
                 response_msg = Message.from_yaml(response.getData())
                 return response_msg.get_body()

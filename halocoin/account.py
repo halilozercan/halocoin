@@ -11,7 +11,9 @@ class AccountService(Service):
     default_account = {
         'amount': 0,
         'count': 0,
-        'cache-length': -1
+        'cache-length': -1,
+        'tx_blocks': [],
+        'mined_blocks': []
     }
 
     def __init__(self, engine):
@@ -35,6 +37,11 @@ class AccountService(Service):
         if apply_tx_pool:
             txs = self.blockchain.tx_pool()
             account = AccountService.update_account_with_txs(address, account, txs, add_flag=True)
+
+        if 'tx_blocks' not in account:
+            account['tx_blocks'] = []
+        if 'mined_blocks' not in account:
+            account['mined_blocks'] = []
 
         return account
 
@@ -61,10 +68,16 @@ class AccountService(Service):
         """
 
         def apply(a, b):
-            if add_flag:
-                a += b
-            else:
-                a -= b
+            if isinstance(a, int):
+                if add_flag:
+                    a += b
+                else:
+                    a -= b
+            elif isinstance(a, list):
+                if add_flag:
+                    a.append(b)
+                else:
+                    a.remove(b)
             return a
 
         def get_acc(address):
@@ -93,16 +106,18 @@ class AccountService(Service):
 
             if tx['type'] == 'mint':
                 send_account['amount'] = apply(send_account['amount'], custom.block_reward)
+                send_account['mined_blocks'] = apply(send_account['mined_blocks'], block['length'])
             elif tx['type'] == 'spend':
                 recv_address = tx['to']
                 recv_account = get_acc(recv_address)
 
-                send_account['amount'] = apply(send_account['amount'], tx['amount'])
-                send_account['amount'] = apply(send_account['amount'], custom.fee)
+                send_account['amount'] = apply(send_account['amount'], -tx['amount'])
+                send_account['amount'] = apply(send_account['amount'], -custom.fee)
                 send_account['count'] = apply(send_account['count'], 1)
+                send_account['tx_blocks'] = apply(send_account['tx_blocks'], block['length'])
 
                 recv_account['amount'] = apply(recv_account['amount'], tx['amount'])
-                recv_account['count'] = apply(recv_account['count'], 1)
+                recv_account['tx_blocks'] = apply(recv_account['tx_blocks'], block['length'])
                 flag &= (recv_account['amount'] >= 0)
 
             flag &= (send_account['amount'] >= 0)
@@ -117,27 +132,49 @@ class AccountService(Service):
         return flag
 
     @staticmethod
-    def update_account_with_txs(address, account, txs, add_flag=True, only_outgoing=False):
+    def update_account_with_txs(address, account, txs, add_flag=True, only_outgoing=False, block_number=-1):
         def apply(a, b):
-            if add_flag:
-                a += b
-            else:
-                a -= b
+            if isinstance(a, int):
+                if add_flag:
+                    a += b
+                else:
+                    a -= b
+            elif isinstance(a, list):
+                if add_flag:
+                    a.append(b)
+                else:
+                    a.remove(b)
             return a
 
         for tx in txs:
             owner = tools.tx_owner_address(tx)
             if tx['type'] == 'mint' and owner == address:
                 account['amount'] = apply(account['amount'], custom.block_reward)
+                if block_number != -1:
+                    account['mined_blocks'] = apply(account['mined_blocks'], block_number)
             elif tx['type'] == 'spend':
                 if owner == address:
-                    account['amount'] = apply(account['amount'], tx['amount'])
-                    account['amount'] = apply(account['amount'], custom.fee)
+                    account['amount'] = apply(account['amount'], -tx['amount'])
+                    account['amount'] = apply(account['amount'], -custom.fee)
                     account['count'] = apply(account['count'], 1)
+                    if block_number != -1:
+                        account['tx_blocks'] = apply(account['tx_blocks'], block_number)
                 elif tx['to'] == address and not only_outgoing:
                     account['amount'] = apply(account['amount'], tx['amount'])
-                    account['count'] = apply(account['count'], 1)
+                    if block_number != -1:
+                        account['tx_blocks'] = apply(account['tx_blocks'], block_number)
         return account
+
+    def invalidate_cache(self, address):
+        account = copy.deepcopy(AccountService.default_account)
+
+        for i in range(int(self.db.get('length'))+1):
+            block = self.db.get(str(i))
+            account = AccountService.update_account_with_txs(address, account, block['txs'],
+                                                             add_flag=True, block_number=block['length'])
+
+        self.db.put(address, account)
+        return 'Updated ' + str(account)
 
     def known_tx_count(self, address):
         # TODO: address is a address object from database. Find the real address string inside

@@ -4,7 +4,6 @@ import copy
 import json
 import socket
 import sys
-import time
 
 import ntwrk
 import tools
@@ -15,7 +14,6 @@ from service import Service, threaded
 
 
 def blockchain_synced(func):
-
     def wrapper(self, *args, **kwargs):
         if self.blockchain.get_chain_state() == BlockchainService.IDLE:
             return func(self, *args, **kwargs)
@@ -40,19 +38,16 @@ class ApiService(Service):
         self.account = self.engine.account
         self.miner = self.engine.miner
 
-        start = time.time()
-        while start + 60 > time.time():
-            try:
-                self.s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                self.s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-                self.s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-                self.s.settimeout(1)
-                self.s.bind(('localhost', self.engine.config['api.port']))
-                self.s.listen(5)
-                return True
-            except:
-                time.sleep(2)
-        return True
+        try:
+            self.s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            self.s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            self.s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            self.s.settimeout(1)
+            self.s.bind(('localhost', self.engine.config['api.port']))
+            self.s.listen(5)
+            return True
+        except:
+            return False
 
     def on_close(self):
         try:
@@ -124,6 +119,18 @@ class ApiService(Service):
 
     def myaddress(self):
         return self.db.get('address')
+
+    @blockchain_synced
+    def invalidate(self, address=None):
+        if address is None:
+            address = self.db.get('address')
+        self.account.invalidate_cache(address)
+        account = self.account.get_account(address)
+        account = AccountService.update_account_with_txs(address,
+                                                         account,
+                                                         self.blockchain.tx_pool(),
+                                                         only_outgoing=True)
+        return account['amount']
 
     @blockchain_synced
     def spend(self, amount=0, address=None, message=''):

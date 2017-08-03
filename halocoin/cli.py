@@ -25,7 +25,8 @@ def run_command(p):
 
 def run(argv):
     actions = ['start', 'stop', 'spend', 'balance', 'mybalance', 'difficulty', 'info', 'myaddress',
-               'peers', 'blockcount', 'txs', 'new_wallet', 'pubkey', 'block', 'mine', 'history']
+               'peers', 'blockcount', 'txs', 'new_wallet', 'pubkey', 'block', 'mine', 'history',
+               'invalidate']
     parser = argparse.ArgumentParser(description='CLI for halocoin application.')
     parser.add_argument('action', help='Main action to take', choices=actions)
     parser.add_argument('--address', action="store", type=str, dest='address',
@@ -120,6 +121,9 @@ def run(argv):
             cmd['number'] = args.number
             print(run_command(cmd))
         elif args.action == 'balance':
+            cmd['address'] = args.address
+            print(run_command(cmd))
+        elif args.action == 'invalidate':
             cmd['address'] = args.address
             print(run_command(cmd))
         elif args.action == 'spend':
