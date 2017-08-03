@@ -25,25 +25,25 @@ class PeerListenService(Service):
         self.db = self.engine.db
         self.blockchain = self.engine.blockchain
 
-        start = time.time()
-        while start + 60 > time.time():
-            try:
-                self.s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                self.s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-                self.s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-                self.s.settimeout(1)
-                self.s.bind(('0.0.0.0', self.engine.config['peer.port']))
-                self.s.listen(10)
-                return True
-            except:
-                tools.log("Could not start Peer Receive socket!")
-                time.sleep(2)
-        return False
+        try:
+            self.s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            self.s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            self.s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            self.s.settimeout(1)
+            self.s.bind(('0.0.0.0', self.engine.config['peer.port']))
+            self.s.listen(10)
+            return True
+        except:
+            tools.log("Could not start Peer Receive socket!")
+            return False
 
     @threaded
     def listen(self):
         try:
             client_sock, address = self.s.accept()
+            if address == '127.0.0.1' or address == '0.0.0.0' or address == 'localhost':
+                client_sock.close()
+                return
             response, leftover = ntwrk.receive(client_sock)
             if response.getFlag():
                 message = Message.from_yaml(response.getData())
@@ -60,7 +60,6 @@ class PeerListenService(Service):
                     tools.log(sys.exc_info())
                 response = Message(headers={'ack': message.get_header('id')},
                                    body=result)
-                new_peer = [address]
                 ntwrk.send(response, client_sock)
                 client_sock.close()
         except:
