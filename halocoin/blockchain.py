@@ -349,10 +349,10 @@ class BlockchainService(Service):
     def fork_check(newblocks, length, top_block_on_chain):
         recent_hash = tools.det_hash(top_block_on_chain)
         first_new_block = newblocks[0]
-        if int(first_new_block['length']) == 0 and tools.det_hash(first_new_block) != custom.genesis:
+        if first_new_block['length'] == 0 and tools.det_hash(first_new_block) != custom.genesis:
             return False
-        their_hashes = map(lambda x: x['prevHash'] if x['length'] > 0 else 0, newblocks) + \
-                       [tools.det_hash(newblocks[-1])]
+        their_hashes = map(lambda x: x['prevHash'] if x['length'] >= 0 else 0, newblocks)
+        their_hashes += [tools.det_hash(newblocks[-1])]
         b = (recent_hash not in their_hashes) and newblocks[0]['length'] - 1 < length < newblocks[-1]['length']
         return b
 

@@ -41,9 +41,6 @@ class PeerListenService(Service):
     def listen(self):
         try:
             client_sock, address = self.s.accept()
-            if address == '127.0.0.1' or address == '0.0.0.0' or address == 'localhost':
-                client_sock.close()
-                return
             response, leftover = ntwrk.receive(client_sock)
             if response.getFlag():
                 message = Message.from_yaml(response.getData())
