@@ -277,15 +277,6 @@ class BlockchainService(Service):
         def get_val(length):
             leng = str(length)
             if not leng in storage:
-                block = self.db.get(leng)
-                if not block:
-                    if leng == self.db.get('length'):
-                        self.db.put('length', int(leng) - 1)
-                        block = self.db.get(leng)
-                    else:
-                        pass
-                        #error()
-                # try:
                 storage[leng] = self.db.get(leng)[key[:-1]]
                 self.db.put(key, storage)
             return storage[leng]
