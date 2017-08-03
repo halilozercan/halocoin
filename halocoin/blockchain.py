@@ -172,6 +172,9 @@ class BlockchainService(Service):
         # TODO: understand what is going on here
         if block['diffLength'] != hex_sum(self.db.get('diffLength'),
                                           hex_invert(block['target'])):
+            print block['diffLength']
+            print hex_sum(self.db.get('diffLength'), hex_invert(block['target']))
+            print block['length']
             tools.log('difflength is wrong')
             return False
 
