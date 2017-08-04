@@ -133,6 +133,22 @@ class ApiService(Service):
         return account['amount']
 
     @blockchain_synced
+    def history(self, address=None):
+        if address is None:
+            address = self.db.get('address')
+        account = self.account.get_account(address)
+        txs = []
+        for block_index in account['tx_blocks']:
+            block = self.db.get(str(block_index))
+            for tx in block['txs']:
+                owner = tools.tx_owner_address(tx)
+                if owner == address:
+                    txs.append(tx)
+                elif tx['type'] == 'spend' and tx['to'] == address:
+                    txs.append(tx)
+        return txs
+
+    @blockchain_synced
     def spend(self, amount=0, address=None, message=''):
         if amount == 0 and address is None:
             return 'not enough inputs'
