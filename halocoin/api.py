@@ -137,15 +137,27 @@ class ApiService(Service):
         if address is None:
             address = self.db.get('address')
         account = self.account.get_account(address)
-        txs = []
-        for block_index in account['tx_blocks']:
+        txs = {
+            "send": [],
+            "recv": [],
+            "mine": []
+        }
+        for block_index in reversed(account['tx_blocks']):
             block = self.db.get(str(block_index))
             for tx in block['txs']:
+                tx['block'] = block_index
                 owner = tools.tx_owner_address(tx)
                 if owner == address:
-                    txs.append(tx)
+                    txs['send'].append(tx)
                 elif tx['type'] == 'spend' and tx['to'] == address:
-                    txs.append(tx)
+                    txs['recv'].append(tx)
+        for block_index in reversed(account['mined_blocks']):
+            block = self.db.get(str(block_index))
+            for tx in block['txs']:
+                tx['block'] = block_index
+                owner = tools.tx_owner_address(tx)
+                if owner == address:
+                    txs['mine'].append(tx)
         return txs
 
     @blockchain_synced

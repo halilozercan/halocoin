@@ -27,7 +27,7 @@ class Service:
 
     def __init__(self, name):
         self.event_thread = threading.Thread()
-        self.into_service_queue = NoExceptionQueue(20)
+        self.into_service_queue = NoExceptionQueue(1000)
         self.signals = {}
         self.service_responses = {}
         self.name = name

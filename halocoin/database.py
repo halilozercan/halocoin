@@ -2,7 +2,9 @@ import json
 import leveldb
 import os
 
-from service import Service, sync
+import time
+
+from service import Service, sync, threaded
 
 
 class DatabaseService(Service):
@@ -12,6 +14,7 @@ class DatabaseService(Service):
         self.database_name = self.engine.config['database.name']
         self.DB = None
         self.salt = None
+        self.req_count = 0
         self.set_state(Service.INIT)
 
     def on_register(self):
@@ -26,6 +29,7 @@ class DatabaseService(Service):
     @sync
     def get(self, key):
         """Gets the key in args[0] using the salt"""
+        self.req_count += 1
         try:
             return json.loads(self.DB.Get(self.salt + str(key)))
         except KeyError:
@@ -37,6 +41,7 @@ class DatabaseService(Service):
         Puts the val in args[1] under the key in args[0] with the salt
         prepended to the key.
         """
+        self.req_count += 1
         try:
             self.DB.Put(self.salt + str(key), json.dumps(value))
             return True
@@ -49,6 +54,7 @@ class DatabaseService(Service):
         Checks if the key in args[0] with the salt prepended is
         in the database.
         """
+        self.req_count += 1
         try:
             self.DB.Get(self.salt + str(key))
         except KeyError:
@@ -62,8 +68,13 @@ class DatabaseService(Service):
         Removes the entry in the database under the the key in args[0]
         with the salt prepended.
         """
+        self.req_count += 1
         try:
             self.DB.Delete(self.salt + str(key))
             return True
         except:
             return False
+
+    @sync
+    def get_req_count(self):
+        return self.req_count

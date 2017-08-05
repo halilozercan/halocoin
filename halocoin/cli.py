@@ -135,9 +135,26 @@ def run(argv):
         elif args.action == 'history':
             cmd['address'] = args.address
             history = run_command(cmd)
-            for tx in history:
-                print("In Block {} {} => {} for amount {}"
-                      .format(tx['block'], tools.tx_owner_address(tx), tx['to'], tx['amount']))
+            if isinstance(history, str):
+                print history
+            else:
+                for tx in history['send']:
+                    print("In Block {} {} => {} for amount {}".format(
+                        tx['block'],
+                        tools.bcolors.HEADER + tools.tx_owner_address(tx) + tools.bcolors.ENDC,
+                        tools.bcolors.WARNING + tx['to'] + tools.bcolors.ENDC,
+                        tx['amount']))
+                for tx in history['recv']:
+                    print("In Block {} {} => {} for amount {}".format(
+                        tx['block'],
+                        tools.bcolors.WARNING + tools.tx_owner_address(tx) + tools.bcolors.ENDC,
+                        tools.bcolors.HEADER + tx['to'] + tools.bcolors.ENDC,
+                        tx['amount']))
+                for tx in history['mine']:
+                    print("In Block {} {} mined amount {}".format(
+                        tx['block'],
+                        tools.bcolors.HEADER + tools.tx_owner_address(tx) + tools.bcolors.ENDC,
+                        custom.block_reward))
         else:
             print(run_command(cmd))
 

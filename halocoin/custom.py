@@ -1,7 +1,7 @@
 """This is to make magic numbers easier to deal with."""
 import multiprocessing
 import os
-from decimal import Decimal
+from cdecimal import Decimal
 
 DEBUG = False
 peers = [['188.166.65.249', 7900], ['46.101.107.152', 7900]]

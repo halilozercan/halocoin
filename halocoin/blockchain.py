@@ -2,7 +2,7 @@
 """
 import copy
 import time
-from decimal import Decimal
+from cdecimal import Decimal
 
 import custom
 import pt
@@ -290,30 +290,19 @@ class BlockchainService(Service):
         return True
 
     def recent_blockthings(self, key, size, length=0):
-
-        def get_val(length):
-            leng = str(length)
-            if not leng in storage:
-                storage[leng] = self.db.get(leng)[key[:-1]]
-                self.db.put(key, storage)
-            return storage[leng]
-
-        def clean_up(storage, end):
-            if end < 0: return
-            if not str(end) in storage:
-                return
-            else:
-                storage.pop(str(end))
-                return clean_up(storage, end - 1)
-
         if length == 0:
             length = self.db.get('length')
 
         storage = self.db.get(key)
         start = max((length - size), 0)
-        end = length - max(custom.mmm, custom.history_length) - 100
-        clean_up(storage, length - end)
-        return map(get_val, range(start, length))
+        result = []
+        for i in range(start, length):
+            leng = str(i)
+            if not leng in storage:
+                storage[leng] = self.db.get(leng)[key[:-1]]
+            result.append(storage[leng])
+        self.db.put(key, storage)
+        return result
 
     @staticmethod
     def sigs_match(_sigs, _pubs, msg):
@@ -459,5 +448,6 @@ class BlockchainService(Service):
             return sum([w[i] * block_lengths[i] / tw for i in range(len(block_lengths))])
 
         retarget = estimate_time() / custom.blocktime
-        return targetTimesFloat(estimate_target(), retarget)
+        result = targetTimesFloat(estimate_target(), retarget)
+        return result
 

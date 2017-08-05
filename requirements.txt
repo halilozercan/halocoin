@@ -1,3 +1,4 @@
+cdecimal
 certifi==2017.7.27.1
 chardet==3.0.4
 filelock==2.0.11
