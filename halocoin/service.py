@@ -42,6 +42,8 @@ class Service:
             service.__threads[order.args[0]][0] = False
         elif order.action == '__shutdown_service__':
             result = True
+            for thread in service.__threads:
+                thread[0] = False
             service.set_state(Service.STOPPED)
         elif hasattr(service, order.action):
             try:
@@ -50,7 +52,6 @@ class Service:
             except:
                 result = None
                 tools.log(sys.exc_info())
-
         return result
 
     def register(self):
@@ -112,7 +113,10 @@ class Service:
     def unregister(self):
         self.execute('__shutdown_service__', True, args=(), kwargs={})
         for key, thread in self.__threads.iteritems():
-            thread[1].join()
+            try:
+                thread[1].join()
+            except:
+                pass
 
         # If unregister is called from the service instance, there is no need to join.
         # Thread wants to destory itself
@@ -135,9 +139,9 @@ class Service:
             result = Service.execute_order(self, new_order)
             return result
 
+        self.signals[new_order.id] = threading.Event()
+        self.into_service_queue.put(new_order)
         if expect_result:
-            self.signals[new_order.id] = threading.Event()
-            self.into_service_queue.put(new_order)
             try:
                 if self.signals[new_order.id].wait():
                     response = self.service_responses[new_order.id]
@@ -170,8 +174,9 @@ class Service:
 
     def threaded_running(self):
         thread_name = threading.current_thread().name
+        is_service_running = (self.get_state() == Service.RUNNING)
         try:
-            return self.__threads[thread_name][0]
+            return self.__threads[thread_name][0] and is_service_running
         except:
             return True
 

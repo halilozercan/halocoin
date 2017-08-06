@@ -1,6 +1,7 @@
 """This program starts all the threads going. When it hears a kill signal, it kills all the threads.
 """
 import os
+import threading
 import time
 
 import custom
@@ -116,6 +117,9 @@ class Engine(Service):
         if self.miner.get_state() == Service.RUNNING:
             self.miner.unregister()
             print 'Closed miner'
+        if self.account.get_state() == Service.RUNNING:
+            self.account.unregister()
+            print 'Closed account'
         if self.api.get_state() == Service.RUNNING:
             self.api.unregister()
             print 'Closed api'

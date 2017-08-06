@@ -1,5 +1,6 @@
 """ This file explains explains the rules for adding and removing blocks from the local chain.
 """
+import Queue
 import copy
 import time
 from cdecimal import Decimal
@@ -41,10 +42,13 @@ class BlockchainService(Service):
         return True
 
     @threaded
-    def process(self):
-        while not self.blocks_queue.empty() and self.threaded_running():
-            self.set_chain_state(BlockchainService.SYNCING)
-            candidate_block = self.blocks_queue.get()
+    def process_blocks(self):
+        try:
+            candidate_block = self.blocks_queue.get(timeout=1)
+        except Queue.Empty:
+            return
+        self.set_chain_state(BlockchainService.SYNCING)
+        try:
             if isinstance(candidate_block, list):
                 blocks = candidate_block  # This is just aliasing
 
@@ -54,31 +58,32 @@ class BlockchainService(Service):
                         integrity_flag = False
                         break
 
-                if not integrity_flag:
-                    continue
-
-                length = self.db.get('length')
-                for i in range(20):
-                    if not self.threaded_running():
-                        break
-                    block = self.db.get(length)
-                    if BlockchainService.fork_check(blocks, length, block):
-                        self.delete_block()
-                        length -= 1
-                    else:
-                        break
-                for block in blocks:
-                    self.add_block(block)
+                if integrity_flag:
+                    length = self.db.get('length')
+                    for i in range(20):
+                        block = self.db.get(length)
+                        if BlockchainService.fork_check(blocks, length, block):
+                            self.delete_block()
+                            length -= 1
+                        else:
+                            break
+                    for block in blocks:
+                        self.add_block(block)
             else:
                 self.add_block(candidate_block)
-            self.blocks_queue.task_done()
+            self.set_chain_state(BlockchainService.IDLE)
+        except:
+            self.set_chain_state(BlockchainService.IDLE)
+        self.blocks_queue.task_done()
 
-        self.set_chain_state(BlockchainService.IDLE)
-
-        while not self.tx_queue.empty() and self.threaded_running():
-            candidate_tx = self.tx_queue.get()
-            self.add_tx(candidate_tx)
-            self.tx_queue.task_done()
+    @threaded
+    def process_txs(self):
+        try:
+            candidate_tx = self.tx_queue.get(timeout=1)
+        except Queue.Empty:
+            return
+        self.add_tx(candidate_tx)
+        self.tx_queue.task_done()
 
     @sync
     def set_chain_state(self, new_state):
