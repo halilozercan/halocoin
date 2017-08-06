@@ -13,6 +13,7 @@ setup(
     entry_points={
         'console_scripts': [
             'halocoin = halocoin.cli:main',
+            'halominer = halocoin.halominer:main',
         ],
     },
     install_requires=['requests', 'wheel', 'pyyaml', 'filelock', 'pycrypto', 'leveldb', 'm3-cdecimal'],

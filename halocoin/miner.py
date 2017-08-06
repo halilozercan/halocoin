@@ -1,7 +1,10 @@
 """ This file mines blocks and talks to peers. It maintains consensus of the
     blockchain.
 """
+import json
 import random
+import subprocess
+import tempfile
 import time
 
 import blockchain
@@ -29,21 +32,31 @@ class MinerService(Service):
             time.sleep(0.1)
             return
 
-        length = self.db.get('length')
-        print 'Miner working for block', (length + 1)
-        if length == -1:
-            candidate_block = self.genesis(self.db.get('pubkey'))
-        else:
-            prev_block = self.db.get(length)
-            candidate_block = self.make_block(prev_block, self.blockchain.tx_pool(), self.db.get('pubkey'))
-
-        start = time.time()
+        candidate_block = self.get_candidate_block()
+        f = tempfile.NamedTemporaryFile()
+        f.write(json.dumps(candidate_block))
+        f.flush()
+        p = subprocess.Popen([custom.miner, f.name], stdin=subprocess.PIPE,
+                             stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         possible_block = None
-        while self.threaded_running() and time.time() < start + custom.blocktime / 3 \
-                and possible_block is None:
-            result = self.proof_of_work(candidate_block)
-            if result.getFlag():
-                possible_block = result.getData()
+        tx_pool = self.blockchain.tx_pool()
+        while self.threaded_running():
+            if p.poll() is not None:
+                possible_block = json.load(open(f.name + '_mined', 'r'))
+                break
+            else:
+                time.sleep(1)
+
+            if self.blockchain.tx_pool() != tx_pool:
+                f.seek(0)
+                candidate_block = self.get_candidate_block()
+                json.dump(candidate_block, f)
+                p.kill()
+                p = subprocess.Popen([custom.miner, f.name], shell=True, stdin=subprocess.PIPE,
+                                     stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
+        if p.poll() is None:
+            p.kill()
 
         if possible_block is not None:
             tools.log('Mined block')
@@ -97,3 +110,13 @@ class MinerService(Service):
             return Response(True, block)
         else:
             return Response(False, None)
+
+    def get_candidate_block(self):
+        length = self.db.get('length')
+        print 'Miner working for block', (length + 1)
+        if length == -1:
+            candidate_block = self.genesis(self.db.get('pubkey'))
+        else:
+            prev_block = self.db.get(length)
+            candidate_block = self.make_block(prev_block, self.blockchain.tx_pool(), self.db.get('pubkey'))
+        return candidate_block
