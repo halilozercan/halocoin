@@ -2,10 +2,13 @@
     blockchain.
 """
 import json
+import os
 import random
 import subprocess
 import tempfile
 import time
+
+import signal
 
 import blockchain
 import custom
@@ -41,22 +44,23 @@ class MinerService(Service):
         possible_block = None
         tx_pool = self.blockchain.tx_pool()
         while self.threaded_running():
-            if p.poll() is not None:
+            if p.poll() is not None and p.poll() == 0:
                 possible_block = json.load(open(f.name + '_mined', 'r'))
                 break
             else:
                 time.sleep(1)
 
-            if self.blockchain.tx_pool() != tx_pool:
+            if self.blockchain.tx_pool() != tx_pool or (self.db.get('length')+1) != candidate_block['length']:
                 f.seek(0)
                 candidate_block = self.get_candidate_block()
                 json.dump(candidate_block, f)
-                p.kill()
+                p.terminate()
                 p = subprocess.Popen([custom.miner, f.name], shell=True, stdin=subprocess.PIPE,
                                      stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
         if p.poll() is None:
-            p.kill()
+            p.terminate()
+            p.wait()
 
         if possible_block is not None:
             tools.log('Mined block')
