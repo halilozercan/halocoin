@@ -54,8 +54,11 @@ class MinerService(Service):
                 f.seek(0)
                 candidate_block = self.get_candidate_block()
                 json.dump(candidate_block, f)
-                p.terminate()
-                p = subprocess.Popen([custom.miner, f.name], shell=True, stdin=subprocess.PIPE,
+                try:
+                    p.terminate()
+                except:
+                    pass
+                p = subprocess.Popen([custom.miner, f.name], stdin=subprocess.PIPE,
                                      stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
         if p.poll() is None:
