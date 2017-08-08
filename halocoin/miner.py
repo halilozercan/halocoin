@@ -2,13 +2,11 @@
     blockchain.
 """
 import json
-import os
+import multiprocessing
 import random
-import subprocess
-import tempfile
 import time
-
-import signal
+import Queue
+from multiprocessing import Process
 
 import blockchain
 import custom
@@ -23,11 +21,18 @@ class MinerService(Service):
         self.engine = engine
         self.db = None
         self.blockchain = None
+        self.core_count = multiprocessing.cpu_count() if custom.miner_core_count == -1 else custom.miner_core_count
+        self.pool = []
+        self.queue = multiprocessing.Queue()
 
     def on_register(self):
         self.db = self.engine.db
         self.blockchain = self.engine.blockchain
+
         return True
+
+    def on_close(self):
+        self.close_workers()
 
     @threaded
     def worker(self):
@@ -36,39 +41,38 @@ class MinerService(Service):
             return
 
         candidate_block = self.get_candidate_block()
-        f = tempfile.NamedTemporaryFile()
-        f.write(json.dumps(candidate_block))
-        f.flush()
-        p = subprocess.Popen([custom.miner, f.name], stdin=subprocess.PIPE,
-                             stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        possible_block = None
         tx_pool = self.blockchain.tx_pool()
-        while self.threaded_running():
-            if p.poll() is not None and p.poll() == 0:
-                possible_block = json.load(open(f.name + '_mined', 'r'))
-                break
-            else:
-                time.sleep(1)
+        self.start_workers(candidate_block)
 
-            if self.blockchain.tx_pool() != tx_pool or (self.db.get('length')+1) != candidate_block['length']:
-                f.seek(0)
+        possible_block = None
+        while not MinerService.is_everyone_dead(self.pool) and self.threaded_running():
+            if self.db.get('length')+1 != candidate_block['length'] or self.blockchain.tx_pool() != tx_pool:
                 candidate_block = self.get_candidate_block()
-                json.dump(candidate_block, f)
-                try:
-                    p.terminate()
-                except:
-                    pass
-                p = subprocess.Popen([custom.miner, f.name], stdin=subprocess.PIPE,
-                                     stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-
-        if p.poll() is None:
-            p.terminate()
-            p.wait()
+                tx_pool = self.blockchain.tx_pool()
+                self.start_workers(candidate_block)
+            try:
+                possible_block = self.queue.get(timeout=0.5)
+                break
+            except Queue.Empty:
+                pass
 
         if possible_block is not None:
             tools.log('Mined block')
             tools.log(possible_block)
             self.blockchain.blocks_queue.put(possible_block)
+
+    def start_workers(self, candidate_block):
+        self.close_workers()
+        for i in range(self.core_count):
+            p = Process(target=MinerService.target, args=[candidate_block, self.queue])
+            p.start()
+            self.pool.append(p)
+
+    def close_workers(self):
+        for p in self.pool:
+            p.terminate()
+            p.join()
+        self.pool = []
 
     def make_block(self, prev_block, txs, pubkey):
         leng = int(prev_block['length']) + 1
@@ -127,3 +131,26 @@ class MinerService(Service):
             prev_block = self.db.get(length)
             candidate_block = self.make_block(prev_block, self.blockchain.tx_pool(), self.db.get('pubkey'))
         return candidate_block
+
+    @staticmethod
+    def target(candidate_block, queue):
+        # Miner registered but no work is sent yet.
+        if candidate_block is None:
+            return
+        if 'nonce' in candidate_block:
+            candidate_block.pop('nonce')
+        halfHash = tools.det_hash(candidate_block)
+        candidate_block['nonce'] = random.randint(0, 10000000000000000000000000000000000000000)
+        current_hash = tools.det_hash({'nonce': candidate_block['nonce'], 'halfHash': halfHash})
+        while current_hash > candidate_block['target']:
+            candidate_block['nonce'] += 1
+            current_hash = tools.det_hash({'nonce': candidate_block['nonce'], 'halfHash': halfHash})
+        if current_hash <= candidate_block['target']:
+            queue.put(candidate_block)
+
+    @staticmethod
+    def is_everyone_dead(processes):
+        for p in processes:
+            if p.is_alive():
+                return False
+        return True

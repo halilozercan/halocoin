@@ -12,7 +12,7 @@ api_port = 7899
 version = "0.0002"
 block_reward = 10 ** 5
 fee = 10 ** 3
-miner = 'halominer'
+miner_core_count = 8  # -1 evaluates to number of cores
 # Lower limits on what the "time" tag in a block can say.
 mmm = 100
 # Take the median of this many of the blocks.

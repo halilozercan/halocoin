@@ -12,8 +12,7 @@ setup(
     download_url='https://github.com/halilozercan/halocoin/tarball/0.0.4.4',
     entry_points={
         'console_scripts': [
-            'halocoin = halocoin.cli:main',
-            'halominer = halocoin.halominer:main',
+            'halocoin = halocoin.cli:main'
         ],
     },
     install_requires=['requests', 'wheel', 'pyyaml', 'filelock', 'pycrypto', 'leveldb', 'm3-cdecimal'],
