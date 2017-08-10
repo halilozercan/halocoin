@@ -1,19 +1,16 @@
 """A bunch of functions that are used by multiple threads.
 """
-import os
-import random
-import sys
-from json import dumps as package, loads as unpackage
-
-import copy
-
-import struct
-
 import StringIO
-
-import custom
+import copy
 import hashlib
 import logging
+import os
+import random
+import struct
+import sys
+from json import dumps as package
+
+import custom
 import pt
 
 
@@ -132,10 +129,8 @@ def daemonize(f):
         sys.exit(0)
 
 
-from Crypto.Cipher import AES
-
-
 def encrypt(key, content, chunksize=64 * 1024):
+    from Crypto.Cipher import AES
     infile = StringIO.StringIO(content)
     outfile = StringIO.StringIO()
     key = hashlib.sha256(key).digest()
@@ -158,6 +153,7 @@ def encrypt(key, content, chunksize=64 * 1024):
 
 
 def decrypt(key, content, chunksize=24 * 1024):
+    from Crypto.Cipher import AES
     infile = StringIO.StringIO(content)
     outfile = StringIO.StringIO()
 

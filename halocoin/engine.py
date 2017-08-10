@@ -1,18 +1,17 @@
 """This program starts all the threads going. When it hears a kill signal, it kills all the threads.
 """
 import os
-import threading
 import time
 
 import custom
+import jsonrpc_api
 import tools
-from api import ApiService
+from account import AccountService
 from blockchain import BlockchainService
 from database import DatabaseService
-from account import AccountService
 from miner import MinerService
-from peer_listen import PeerListenService
 from peer_check import PeerCheckService
+from peer_listen import PeerListenService
 from service import Service, async
 
 
@@ -42,9 +41,9 @@ class Engine(Service):
             'peer.port': custom.port
         }
 
+        #self.api = ApiService(self)
         self.db = DatabaseService(self)
         self.blockchain = BlockchainService(self)
-        self.api = ApiService(self)
         self.peers_check = PeerCheckService(self, custom.peers)
         self.peer_receive = PeerListenService(self)
         self.account = AccountService(self)
@@ -88,10 +87,13 @@ class Engine(Service):
             return False
         print("Started Blockchain")
 
+        """
         if not self.api.register():
             print("API service has failed. Exiting!")
             self.unregister_sub_services()
             return False
+        """
+        jsonrpc_api.run(self)
         print("Started API")
 
         if not self.peer_receive.register():
@@ -120,9 +122,11 @@ class Engine(Service):
         if self.account.get_state() == Service.RUNNING:
             self.account.unregister()
             print 'Closed account'
+        """
         if self.api.get_state() == Service.RUNNING:
             self.api.unregister()
             print 'Closed api'
+        """
         if self.peers_check.get_state() == Service.RUNNING:
             self.peers_check.unregister()
             print 'Closed peers check'
@@ -135,6 +139,8 @@ class Engine(Service):
         if self.db.get_state() == Service.RUNNING:
             self.db.unregister()
             print 'Closed db'
+        jsonrpc_api.shutdown()
+        print 'Closed api'
 
     @async
     def stop(self):
@@ -143,9 +149,10 @@ class Engine(Service):
 
 
 def main(wallet, config, working_dir):
-    new_service = Engine(wallet, config, working_dir)
-    if new_service.register():
-        new_service.join()
+    global engine_instance
+    engine_instance = Engine(wallet, config, working_dir)
+    if engine_instance.register():
+        engine_instance.join()
         print("Exiting gracefully")
     else:
         print("Couldn't start Halocoin")

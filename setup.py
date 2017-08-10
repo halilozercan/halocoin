@@ -4,12 +4,12 @@ from setuptools import find_packages
 
 setup(
     name='Halocoin',
-    version='0.0.4.4',
+    version='0.0.4.5',
     description='An educational blockchain implementation. Forked from zack-bitcoin/basiccoin',
     author='Halil Ozercan',
     author_email='halilozercan@gmail.com',
     url='https://github.com/halilozercan/halocoin',
-    download_url='https://github.com/halilozercan/halocoin/tarball/0.0.4.4',
+    download_url='https://github.com/halilozercan/halocoin/tarball/0.0.4.5',
     entry_points={
         'console_scripts': [
             'halocoin = halocoin.cli:main'

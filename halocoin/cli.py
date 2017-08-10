@@ -4,23 +4,29 @@ import json
 import os
 import random
 import string
-from pprint import pprint
-
-import filelock
 import sys
 
-import signal
+import filelock
+import requests
 
 import custom
 import engine
-
-import ntwrk
 import tools
 
 
-def run_command(p):
-    response = ntwrk.command(('localhost', custom.api_port), p)
-    return response
+def make_api_request(method, **kwargs):
+    url = "http://localhost:" + str(custom.api_port) + "/jsonrpc"
+    headers = {'content-type': 'application/json'}
+
+    # Example echo method
+    payload = {
+        "method": method,
+        "params": kwargs,
+        "jsonrpc": "2.0",
+        "id": 0,
+    }
+    response = requests.post(url, data=json.dumps(payload), headers=headers).json()
+    return response['result']
 
 
 def run(argv):
@@ -46,7 +52,7 @@ def run(argv):
 
     args = parser.parse_args(argv[1:])
 
-    if args.action in ['balance', 'send'] and args.address is None:
+    if args.action in ['send'] and args.address is None:
         print('You should specify an address when running {}'.format(args.action))
         exit(1)
     elif args.action in ['start', 'new_wallet'] and args.wallet is None:
@@ -116,26 +122,19 @@ def run(argv):
             f.write(wallet_encrypted_content)
         print('New wallet is created: {}'.format(args.wallet))
     else:
-        cmd = {'action': args.action}
         if args.action == 'block':
-            cmd['number'] = args.number
-            print(run_command(cmd))
+            print(make_api_request(args.action, number=args.number))
         elif args.action == 'balance':
-            cmd['address'] = args.address
-            print(run_command(cmd))
+            print(make_api_request(args.action, address=args.address))
         elif args.action == 'invalidate':
-            cmd['address'] = args.address
-            print(run_command(cmd))
+            print(make_api_request(args.action, address=args.address))
         elif args.action == 'spend':
-            cmd['address'] = args.address
-            cmd['amount'] = args.amount
-            if args.message is not None:
-                cmd['message'] = args.message
-            print(run_command(cmd))
+            print(make_api_request(args.action, address=args.address, amount=args.amount, message=args.message))
         elif args.action == 'history':
-            cmd['address'] = args.address
-            history = run_command(cmd)
-            if isinstance(history, str):
+            history = make_api_request(args.action, address=args.address)
+            if history is None:
+                print "Could not receive history"
+            elif isinstance(history, str):
                 print history
             else:
                 for tx in history['send']:
@@ -156,7 +155,7 @@ def run(argv):
                         tools.bcolors.HEADER + tools.tx_owner_address(tx) + tools.bcolors.ENDC,
                         custom.block_reward))
         else:
-            print(run_command(cmd))
+            print(make_api_request(args.action))
 
 
 def main():
