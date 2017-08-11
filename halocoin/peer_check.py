@@ -93,6 +93,9 @@ class PeerCheckService(Service):
             self.db.put('peers_ranked', my_peers)
 
     def download_blocks(self, peer, peers_block_count, length):
+        known_length = self.db.get('known_length')
+        if peers_block_count['length'] > known_length:
+            self.db.put('known_length', peers_block_count['length'])
         b = [max(0, length - 10), min(peers_block_count['length'] + 1,
                                       length + self.engine.config['peer.block_request_limit'])]
         blocks = ntwrk.command(peer, {'action': 'range_request', 'range': b})

@@ -7,4 +7,6 @@ pycrypto==2.6.1
 PyYAML==3.12
 requests==2.18.2
 urllib3==1.22
+json-rpc
 m3-cdecimal
+werkzeug

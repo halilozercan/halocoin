@@ -22,7 +22,8 @@ def blockchain_synced(func):
         if _engine.blockchain.get_chain_state() == BlockchainService.IDLE:
             return func(*args, **kwargs)
         else:
-            return 'Blockchain is syncing. This method is not reliable while operation continues.'
+            return 'Blockchain is syncing. This method is not reliable while operation continues.\n' + \
+                   str(_engine.db.get('length')) + '-' + str(_engine.db.get('known_length'))
 
     wrapper.__name__ = func.__name__
 
@@ -158,16 +159,17 @@ def history(address=None):
 
 @dispatcher.add_method
 @blockchain_synced
-def spend(amount=0, address=None, message=''):
+def send(amount=0, address=None, message=''):
     if amount == 0 and address is None:
         return 'not enough inputs'
-    return _engine.easy_add_transaction({'type': 'spend', 'amount': int(amount),
+    return easy_add_transaction({'type': 'spend', 'amount': int(amount),
                                          'to': address, 'message': message})
 
 
 @dispatcher.add_method
 def blockcount():
-    return _engine.db.get('length')
+    return dict(length=_engine.db.get('length'),
+                known_length=_engine.db.get('known_length'))
 
 
 @dispatcher.add_method
@@ -181,10 +183,17 @@ def pubkey():
 
 
 @dispatcher.add_method
-def block(number=-1):
-    if number == -1:
-        number = _engine.db.get('length')
-    return _engine.db.get(str(number))
+def block(number="default"):
+    if "-" in number:
+        _from = int(number.split("-")[0])
+        _to = int(number.split("-")[1])
+        _to = min(_from+50, _to)
+        return [_engine.db.get(str(i)) for i in range(_from, _to)]
+    else:
+        if number == "default":
+            number = _engine.db.get('length')
+        number = int(number)
+        return [_engine.db.get(str(number))]
 
 
 @dispatcher.add_method

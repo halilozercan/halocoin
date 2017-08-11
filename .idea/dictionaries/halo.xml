@@ -2,6 +2,7 @@
   <dictionary name="halo">
     <words>
       <w>blockchain</w>
+      <w>blockcount</w>
     </words>
   </dictionary>
 </component>

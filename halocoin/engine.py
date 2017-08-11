@@ -41,7 +41,6 @@ class Engine(Service):
             'peer.port': custom.port
         }
 
-        #self.api = ApiService(self)
         self.db = DatabaseService(self)
         self.blockchain = BlockchainService(self)
         self.peers_check = PeerCheckService(self, custom.peers)
@@ -73,13 +72,19 @@ class Engine(Service):
             self.db.put('times', {})
             self.db.put('mine', False)
             self.db.put('diffLength', '0')
-            self.db.put('last_cache_length', 0)
             self.db.put('accounts', {})
+            self.db.put('known_length', -1)
         self.db.put('stop', False)
 
         self.db.put('privkey', self.wallet['privkey'])
         self.db.put('pubkey', self.wallet['pubkey'])
         self.db.put('address', tools.make_address([self.wallet['pubkey']], 1))
+
+        if not self.account.register():
+            print("Account service has failed. Exiting!")
+            self.unregister_sub_services()
+            return False
+        print("Started Account")
 
         if not self.blockchain.register():
             print("Blockchain service has failed. Exiting!")
@@ -87,12 +92,6 @@ class Engine(Service):
             return False
         print("Started Blockchain")
 
-        """
-        if not self.api.register():
-            print("API service has failed. Exiting!")
-            self.unregister_sub_services()
-            return False
-        """
         jsonrpc_api.run(self)
         print("Started API")
 
@@ -107,12 +106,6 @@ class Engine(Service):
             self.unregister_sub_services()
             return False
         print("Started Peers Check")
-
-        if not self.account.register():
-            print("Account service has failed. Exiting!")
-            self.unregister_sub_services()
-            return False
-        print("Started Account")
         return True
 
     def unregister_sub_services(self):
@@ -149,7 +142,6 @@ class Engine(Service):
 
 
 def main(wallet, config, working_dir):
-    global engine_instance
     engine_instance = Engine(wallet, config, working_dir)
     if engine_instance.register():
         engine_instance.join()
