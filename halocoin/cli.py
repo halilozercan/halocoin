@@ -28,6 +28,7 @@ def make_api_request(method, **kwargs):
         "id": 0,
     }
     response = requests.post(url, data=json.dumps(payload), headers=headers).json()
+    print response
     return response['result']
 
 

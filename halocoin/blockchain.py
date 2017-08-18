@@ -193,13 +193,13 @@ class BlockchainService(Service):
             tools.log('wrong target')
             return False
 
-        # earliest = tools.median(self.recent_blockthings(self.db.get('times'),
-        #                                                custom.mmm,
-        #                                                self.db.get('length')))
+        earliest = tools.median(self.recent_blockthings('times',
+                                                        custom.mmm,
+                                                        self.db.get('length')))
 
-        # if block['time'] < earliest:
-        #    tools.log('Received block is generated earlier than median.')
-        #    return False
+        if block['time'] < earliest:
+            tools.log('Received block is generated earlier than median.')
+            return False
         if not self.account.update_accounts_with_block(block, add_flag=True, simulate=True):
             tools.log('Received block failed transactions check.')
             return False
