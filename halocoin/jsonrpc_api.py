@@ -93,6 +93,7 @@ def easy_add_transaction(tx_orig, privkey='default'):
     return 'Tx amount:{} to:{} added to the pool'.format(tx['amount'], tx['to'])
 
 
+@dispatcher.add_method
 def peers():
     return _engine.db.get('peers_ranked')
 
@@ -164,7 +165,7 @@ def send(amount=0, address=None, message=''):
     if amount == 0 and address is None:
         return 'not enough inputs'
     return easy_add_transaction({'type': 'spend', 'amount': int(amount),
-                                         'to': address, 'message': message})
+                                 'to': address, 'message': message})
 
 
 @dispatcher.add_method
@@ -188,7 +189,7 @@ def block(number="default"):
     if "-" in number:
         _from = int(number.split("-")[0])
         _to = int(number.split("-")[1])
-        _to = min(_from+50, _to)
+        _to = min(_from + 50, _to)
         return [_engine.db.get(str(i)) for i in range(_from, _to)]
     else:
         if number == "default":
