@@ -11,5 +11,4 @@ json-rpc
 m3-cdecimal
 werkzeug
 tabulate
-ujson
 redis
