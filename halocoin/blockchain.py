@@ -59,7 +59,7 @@ class BlockchainService(Service):
                         break
 
                 if integrity_flag:
-                    length = self.db.get('length')
+                    length = self.db.get('length') - 1
                     for i in range(20):
                         block = self.db.get(length)
                         if BlockchainService.fork_check(blocks, length, block):
@@ -161,6 +161,7 @@ class BlockchainService(Service):
         """Attempts adding a new block to the blockchain.
          Median is good for weeding out liars, so long as the liars don't have 51%
          hashpower. """
+        start = time.time()
 
         length = self.db.get('length')
 
@@ -403,7 +404,6 @@ class BlockchainService(Service):
         return response
 
     def target(self, length):
-        memoized_weights = [custom.inflection ** i for i in range(1000)]
         """ Returns the target difficulty at a particular blocklength. """
         if length < 4:
             return '0' * 4 + 'f' * 60  # Use same difficulty for first few blocks.
@@ -415,7 +415,7 @@ class BlockchainService(Service):
 
         def weights(length):  # uses float
             # returns from small to big
-            out = memoized_weights[:length]
+            out = custom.memoized_weights[:length]
             out.reverse()
             return out
 

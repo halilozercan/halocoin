@@ -25,6 +25,7 @@ def blockchain_synced(func):
             return 'Blockchain is syncing. This method is not reliable while operation continues.\n' + \
                    str(_engine.db.get('length')) + '-' + str(_engine.db.get('known_length'))
 
+    # To keep the function name same for RPC helper
     wrapper.__name__ = func.__name__
 
     return wrapper

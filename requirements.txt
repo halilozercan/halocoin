@@ -10,3 +10,6 @@ urllib3==1.22
 json-rpc
 m3-cdecimal
 werkzeug
+tabulate
+ujson
+redis

@@ -6,6 +6,7 @@ import hashlib
 import logging
 import os
 import random
+import string
 import struct
 import sys
 from json import dumps as package
@@ -124,7 +125,7 @@ def median(mylist):
 def daemonize(f):
     pid = os.fork()
     if pid == 0:
-        f()
+        f(*args)
     else:
         sys.exit(0)
 
@@ -171,3 +172,28 @@ def decrypt(key, content, chunksize=24 * 1024):
 
     outfile.truncate(origsize)
     return outfile.getvalue()
+
+
+def random_wallet(number_of_pairs=1):
+    if number_of_pairs == 1:
+        init = ''.join(random.choice(string.lowercase) for i in range(64))
+        privkey = det_hash(init)
+        pubkey = privtopub(privkey)
+        address = make_address([pubkey], 1)
+        wallet = {
+            'privkey': str(privkey),
+            'pubkey': str(pubkey),
+            'address': str(address)
+        }
+    else:
+        wallet = {
+            'privkeys': [],
+            'pubkeys': []
+        }
+        for i in range(number_of_pairs):
+            init = ''.join(random.choice(string.lowercase) for i in range(64))
+            privkey = det_hash(init)
+            pubkey = privtopub(privkey)
+            wallet['privkeys'].append(privkey)
+            wallet['pubkeys'].append(pubkey)
+    return wallet

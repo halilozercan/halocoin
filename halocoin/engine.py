@@ -8,7 +8,7 @@ import jsonrpc_api
 import tools
 from account import AccountService
 from blockchain import BlockchainService
-from database import DatabaseService
+from database import DatabaseService, RedisService
 from miner import MinerService
 from peer_check import PeerCheckService
 from peer_listen import PeerListenService
@@ -35,13 +35,25 @@ class Engine(Service):
 
         # TODO: remove
         self.config = {
-            'database.name': os.path.join(self.working_dir, custom.database_name),
+            'database.type': custom.db_type,
             'api.port': custom.api_port,
             'peer.block_request_limit': 50,
             'peer.port': custom.port
         }
 
-        self.db = DatabaseService(self)
+        if custom.db_type == 'redis':
+            self.config.update({
+                'database.name': custom.db_name,
+                'database.pass': custom.db_pass,
+                'database.port': custom.db_port
+            })
+            self.db = RedisService(self)
+        elif custom.db_type == 'leveldb':
+            self.config.update({
+                'database.name': os.path.join(self.working_dir, custom.db_name)
+            })
+            self.db = DatabaseService(self)
+
         self.blockchain = BlockchainService(self)
         self.peers_check = PeerCheckService(self, custom.peers)
         self.peer_receive = PeerListenService(self)

@@ -3,9 +3,9 @@ This file explains how we initiate interactions with our peers.
 """
 import time
 
+import blockchain
 import ntwrk
 import tools
-from blockchain import BlockchainService
 from service import Service, threaded, sync
 
 
@@ -30,6 +30,9 @@ class PeerCheckService(Service):
 
     @threaded
     def listen(self):
+        if self.blockchain.get_chain_state() == blockchain.BlockchainService.SYNCING:
+            time.sleep(0.1)
+            return
         if len(self.old_peers) > 0:
             # Sort old peers by their rank. r[2] contains rank number.
             pr = sorted(self.old_peers, key=lambda r: r[2])

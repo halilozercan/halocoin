@@ -1,12 +1,10 @@
 #!/usr/bin/env python
 import argparse
+import datetime
 import json
 import os
-import random
-import string
 import sys
 
-import datetime
 import filelock
 import requests
 from tabulate import tabulate
@@ -88,8 +86,6 @@ def run(argv):
                         help='Block number or range')
     parser.add_argument('--wallet', action="store", type=str, dest='wallet',
                         help='Wallet file address')
-    parser.add_argument('--no-database', action="store_true", dest='no_database',
-                        help='Do not use database information, look at blockchain')
     parser.add_argument('--dir', action="store", type=str, dest='dir',
                         help='Directory for halocoin to use.')
 
@@ -150,15 +146,7 @@ def run(argv):
             wallet_pw = getpass('New wallet password: ')
             wallet_pw_2 = getpass('New wallet password(again): ')
 
-        init = ''.join(random.choice(string.lowercase) for i in range(64))
-        privkey = tools.det_hash(init)
-        pubkey = tools.privtopub(privkey)
-        address = tools.make_address([pubkey], 1)
-        wallet = {
-            'privkey': str(privkey),
-            'pubkey': str(pubkey),
-            'address': str(address)
-        }
+        wallet = tools.random_wallet()
         wallet_content = json.dumps(wallet)
         wallet_encrypted_content = tools.encrypt(wallet_pw, wallet_content)
         with open(args.wallet, 'w') as f:
