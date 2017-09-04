@@ -20,10 +20,12 @@ class PeerListenService(Service):
         self.engine = engine
         self.db = None
         self.blockchain = None
+        self.account = None
 
     def on_register(self):
         self.db = self.engine.db
         self.blockchain = self.engine.blockchain
+        self.account = self.engine.account
 
         try:
             self.s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -64,10 +66,7 @@ class PeerListenService(Service):
 
     @sync
     def receive_peer(self, peer):
-        ps = self.db.get('peers_ranked')
-        if peer[0] not in map(lambda x: x[0][0], ps):
-            ps = tools.add_peer_ranked(peer, ps)
-        self.db.put('peers_ranked', ps)
+        self.account.add_peer(peer)
 
     @sync
     def block_count(self):
@@ -90,7 +89,7 @@ class PeerListenService(Service):
 
     @sync
     def peers(self):
-        return self.db.get('peers_ranked')
+        return self.account.get_peers()
 
     @sync
     def txs(self):

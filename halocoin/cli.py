@@ -39,13 +39,26 @@ def print_txs(txs):
             tx['message'] = ''
         table.append([tx['type'], tx['from'], tx['to'], tx['amount'], tx['message']])
 
-    print tabulate(table,
+    print(tabulate(table,
                    headers=[tools.bcolors.HEADER + 'Type' + tools.bcolors.ENDC,
                             tools.bcolors.HEADER + 'From' + tools.bcolors.ENDC,
                             tools.bcolors.HEADER + 'To' + tools.bcolors.ENDC,
                             tools.bcolors.HEADER + 'Amount' + tools.bcolors.ENDC,
                             tools.bcolors.HEADER + 'Message' + tools.bcolors.ENDC],
-                   tablefmt='orgtbl')
+                   tablefmt='orgtbl'))
+
+
+def print_peers(peers):
+    table = []
+    for peer in peers:
+        table.append([peer[0][0], peer[0][1], peer[1], peer[3]])
+
+    print(tabulate(table,
+                   headers=[tools.bcolors.HEADER + 'Address' + tools.bcolors.ENDC,
+                            tools.bcolors.HEADER + 'Port' + tools.bcolors.ENDC,
+                            tools.bcolors.HEADER + 'Rank' + tools.bcolors.ENDC,
+                            tools.bcolors.HEADER + 'Length' + tools.bcolors.ENDC],
+                   tablefmt='orgtbl'))
 
 
 def print_blocks(blocks):
@@ -58,16 +71,39 @@ def print_blocks(blocks):
         ).strftime('%Y-%m-%d %H:%M:%S')
         mint_tx = filter(lambda t: t['type'] == 'mint', block['txs'])[0]
         table.append([block['length'], tools.tx_owner_address(mint_tx), block['time']])
-    print tools.bcolors.WARNING + "Blocks:\n" + tools.bcolors.ENDC
-    print tabulate(table, headers=[tools.bcolors.HEADER + 'Length' + tools.bcolors.ENDC,
+    print(tools.bcolors.WARNING + "Blocks:\n" + tools.bcolors.ENDC)
+    print(tabulate(table, headers=[tools.bcolors.HEADER + 'Length' + tools.bcolors.ENDC,
                                    tools.bcolors.HEADER + 'Miner' + tools.bcolors.ENDC,
-                                   tools.bcolors.HEADER + 'Time' + tools.bcolors.ENDC], tablefmt='orgtbl')
+                                   tools.bcolors.HEADER + 'Time' + tools.bcolors.ENDC], tablefmt='orgtbl'))
 
     if len(blocks) == 1:
-        print tools.bcolors.WARNING + "\nTransactions in the Block:\n" + tools.bcolors.ENDC
+        print(tools.bcolors.WARNING + "\nTransactions in the Block:\n" + tools.bcolors.ENDC)
         print_txs(blocks[0]['txs'])
 
-    print "\n"
+
+def print_history(history):
+    if history is None:
+        print("Could not receive history")
+    elif isinstance(history, str):
+        print(history)
+    else:
+        for tx in history['send']:
+            print("In Block {} {} => {} for amount {}".format(
+                tx['block'],
+                tools.bcolors.HEADER + tools.tx_owner_address(tx) + tools.bcolors.ENDC,
+                tools.bcolors.WARNING + tx['to'] + tools.bcolors.ENDC,
+                tx['amount']))
+        for tx in history['recv']:
+            print("In Block {} {} => {} for amount {}".format(
+                tx['block'],
+                tools.bcolors.WARNING + tools.tx_owner_address(tx) + tools.bcolors.ENDC,
+                tools.bcolors.HEADER + tx['to'] + tools.bcolors.ENDC,
+                tx['amount']))
+        for tx in history['mine']:
+            print("In Block {} {} mined amount {}".format(
+                tx['block'],
+                tools.bcolors.HEADER + tools.tx_owner_address(tx) + tools.bcolors.ENDC,
+                custom.block_reward))
 
 
 def run(argv):
@@ -167,30 +203,12 @@ def run(argv):
             print(make_api_request(args.action, address=args.address))
         elif args.action == 'send':
             print(make_api_request(args.action, address=args.address, amount=args.amount, message=args.message))
+        elif args.action == 'peers':
+            peers = make_api_request(args.action)
+            print_peers(peers)
         elif args.action == 'history':
             history = make_api_request(args.action, address=args.address)
-            if history is None:
-                print "Could not receive history"
-            elif isinstance(history, str):
-                print history
-            else:
-                for tx in history['send']:
-                    print("In Block {} {} => {} for amount {}".format(
-                        tx['block'],
-                        tools.bcolors.HEADER + tools.tx_owner_address(tx) + tools.bcolors.ENDC,
-                        tools.bcolors.WARNING + tx['to'] + tools.bcolors.ENDC,
-                        tx['amount']))
-                for tx in history['recv']:
-                    print("In Block {} {} => {} for amount {}".format(
-                        tx['block'],
-                        tools.bcolors.WARNING + tools.tx_owner_address(tx) + tools.bcolors.ENDC,
-                        tools.bcolors.HEADER + tx['to'] + tools.bcolors.ENDC,
-                        tx['amount']))
-                for tx in history['mine']:
-                    print("In Block {} {} mined amount {}".format(
-                        tx['block'],
-                        tools.bcolors.HEADER + tools.tx_owner_address(tx) + tools.bcolors.ENDC,
-                        custom.block_reward))
+            print_history(history)
         else:
             print(make_api_request(args.action))
 

@@ -77,9 +77,7 @@ class MinerService(Service):
     def make_block(self, prev_block, txs, pubkey):
         leng = int(prev_block['length']) + 1
         target_ = self.blockchain.target(leng)
-        print 'target', target_
-        diffLength = blockchain.hex_sum(prev_block['diffLength'],
-                                        blockchain.hex_invert(target_))
+        diffLength = tools.hex_sum(prev_block['diffLength'], tools.hex_invert(target_))
         out = {'version': custom.version,
                'txs': txs + [self.make_mint(pubkey)],
                'length': leng,
@@ -101,7 +99,7 @@ class MinerService(Service):
                'length': 0,
                'time': time.time(),
                'target': target_,
-               'diffLength': blockchain.hex_invert(target_),
+               'diffLength': tools.hex_invert(target_),
                'txs': [self.make_mint(pubkey)]}
         return out
 

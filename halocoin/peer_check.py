@@ -14,18 +14,20 @@ class PeerCheckService(Service):
         # This logic might change. Here we add new peers while initializing the service
         Service.__init__(self, 'peers_check')
         self.engine = engine
-        self.new_peers = new_peers
+        self.new_peers = []
+        for new_peer in new_peers:
+            self.new_peers.append([new_peer, 5, '0', 0])
         self.db = None
         self.blockchain = None
+        self.account = None
         self.old_peers = []
 
     def on_register(self):
         self.db = self.engine.db
         self.blockchain = self.engine.blockchain
-        self.old_peers = self.db.get('peers_ranked')
+        self.account = self.engine.account
         for peer in self.new_peers:
-            self.old_peers = tools.add_peer_ranked(peer, self.old_peers)
-        self.db.put('peers_ranked', self.old_peers)
+            self.account.add_peer(peer)
         return True
 
     @threaded
@@ -33,40 +35,37 @@ class PeerCheckService(Service):
         if self.blockchain.get_chain_state() == blockchain.BlockchainService.SYNCING:
             time.sleep(0.1)
             return
-        if len(self.old_peers) > 0:
-            # Sort old peers by their rank. r[2] contains rank number.
-            pr = sorted(self.old_peers, key=lambda r: r[2])
-            # Reverse because high rank number means lower quality
-            pr.reverse()
+
+        peers = self.account.get_peers()
+        if len(peers) > 0:
+            pr = sorted(peers, key=lambda x: x[1], reverse=True)
 
             i = tools.exponential_random(3.0 / 4) % len(pr)
+            peer = pr[i]
             t1 = time.time()
-            r = self.peer_check(i, pr)
+            r = self.peer_check(peer)
             t2 = time.time()
-            p = pr[i][0]
-            pr = self.db.get('peers_ranked')
-            for peer in pr:
-                if peer[0] == p:
-                    pr[i][1] *= 0.8
-                    if r == 0:
-                        pr[i][1] += 0.2 * (t2 - t1)
-                    else:
-                        pr[i][1] += 0.2 * 30
-            self.db.put('peers_ranked', pr)
+
+            peer[1] *= 0.8
+            if r == 0:
+                peer[1] += 0.2 * (t2 - t1)
+            else:
+                peer[1] += 0.2 * 30
+            self.account.update_peer(peer)
 
     @sync
-    def peer_check(self, i, peers):
-        peer = peers[i][0]
-        block_count = ntwrk.command(peer, {'action': 'block_count'})
+    def peer_check(self, peer):
+        block_count = ntwrk.command(peer[0], {'action': 'block_count'})
 
         if not isinstance(block_count, dict):
             return
         if 'error' in block_count.keys():
             return
 
-        peers[i][2] = block_count['diffLength']
-        peers[i][3] = block_count['length']
-        self.db.put('peers_ranked', peers)
+        peer[2] = block_count['diffLength']
+        peer[3] = block_count['length']
+        self.account.update_peer(peer)
+
         length = self.db.get('length')
         diff_length = self.db.get('diffLength')
         size = max(len(diff_length), len(block_count['diffLength']))
@@ -76,24 +75,19 @@ class PeerCheckService(Service):
         # We are deciding what to do with this peer. We can either
         # send them blocks, share txs or download blocks.
         if them < us:
-            self.give_block(peer, block_count['length'])
+            self.give_block(peer[0], block_count['length'])
         elif us == them:
-            self.ask_for_txs(peer)
+            self.ask_for_txs(peer[0])
         else:
-            self.download_blocks(peer, block_count, length)
-        flag = False
-        my_peers = self.db.get('peers_ranked')
-        their_peers = ntwrk.command(peer, {'action': 'peers'})
+            self.download_blocks(peer[0], block_count, length)
+
+        my_peers = self.account.get_peers()
+        their_peers = ntwrk.command(peer[0], {'action': 'peers'})
         if type(their_peers) == list:
             for p in their_peers:
-                if p not in my_peers:
-                    flag = True
-                    my_peers.append(p)
+                self.account.add_peer(p)
             for p in my_peers:
-                if p not in their_peers:
-                    ntwrk.command(peer, {'action': 'receive_peer', 'peer': p})
-        if flag:
-            self.db.put('peers_ranked', my_peers)
+                ntwrk.command(peer[0], {'action': 'receive_peer', 'peer': p})
 
     def download_blocks(self, peer, peers_block_count, length):
         known_length = self.db.get('known_length')

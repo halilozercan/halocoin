@@ -1,6 +1,7 @@
 """This program starts all the threads going. When it hears a kill signal, it kills all the threads.
 """
 import os
+import pickle
 import time
 
 import custom
@@ -80,6 +81,7 @@ class Engine(Service):
             self.db.put('memoized_votes', {})
             self.db.put('txs', [])
             self.db.put('peers_ranked', [])
+            self.db.put('peers', [])
             self.db.put('targets', {})
             self.db.put('times', {})
             self.db.put('mine', False)
@@ -91,6 +93,7 @@ class Engine(Service):
         self.db.put('privkey', self.wallet['privkey'])
         self.db.put('pubkey', self.wallet['pubkey'])
         self.db.put('address', tools.make_address([self.wallet['pubkey']], 1))
+        self.db.put('peers', [])
 
         if not self.account.register():
             print("Account service has failed. Exiting!")
@@ -123,29 +126,29 @@ class Engine(Service):
     def unregister_sub_services(self):
         if self.miner.get_state() == Service.RUNNING:
             self.miner.unregister()
-            print 'Closed miner'
+            print('Closed miner')
         if self.account.get_state() == Service.RUNNING:
             self.account.unregister()
-            print 'Closed account'
+            print('Closed account')
         """
         if self.api.get_state() == Service.RUNNING:
             self.api.unregister()
-            print 'Closed api'
+            print('Closed api')
         """
         if self.peers_check.get_state() == Service.RUNNING:
             self.peers_check.unregister()
-            print 'Closed peers check'
+            print('Closed peers check')
         if self.peer_receive.get_state() == Service.RUNNING:
             self.peer_receive.unregister()
-            print 'Closed peer_receive'
+            print('Closed peer_receive')
         if self.blockchain.get_state() == Service.RUNNING:
             self.blockchain.unregister()
-            print 'Closed blockchain'
+            print('Closed blockchain')
         if self.db.get_state() == Service.RUNNING:
             self.db.unregister()
-            print 'Closed db'
+            print('Closed db')
         jsonrpc_api.shutdown()
-        print 'Closed api'
+        print('Closed api')
 
     @async
     def stop(self):

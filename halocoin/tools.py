@@ -122,6 +122,16 @@ def median(mylist):
     return sorted(mylist)[len(mylist) / 2]
 
 
+def hex_sum(a, b):
+    # Sum of numbers expressed as hexidecimal strings
+    return buffer_(str(hex(int(a, 16) + int(b, 16)))[2: -1], 64)
+
+
+def hex_invert(n):
+    # Use double-size for division, to reduce information leakage.
+    return buffer_(str(hex(int('f' * 128, 16) / int(n, 16)))[2: -1], 64)
+
+
 def daemonize(f):
     pid = os.fork()
     if pid == 0:

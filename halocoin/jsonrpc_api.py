@@ -95,7 +95,7 @@ def easy_add_transaction(tx_orig, privkey='default'):
 
 @dispatcher.add_method
 def peers():
-    return _engine.db.get('peers_ranked')
+    return _engine.account.get_peers()
 
 
 @dispatcher.add_method

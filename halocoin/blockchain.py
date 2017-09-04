@@ -12,16 +12,6 @@ from ntwrk import Response
 from service import Service, threaded, sync, NoExceptionQueue
 
 
-def hex_sum(a, b):
-    # Sum of numbers expressed as hexidecimal strings
-    return tools.buffer_(str(hex(int(a, 16) + int(b, 16)))[2: -1], 64)
-
-
-def hex_invert(n):
-    # Use double-size for division, to reduce information leakage.
-    return tools.buffer_(str(hex(int('f' * 128, 16) / int(n, 16)))[2: -1], 64)
-
-
 class BlockchainService(Service):
     tx_types = ['spend', 'mint']
     IDLE = 1
@@ -161,7 +151,6 @@ class BlockchainService(Service):
         """Attempts adding a new block to the blockchain.
          Median is good for weeding out liars, so long as the liars don't have 51%
          hashpower. """
-        start = time.time()
 
         length = self.db.get('length')
 
@@ -170,22 +159,20 @@ class BlockchainService(Service):
             return False
 
         # TODO: understand what is going on here
-        if block['diffLength'] != hex_sum(self.db.get('diffLength'),
-                                          hex_invert(block['target'])):
-            print block['diffLength']
-            print hex_sum(self.db.get('diffLength'), hex_invert(block['target']))
-            print block['length']
+        if block['diffLength'] != tools.hex_sum(self.db.get('diffLength'), tools.hex_invert(block['target'])):
+            tools.log(block['diffLength'])
+            tools.log(tools.hex_sum(self.db.get('diffLength'), tools.hex_invert(block['target'])))
+            tools.log(block['length'])
             tools.log('difflength is wrong')
             return False
 
-        if length >= 0:
-            if tools.det_hash(self.db.get(length)) != block['prevHash']:
-                tools.log('prevhash different')
-                return False
+        if length >= 0 and tools.det_hash(self.db.get(length)) != block['prevHash']:
+            tools.log('prevhash different')
+            return False
 
         nonce_and_hash = tools.hash_without_nonce(block)
         if tools.det_hash(nonce_and_hash) > block['target']:
-            tools.log('hash is not applicable to target')
+            tools.log('hash value does not match the target')
             return False
 
         if block['target'] != self.target(block['length']):
@@ -194,13 +181,12 @@ class BlockchainService(Service):
             tools.log('wrong target')
             return False
 
-        earliest = tools.median(self.recent_blockthings('times',
-                                                        custom.mmm,
-                                                        self.db.get('length')))
-
-        if block['time'] < earliest:
+        recent_time_values = self.recent_blockthings('times', custom.mmm, self.db.get('length'))
+        median_block = tools.median(recent_time_values)
+        if block['time'] < median_block:
             tools.log('Received block is generated earlier than median.')
             return False
+
         if not self.account.update_accounts_with_block(block, add_flag=True, simulate=True):
             tools.log('Received block failed transactions check.')
             return False
@@ -231,18 +217,14 @@ class BlockchainService(Service):
         length = self.db.get('length')
         if length < 0:
             return
-        try:
-            targets = self.db.get('targets')
-            targets.pop(str(length))
-            self.db.put('targets', targets)
-        except:
-            pass
-        try:
-            times = self.db.get('times')
-            times.pop(str(length))
-            self.db.put('times', times)
-        except:
-            pass
+
+        targets = self.db.get('targets')
+        targets.pop(str(length))
+        self.db.put('targets', targets)
+
+        times = self.db.get('times')
+        times.pop(str(length))
+        self.db.put('times', times)
 
         block = self.db.get(length)
         self.account.update_accounts_with_block(block, add_flag=False)
@@ -430,19 +412,19 @@ class BlockchainService(Service):
                 if len(l) < 1:
                     return 0
                 while len(l) > 1:
-                    l = [hex_sum(l[0], l[1])] + l[2:]
+                    l = [tools.hex_sum(l[0], l[1])] + l[2:]
                 return l[0]
 
             targets = self.recent_blockthings('targets', custom.history_length)
             w = weights(len(targets))  # should be rat instead of float
             tw = sum(w)
-            targets = map(hex_invert, targets)
+            targets = map(tools.hex_invert, targets)
 
             def weighted_multiply(i):
                 return targetTimesFloat(targets[i], w[i] / tw)  # this should use rat division instead
 
             weighted_targets = [weighted_multiply(i) for i in range(len(targets))]
-            return hex_invert(sumTargets(weighted_targets))
+            return tools.hex_invert(sumTargets(weighted_targets))
 
         def estimate_time():
             times = self.recent_blockthings('times', custom.history_length)

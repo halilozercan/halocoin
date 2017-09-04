@@ -2,6 +2,7 @@ import copy
 import json
 import leveldb
 import os
+import pickle
 
 import tools, custom
 from service import Service, sync
@@ -193,3 +194,49 @@ class AccountService(Service):
                                                          add_flag=True)
 
         return account['amount'] >= 0
+
+    @sync
+    def get_peers(self):
+        return self.db.get('peers')
+
+    @sync
+    def add_peer(self, peer):
+        if not AccountService.is_peer(peer):
+            return
+
+        peers = self.db.get('peers')
+        for _peer in peers:
+            if peer[0] == _peer[0]:
+                return
+
+        peers.append(peer)
+        self.db.put('peers', peers)
+
+    @sync
+    def update_peer(self, peer):
+        if not AccountService.is_peer(peer):
+            return
+
+        peers = self.db.get('peers')
+        for i, _peer in enumerate(peers):
+            if peer[0] == _peer[0]:
+                peers[i] = peer
+                break
+
+        self.db.put('peers', peers)
+
+    @staticmethod
+    def is_peer(peer):
+        if not isinstance(peer, list):
+            return False
+
+        if len(peer) != 4:
+            return False
+
+        if not isinstance(peer[0], list):
+            return False
+
+        if len(peer[0]) != 2:
+            return False
+
+        return True

@@ -99,7 +99,7 @@ def command(peer, message):
     """
     This method is special for blockchain communication. It is a pipeline of
     connect, send and receive.
-    :param peer: A tuple containing address and port
+    :param peer: A peer object
     :param message: message to be sent
     :return: received response or error
     """
