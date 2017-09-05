@@ -90,6 +90,7 @@ class Engine(Service):
         self.db.put('privkey', self.wallet['privkey'])
         self.db.put('pubkey', self.wallet['pubkey'])
         self.db.put('address', tools.make_address([self.wallet['pubkey']], 1))
+        # Todo: remove in a future release
         self.db.put('peers', [])
 
         if not self.account.register():

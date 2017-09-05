@@ -10,11 +10,11 @@ They must stay here.
 
 # Configurable
 DEBUG = False
-db_type = 'redis'
+db_type = 'leveldb'
 # db_user = 'username'
 db_pass = 'halocoin'
 db_port = 6379
-db_name = 0
+db_name = 'halodb'
 log_file = 'log'
 port = 7900
 api_port = 7899
