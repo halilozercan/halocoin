@@ -1,13 +1,9 @@
 import Queue
 import inspect
-import logging
 import os
 import socket
 import ssl
 import threading
-import time
-
-import sys
 import uuid
 
 from smp import SMProtocol

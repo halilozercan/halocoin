@@ -1,5 +1,3 @@
-"""A bunch of functions that are used by multiple threads.
-"""
 import StringIO
 import copy
 import hashlib

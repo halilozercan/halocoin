@@ -1,10 +1,15 @@
-"""This is to make magic numbers easier to deal with."""
-import multiprocessing
-import os
 from cdecimal import Decimal
 
+"""
+Most of these stuff should be moved into config file.
+- Initial peer list must be in some kind of torrent file.
+- Inflection, block reward, etc. are not configurable. 
+They must stay here.
+- 
+"""
+
+# Configurable
 DEBUG = False
-peers = [['188.166.65.249', 7900], ['46.101.107.152', 7900]]
 db_type = 'redis'
 # db_user = 'username'
 db_pass = 'halocoin'
@@ -13,6 +18,10 @@ db_name = 0
 log_file = 'log'
 port = 7900
 api_port = 7899
+download_many = 50  # Max number of blocks to request from a peer at the same time.
+
+
+# Integrity of blockchain
 version = "0.0002"
 block_reward = 10 ** 5
 fee = 10 ** 3
@@ -27,5 +36,9 @@ history_length = 400
 # total weight.
 inflection = Decimal('0.985')
 memoized_weights = [inflection ** i for i in range(1000)]
-download_many = 50  # Max number of blocks to request from a peer at the same time.
 blocktime = 120
+
+
+# Independent
+peers = [['188.166.65.249', 7900], ['46.101.107.152', 7900]]
+

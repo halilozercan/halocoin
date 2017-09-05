@@ -127,10 +127,7 @@ def run(argv):
 
     args = parser.parse_args(argv[1:])
 
-    if args.action in ['send'] and args.address is None:
-        print('You should specify an address when running {}'.format(args.action))
-        exit(1)
-    elif args.action in ['start', 'new_wallet'] and args.wallet is None:
+    if args.action in ['start', 'new_wallet'] and args.wallet is None:
         print('You should specify a wallet to run {}'.format(args.action))
         exit(1)
 
@@ -173,6 +170,8 @@ def run(argv):
                 engine.main(wallet, None, working_dir)
         except filelock.Timeout:
             print('Halocoin is already running')
+        except:
+            print('Halocoin ran into a problem while starting!')
     elif args.action == 'new_wallet':
         from getpass import getpass
 

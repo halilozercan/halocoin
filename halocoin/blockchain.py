@@ -1,5 +1,3 @@
-""" This file explains explains the rules for adding and removing blocks from the local chain.
-"""
 import Queue
 import copy
 import time

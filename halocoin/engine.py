@@ -1,11 +1,8 @@
-"""This program starts all the threads going. When it hears a kill signal, it kills all the threads.
-"""
 import os
-import pickle
 import time
 
+import api
 import custom
-import jsonrpc_api
 import tools
 from account import AccountService
 from blockchain import BlockchainService
@@ -42,14 +39,14 @@ class Engine(Service):
             'peer.port': custom.port
         }
 
-        if custom.db_type == 'redis':
+        if self.config['database.type'] == 'redis':
             self.config.update({
                 'database.name': custom.db_name,
                 'database.pass': custom.db_pass,
                 'database.port': custom.db_port
             })
             self.db = RedisService(self)
-        elif custom.db_type == 'leveldb':
+        elif self.config['database.type'] == 'leveldb':
             self.config.update({
                 'database.name': os.path.join(self.working_dir, custom.db_name)
             })
@@ -62,11 +59,11 @@ class Engine(Service):
         self.miner = MinerService(self)
 
     def on_register(self):
-        print('Starting full node')
+        print('Starting halocoin')
         if not self.db.register():
             return False
 
-        print("Waiting for database to warm up")
+        print("Firing up the Database")
         time.sleep(1)
 
         if not test_database(self.db):
@@ -75,7 +72,7 @@ class Engine(Service):
 
         b = self.db.get('init')
         if not b:
-            print("Initializing Database")
+            print("Initializing records")
             self.db.put('init', True)
             self.db.put('length', -1)
             self.db.put('memoized_votes', {})
@@ -107,9 +104,6 @@ class Engine(Service):
             return False
         print("Started Blockchain")
 
-        jsonrpc_api.run(self)
-        print("Started API")
-
         if not self.peer_receive.register():
             print("Peer Receive service has failed. Exiting!")
             self.unregister_sub_services()
@@ -121,6 +115,10 @@ class Engine(Service):
             self.unregister_sub_services()
             return False
         print("Started Peers Check")
+
+        api.run(self)
+        print("Started API")
+
         return True
 
     def unregister_sub_services(self):
@@ -130,11 +128,6 @@ class Engine(Service):
         if self.account.get_state() == Service.RUNNING:
             self.account.unregister()
             print('Closed account')
-        """
-        if self.api.get_state() == Service.RUNNING:
-            self.api.unregister()
-            print('Closed api')
-        """
         if self.peers_check.get_state() == Service.RUNNING:
             self.peers_check.unregister()
             print('Closed peers check')
@@ -147,7 +140,7 @@ class Engine(Service):
         if self.db.get_state() == Service.RUNNING:
             self.db.unregister()
             print('Closed db')
-        jsonrpc_api.shutdown()
+        api.shutdown()
         print('Closed api')
 
     @async
@@ -160,6 +153,6 @@ def main(wallet, config, working_dir):
     engine_instance = Engine(wallet, config, working_dir)
     if engine_instance.register():
         engine_instance.join()
-        print("Exiting gracefully")
+        print("Shutting down gracefully")
     else:
-        print("Couldn't start Halocoin")
+        print("Couldn't start halocoin")

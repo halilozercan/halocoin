@@ -1,5 +1,3 @@
-"""This is the internal API. These are the words that are used to interact with a local node that you have the password to.
-"""
 import copy
 import json
 import threading

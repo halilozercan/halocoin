@@ -1,13 +1,8 @@
-"""When a peer talks to us, this is how we generate a response. This is the external API.
-"""
 import copy
 import json
 import socket
 import sys
 
-import time
-
-import custom
 import ntwrk
 import tools
 from ntwrk import Message

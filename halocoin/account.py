@@ -1,10 +1,7 @@
 import copy
-import json
-import leveldb
-import os
-import pickle
 
-import tools, custom
+import custom
+import tools
 from service import Service, sync
 
 

@@ -8,6 +8,9 @@ from service import Service, sync
 
 
 class DatabaseService(Service):
+    """
+    Database bindings for leveldb
+    """
     def __init__(self, engine):
         Service.__init__(self, name='database')
         self.engine = engine
@@ -74,6 +77,9 @@ class DatabaseService(Service):
 
 
 class RedisService(Service):
+    """
+    Database bindings for redis
+    """
     def __init__(self, engine):
         Service.__init__(self, name='database')
         self.engine = engine

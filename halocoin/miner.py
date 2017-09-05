@@ -1,11 +1,7 @@
-""" This file mines blocks and talks to peers. It maintains consensus of the
-    blockchain.
-"""
-import json
+import Queue
 import multiprocessing
 import random
 import time
-import Queue
 from multiprocessing import Process
 
 import blockchain
@@ -16,6 +12,11 @@ from service import Service, threaded
 
 
 class MinerService(Service):
+    """
+    Simple miner service. Starts running when miner is turned on.
+    Executes number of workers as specified in config.
+    Workers are run as different processes. Supports multicore mining.
+    """
     def __init__(self, engine):
         Service.__init__(self, "miner")
         self.engine = engine

@@ -6,4 +6,6 @@ venv/
 todo
 build/
 dist/
+data_folder/
 *egg-info*
+tests/

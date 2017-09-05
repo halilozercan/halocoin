@@ -1,7 +1,3 @@
-"""A bunch of functions that are used by multiple threads.
-"""
-
-
 import re
 import subprocess
 

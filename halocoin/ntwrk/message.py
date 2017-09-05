@@ -1,6 +1,6 @@
-import json
-import yaml
 import uuid
+
+import yaml
 
 
 class Order:
