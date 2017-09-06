@@ -91,11 +91,11 @@ class PeerListenService(Service):
         return self.blockchain.tx_pool()
 
     @sync
-    def pushtx(self, tx):
+    def push_tx(self, tx):
         self.blockchain.tx_queue.put(tx)
         return 'success'
 
     @sync
-    def pushblock(self, blocks):
+    def push_block(self, blocks):
         self.blockchain.blocks_queue.put(blocks)
         return 'success'

@@ -107,7 +107,7 @@ class PeerCheckService(Service):
         T = self.blockchain.tx_pool()
         pushers = filter(lambda t: t not in txs, T)
         for push in pushers:
-            ntwrk.command(peer, {'action': 'pushtx', 'tx': push})
+            ntwrk.command(peer, {'action': 'push_tx', 'tx': push})
         return 0
 
     def give_block(self, peer, block_count_peer):
@@ -116,6 +116,6 @@ class PeerCheckService(Service):
                                                block_count_peer + self.engine.config['peer.block_request_limit'])]
         for i in range(b[0], b[1] + 1):
             blocks.append(self.db.get(i))
-        ntwrk.command(peer, {'action': 'pushblock',
+        ntwrk.command(peer, {'action': 'push_block',
                              'blocks': blocks})
         return 0

@@ -29,6 +29,17 @@ def make_api_request(method, **kwargs):
     return response['result']
 
 
+class colors:
+    HEADER = '\033[95m'
+    OKBLUE = '\033[94m'
+    OKGREEN = '\033[92m'
+    WARNING = '\033[93m'
+    FAIL = '\033[91m'
+    ENDC = '\033[0m'
+    BOLD = '\033[1m'
+    UNDERLINE = '\033[4m'
+
+
 def print_txs(txs):
     table = []
     for tx in txs:
@@ -40,11 +51,11 @@ def print_txs(txs):
         table.append([tx['type'], tx['from'], tx['to'], tx['amount'], tx['message']])
 
     print(tabulate(table,
-                   headers=[tools.bcolors.HEADER + 'Type' + tools.bcolors.ENDC,
-                            tools.bcolors.HEADER + 'From' + tools.bcolors.ENDC,
-                            tools.bcolors.HEADER + 'To' + tools.bcolors.ENDC,
-                            tools.bcolors.HEADER + 'Amount' + tools.bcolors.ENDC,
-                            tools.bcolors.HEADER + 'Message' + tools.bcolors.ENDC],
+                   headers=[colors.HEADER + 'Type' + colors.ENDC,
+                            colors.HEADER + 'From' + colors.ENDC,
+                            colors.HEADER + 'To' + colors.ENDC,
+                            colors.HEADER + 'Amount' + colors.ENDC,
+                            colors.HEADER + 'Message' + colors.ENDC],
                    tablefmt='orgtbl'))
 
 
@@ -54,10 +65,10 @@ def print_peers(peers):
         table.append([peer[0][0], peer[0][1], peer[1], peer[3]])
 
     print(tabulate(table,
-                   headers=[tools.bcolors.HEADER + 'Address' + tools.bcolors.ENDC,
-                            tools.bcolors.HEADER + 'Port' + tools.bcolors.ENDC,
-                            tools.bcolors.HEADER + 'Rank' + tools.bcolors.ENDC,
-                            tools.bcolors.HEADER + 'Length' + tools.bcolors.ENDC],
+                   headers=[colors.HEADER + 'Address' + colors.ENDC,
+                            colors.HEADER + 'Port' + colors.ENDC,
+                            colors.HEADER + 'Rank' + colors.ENDC,
+                            colors.HEADER + 'Length' + colors.ENDC],
                    tablefmt='orgtbl'))
 
 
@@ -71,13 +82,13 @@ def print_blocks(blocks):
         ).strftime('%Y-%m-%d %H:%M:%S')
         mint_tx = filter(lambda t: t['type'] == 'mint', block['txs'])[0]
         table.append([block['length'], tools.tx_owner_address(mint_tx), block['time']])
-    print(tools.bcolors.WARNING + "Blocks:\n" + tools.bcolors.ENDC)
-    print(tabulate(table, headers=[tools.bcolors.HEADER + 'Length' + tools.bcolors.ENDC,
-                                   tools.bcolors.HEADER + 'Miner' + tools.bcolors.ENDC,
-                                   tools.bcolors.HEADER + 'Time' + tools.bcolors.ENDC], tablefmt='orgtbl'))
+    print(colors.WARNING + "Blocks:\n" + colors.ENDC)
+    print(tabulate(table, headers=[colors.HEADER + 'Length' + colors.ENDC,
+                                   colors.HEADER + 'Miner' + colors.ENDC,
+                                   colors.HEADER + 'Time' + colors.ENDC], tablefmt='orgtbl'))
 
     if len(blocks) == 1:
-        print(tools.bcolors.WARNING + "\nTransactions in the Block:\n" + tools.bcolors.ENDC)
+        print(colors.WARNING + "\nTransactions in the Block:\n" + colors.ENDC)
         print_txs(blocks[0]['txs'])
 
 
@@ -90,19 +101,19 @@ def print_history(history):
         for tx in history['send']:
             print("In Block {} {} => {} for amount {}".format(
                 tx['block'],
-                tools.bcolors.HEADER + tools.tx_owner_address(tx) + tools.bcolors.ENDC,
-                tools.bcolors.WARNING + tx['to'] + tools.bcolors.ENDC,
+                colors.HEADER + tools.tx_owner_address(tx) + colors.ENDC,
+                colors.WARNING + tx['to'] + colors.ENDC,
                 tx['amount']))
         for tx in history['recv']:
             print("In Block {} {} => {} for amount {}".format(
                 tx['block'],
-                tools.bcolors.WARNING + tools.tx_owner_address(tx) + tools.bcolors.ENDC,
-                tools.bcolors.HEADER + tx['to'] + tools.bcolors.ENDC,
+                colors.WARNING + tools.tx_owner_address(tx) + colors.ENDC,
+                colors.HEADER + tx['to'] + colors.ENDC,
                 tx['amount']))
         for tx in history['mine']:
             print("In Block {} {} mined amount {}".format(
                 tx['block'],
-                tools.bcolors.HEADER + tools.tx_owner_address(tx) + tools.bcolors.ENDC,
+                colors.HEADER + tools.tx_owner_address(tx) + colors.ENDC,
                 custom.block_reward))
 
 

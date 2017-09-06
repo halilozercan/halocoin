@@ -9,3 +9,4 @@ dist/
 data_folder/
 *egg-info*
 tests/
+.idea/

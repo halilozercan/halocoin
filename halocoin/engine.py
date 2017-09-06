@@ -123,12 +123,12 @@ class Engine(Service):
         return True
 
     def unregister_sub_services(self):
+        api.shutdown()
+        print('Closed api')
+
         if self.miner.get_state() == Service.RUNNING:
             self.miner.unregister()
             print('Closed miner')
-        if self.account.get_state() == Service.RUNNING:
-            self.account.unregister()
-            print('Closed account')
         if self.peers_check.get_state() == Service.RUNNING:
             self.peers_check.unregister()
             print('Closed peers check')
@@ -138,11 +138,12 @@ class Engine(Service):
         if self.blockchain.get_state() == Service.RUNNING:
             self.blockchain.unregister()
             print('Closed blockchain')
+        if self.account.get_state() == Service.RUNNING:
+            self.account.unregister()
+            print('Closed account')
         if self.db.get_state() == Service.RUNNING:
             self.db.unregister()
             print('Closed db')
-        api.shutdown()
-        print('Closed api')
 
     @async
     def stop(self):
