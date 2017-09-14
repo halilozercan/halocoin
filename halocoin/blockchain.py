@@ -217,11 +217,13 @@ class BlockchainService(Service):
             return
 
         targets = self.db.get('targets')
-        targets.pop(str(length))
+        if str(length) in targets:
+            targets.pop(str(length))
         self.db.put('targets', targets)
 
         times = self.db.get('times')
-        times.pop(str(length))
+        if str(length) in times:
+            times.pop(str(length))
         self.db.put('times', times)
 
         block = self.db.get(length)
@@ -244,6 +246,8 @@ class BlockchainService(Service):
 
         for orphan in sorted(orphans, key=lambda x: x['count']):
             self.add_tx(orphan)
+
+        return True
 
     @staticmethod
     def block_integrity_check(block):

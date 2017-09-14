@@ -183,6 +183,18 @@ def pubkey():
 
 
 @dispatcher.add_method
+def delete_block(number="0"):
+    counts = [0, 0]
+    for i in range(int(number)):
+        try:
+            _engine.blockchain.delete_block()
+            counts[0] += 1
+        except:
+            counts[1] += 1
+    return "Removed {}, Not removed {}".format(counts[0], counts[1])
+
+
+@dispatcher.add_method
 def block(number="default"):
     if "-" in number:
         _from = int(number.split("-")[0])

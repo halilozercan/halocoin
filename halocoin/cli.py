@@ -29,7 +29,7 @@ def make_api_request(method, **kwargs):
     return response['result']
 
 
-class colors:
+class Colors:
     HEADER = '\033[95m'
     OKBLUE = '\033[94m'
     OKGREEN = '\033[92m'
@@ -51,11 +51,11 @@ def print_txs(txs):
         table.append([tx['type'], tx['from'], tx['to'], tx['amount'], tx['message']])
 
     print(tabulate(table,
-                   headers=[colors.HEADER + 'Type' + colors.ENDC,
-                            colors.HEADER + 'From' + colors.ENDC,
-                            colors.HEADER + 'To' + colors.ENDC,
-                            colors.HEADER + 'Amount' + colors.ENDC,
-                            colors.HEADER + 'Message' + colors.ENDC],
+                   headers=[Colors.HEADER + 'Type' + Colors.ENDC,
+                            Colors.HEADER + 'From' + Colors.ENDC,
+                            Colors.HEADER + 'To' + Colors.ENDC,
+                            Colors.HEADER + 'Amount' + Colors.ENDC,
+                            Colors.HEADER + 'Message' + Colors.ENDC],
                    tablefmt='orgtbl'))
 
 
@@ -65,10 +65,10 @@ def print_peers(peers):
         table.append([peer[0][0], peer[0][1], peer[1], peer[3]])
 
     print(tabulate(table,
-                   headers=[colors.HEADER + 'Address' + colors.ENDC,
-                            colors.HEADER + 'Port' + colors.ENDC,
-                            colors.HEADER + 'Rank' + colors.ENDC,
-                            colors.HEADER + 'Length' + colors.ENDC],
+                   headers=[Colors.HEADER + 'Address' + Colors.ENDC,
+                            Colors.HEADER + 'Port' + Colors.ENDC,
+                            Colors.HEADER + 'Rank' + Colors.ENDC,
+                            Colors.HEADER + 'Length' + Colors.ENDC],
                    tablefmt='orgtbl'))
 
 
@@ -82,13 +82,13 @@ def print_blocks(blocks):
         ).strftime('%Y-%m-%d %H:%M:%S')
         mint_tx = filter(lambda t: t['type'] == 'mint', block['txs'])[0]
         table.append([block['length'], tools.tx_owner_address(mint_tx), block['time']])
-    print(colors.WARNING + "Blocks:\n" + colors.ENDC)
-    print(tabulate(table, headers=[colors.HEADER + 'Length' + colors.ENDC,
-                                   colors.HEADER + 'Miner' + colors.ENDC,
-                                   colors.HEADER + 'Time' + colors.ENDC], tablefmt='orgtbl'))
+    print(Colors.WARNING + "Blocks:\n" + Colors.ENDC)
+    print(tabulate(table, headers=[Colors.HEADER + 'Length' + Colors.ENDC,
+                                   Colors.HEADER + 'Miner' + Colors.ENDC,
+                                   Colors.HEADER + 'Time' + Colors.ENDC], tablefmt='orgtbl'))
 
     if len(blocks) == 1:
-        print(colors.WARNING + "\nTransactions in the Block:\n" + colors.ENDC)
+        print(Colors.WARNING + "\nTransactions in the Block:\n" + Colors.ENDC)
         print_txs(blocks[0]['txs'])
 
 
@@ -101,26 +101,26 @@ def print_history(history):
         for tx in history['send']:
             print("In Block {} {} => {} for amount {}".format(
                 tx['block'],
-                colors.HEADER + tools.tx_owner_address(tx) + colors.ENDC,
-                colors.WARNING + tx['to'] + colors.ENDC,
+                Colors.HEADER + tools.tx_owner_address(tx) + Colors.ENDC,
+                Colors.WARNING + tx['to'] + Colors.ENDC,
                 tx['amount']))
         for tx in history['recv']:
             print("In Block {} {} => {} for amount {}".format(
                 tx['block'],
-                colors.WARNING + tools.tx_owner_address(tx) + colors.ENDC,
-                colors.HEADER + tx['to'] + colors.ENDC,
+                Colors.WARNING + tools.tx_owner_address(tx) + Colors.ENDC,
+                Colors.HEADER + tx['to'] + Colors.ENDC,
                 tx['amount']))
         for tx in history['mine']:
             print("In Block {} {} mined amount {}".format(
                 tx['block'],
-                colors.HEADER + tools.tx_owner_address(tx) + colors.ENDC,
+                Colors.HEADER + tools.tx_owner_address(tx) + Colors.ENDC,
                 custom.block_reward))
 
 
 def run(argv):
     actions = ['start', 'stop', 'send', 'balance', 'mybalance', 'difficulty', 'info', 'myaddress',
                'peers', 'blockcount', 'txs', 'new_wallet', 'pubkey', 'block', 'mine', 'history',
-               'invalidate']
+               'invalidate', 'delete_block']
     parser = argparse.ArgumentParser(description='CLI for halocoin application.')
     parser.add_argument('action', help='Main action to take', choices=actions)
     parser.add_argument('--address', action="store", type=str, dest='address',
@@ -202,6 +202,8 @@ def run(argv):
         if args.action == 'block':
             blocks = make_api_request(args.action, number=args.number)
             print_blocks(blocks)
+        elif args.action == 'delete_block':
+            print(make_api_request(args.action, number=args.number))
         elif args.action == 'blockcount':
             result = make_api_request(args.action)
             print 'We have {} blocks.'.format(result['length'])
