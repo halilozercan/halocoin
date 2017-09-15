@@ -63,6 +63,10 @@ class PeerCheckService(Service):
         peer[3] = block_count['length']
         self.account.update_peer(peer)
 
+        known_length = self.db.get('known_length')
+        if block_count['length'] > known_length:
+            self.db.put('known_length', block_count['length'])
+
         length = self.db.get('length')
         diff_length = self.db.get('diffLength')
         size = max(len(diff_length), len(block_count['diffLength']))
@@ -87,9 +91,6 @@ class PeerCheckService(Service):
                 ntwrk.command(peer[0], {'action': 'receive_peer', 'peer': p})
 
     def download_blocks(self, peer, peers_block_count, length):
-        known_length = self.db.get('known_length')
-        if peers_block_count['length'] > known_length:
-            self.db.put('known_length', peers_block_count['length'])
         b = [max(0, length - 10), min(peers_block_count['length'] + 1,
                                       length + self.engine.config['peer.block_request_limit'])]
         blocks = ntwrk.command(peer, {'action': 'range_request', 'range': b})
@@ -99,15 +100,16 @@ class PeerCheckService(Service):
         return 0
 
     def ask_for_txs(self, peer):
+        T = self.blockchain.tx_pool()
+        pushers = filter(lambda t: t not in txs, T)
+        for push in pushers:
+            ntwrk.command(peer, {'action': 'push_tx', 'tx': push})
+
         txs = ntwrk.command(peer, {'action': 'txs'})
         if not isinstance(txs, list):
             return -1
         for tx in txs:
             self.blockchain.tx_queue.put(tx)
-        T = self.blockchain.tx_pool()
-        pushers = filter(lambda t: t not in txs, T)
-        for push in pushers:
-            ntwrk.command(peer, {'action': 'push_tx', 'tx': push})
         return 0
 
     def give_block(self, peer, block_count_peer):
