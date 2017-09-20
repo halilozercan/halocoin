@@ -60,7 +60,7 @@ class AccountService(Service):
         """
 
         :param block:
-        :param add_flag:
+        :param add_flag: Is block being added or removed
         :param simulate: Do not actually update the accounts, return any irregularity
         :return:
         """
@@ -175,10 +175,9 @@ class AccountService(Service):
         return 'Updated ' + str(account)
 
     def known_tx_count(self, address):
-        # TODO: address is a address object from database. Find the real address string inside
         # Returns the number of transactions that pubkey has broadcast.
-        def number_of_unconfirmed_txs(address):
-            return len(filter(lambda t: address == tools.tx_owner_address(t), txs_in_pool))
+        def number_of_unconfirmed_txs(_address):
+            return len(filter(lambda t: _address == tools.tx_owner_address(t), txs_in_pool))
 
         account = self.get_account(address)
         txs_in_pool = self.blockchain.tx_pool()

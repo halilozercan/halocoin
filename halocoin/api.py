@@ -97,18 +97,6 @@ def peers():
 
 
 @dispatcher.add_method
-@blockchain_synced
-def info(subject=None):
-    if subject is None:
-        return 'not enough inputs'
-    if subject == 'myaddress':
-        address = _engine.db.get('address')
-    else:
-        address = subject
-    return _engine.account.get_account(address)
-
-
-@dispatcher.add_method
 def myaddress():
     return _engine.db.get('address')
 

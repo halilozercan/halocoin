@@ -17,6 +17,6 @@ setup(
     },
     install_requires=['requests', 'wheel', 'pyyaml', 'filelock',
                       'pycrypto', 'leveldb', 'm3-cdecimal',
-                      'werkzeug', 'json-rpc', 'tabulate', 'redis'],
+                      'werkzeug', 'json-rpc', 'tabulate'],
     packages=find_packages(exclude=("tests", "tests.*")),
 )

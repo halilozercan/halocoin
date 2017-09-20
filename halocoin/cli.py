@@ -14,6 +14,29 @@ import engine
 import tools
 
 
+class Colors:
+    HEADER = '\033[95m'
+    OKBLUE = '\033[94m'
+    OKGREEN = '\033[92m'
+    WARNING = '\033[93m'
+    FAIL = '\033[91m'
+    ENDC = '\033[0m'
+    BOLD = '\033[1m'
+    UNDERLINE = '\033[4m'
+
+
+actions = dict()
+
+
+def action(func):
+    def wrapper(*args, **kwargs):
+        return func(*args, **kwargs)
+
+    global actions
+    actions[func.__name__] = wrapper
+    return wrapper
+
+
 def make_api_request(method, **kwargs):
     url = "http://localhost:" + str(custom.api_port) + "/jsonrpc"
     headers = {'content-type': 'application/json'}
@@ -27,17 +50,6 @@ def make_api_request(method, **kwargs):
     }
     response = requests.post(url, data=json.dumps(payload), headers=headers).json()
     return response['result']
-
-
-class Colors:
-    HEADER = '\033[95m'
-    OKBLUE = '\033[94m'
-    OKGREEN = '\033[92m'
-    WARNING = '\033[93m'
-    FAIL = '\033[91m'
-    ENDC = '\033[0m'
-    BOLD = '\033[1m'
-    UNDERLINE = '\033[4m'
 
 
 def print_txs(txs):
@@ -117,31 +129,8 @@ def print_history(history):
                 custom.block_reward))
 
 
-def run(argv):
-    actions = ['start', 'stop', 'send', 'balance', 'mybalance', 'difficulty', 'info', 'myaddress',
-               'peers', 'blockcount', 'txs', 'new_wallet', 'pubkey', 'block', 'mine', 'history',
-               'invalidate', 'delete_block']
-    parser = argparse.ArgumentParser(description='CLI for halocoin application.')
-    parser.add_argument('action', help='Main action to take', choices=actions)
-    parser.add_argument('--address', action="store", type=str, dest='address',
-                        help='Give a valid blockchain address')
-    parser.add_argument('--message', action="store", type=str, dest='message',
-                        help='Message to send with transaction')
-    parser.add_argument('--amount', action="store", type=int, dest='amount',
-                        help='Amount of coins that are going to be used')
-    parser.add_argument('--number', action="store", type=str, dest='number',
-                        help='Block number or range')
-    parser.add_argument('--wallet', action="store", type=str, dest='wallet',
-                        help='Wallet file address')
-    parser.add_argument('--dir', action="store", type=str, dest='dir',
-                        help='Directory for halocoin to use.')
-
-    args = parser.parse_args(argv[1:])
-
-    if args.action in ['start', 'new_wallet'] and args.wallet is None:
-        print('You should specify a wallet to run {}'.format(args.action))
-        exit(1)
-
+@action
+def start(args):
     if args.dir is None:
         working_dir = tools.get_default_dir()
     else:
@@ -159,70 +148,136 @@ def run(argv):
             print("Could not create a directory!")
             exit(1)
 
-    tools.init_logging(working_dir)
+    lock = filelock.FileLock(os.path.join(working_dir, 'engine_lock'))
+    try:
+        with lock.acquire(timeout=2):
+            tools.init_logging(working_dir)
+            engine.main(None, working_dir)
+    except filelock.Timeout:
+        print('Halocoin is already running')
+    except:
+        print('Halocoin ran into a problem while starting!')
 
-    if args.action == 'start':
-        lock = filelock.FileLock(os.path.join(working_dir, 'engine_lock'))
+
+@action
+def new_wallet(args):
+    from getpass import getpass
+
+    wallet_pw = 'w'
+    wallet_pw_2 = 'w2'
+    while wallet_pw != wallet_pw_2:
+        wallet_pw = getpass('New wallet password: ')
+        wallet_pw_2 = getpass('New wallet password(again): ')
+
+    wallet = tools.random_wallet()
+    wallet_content = json.dumps(wallet)
+    wallet_encrypted_content = tools.encrypt(wallet_pw, wallet_content)
+    with open(args.path, 'w') as f:
+        f.write(wallet_encrypted_content)
+    print('New wallet is created at {}'.format(args.wallet))
+
+
+@action
+def info_wallet(args):
+    wallet_file = open(args.path, 'r')
+    wallet_encrypted_content = wallet_file.read()
+    from getpass import getpass
+
+    while True:
         try:
-            with lock.acquire(timeout=2):
-                wallet_file = open(args.wallet, 'r')
-                wallet_encrypted_content = wallet_file.read()
-                from getpass import getpass
+            wallet_pw = getpass('Wallet password: ')
+            wallet = json.loads(tools.decrypt(wallet_pw, wallet_encrypted_content))
+            break
+        except ValueError:
+            print('Wrong password')
 
-                while True:
-                    try:
-                        wallet_pw = getpass('Wallet password: ')
-                        wallet = json.loads(tools.decrypt(wallet_pw, wallet_encrypted_content))
-                        break
-                    except ValueError:
-                        print('Wrong password')
+    print("Address: {}".format(wallet['address']))
+    print("Pubkey: {}".format(wallet['pubkey']))
+    print("Privkey: {}".format(wallet['privkey']))
 
-                # TODO: Real configuration
-                engine.main(wallet, None, working_dir)
-        except filelock.Timeout:
-            print('Halocoin is already running')
-        except:
-            print('Halocoin ran into a problem while starting!')
-    elif args.action == 'new_wallet':
-        from getpass import getpass
 
-        wallet_pw = 'w'
-        wallet_pw_2 = 'w2'
-        while wallet_pw != wallet_pw_2:
-            wallet_pw = getpass('New wallet password: ')
-            wallet_pw_2 = getpass('New wallet password(again): ')
+@action
+def block(args):
+    blocks = make_api_request(args.action, number=args.number)
+    print_blocks(blocks)
 
-        wallet = tools.random_wallet()
-        wallet_content = json.dumps(wallet)
-        wallet_encrypted_content = tools.encrypt(wallet_pw, wallet_content)
-        with open(args.wallet, 'w') as f:
-            f.write(wallet_encrypted_content)
-        print('New wallet is created: {}'.format(args.wallet))
-    else:
-        if args.action == 'block':
-            blocks = make_api_request(args.action, number=args.number)
-            print_blocks(blocks)
-        elif args.action == 'delete_block':
-            print(make_api_request(args.action, number=args.number))
-        elif args.action == 'blockcount':
-            result = make_api_request(args.action)
-            print 'We have {} blocks.'.format(result['length'])
-            if result['length'] != result['known_length']:
-                print 'Peers are reporting {} blocks.'.format(result['known_length'])
-        elif args.action == 'balance':
-            print(make_api_request(args.action, address=args.address))
-        elif args.action == 'invalidate':
-            print(make_api_request(args.action, address=args.address))
-        elif args.action == 'send':
-            print(make_api_request(args.action, address=args.address, amount=args.amount, message=args.message))
-        elif args.action == 'peers':
-            peers = make_api_request(args.action)
-            print_peers(peers)
-        elif args.action == 'history':
-            history = make_api_request(args.action, address=args.address)
-            print_history(history)
-        else:
-            print(make_api_request(args.action))
+
+@action
+def blockcount(args):
+    result = make_api_request(args.action)
+    print 'We have {} blocks.'.format(result['length'])
+    if result['length'] != result['known_length']:
+        print 'Peers are reporting {} blocks.'.format(result['known_length'])
+
+
+@action
+def balance(args):
+    print(make_api_request(args.action, address=args.address))
+
+
+@action
+def send(args):
+    print(make_api_request(args.action, address=args.address, amount=args.amount, message=args.message))
+
+@action
+def peers(args):
+    peers = make_api_request(args.action)
+    print_peers(peers)
+
+
+@action
+def history(args):
+    history = make_api_request(args.action, address=args.address)
+    print_history(history)
+
+
+@action
+def stop(args):
+    print(make_api_request(args.action))
+
+
+@action
+def mine(args):
+    print(make_api_request(args.action))
+
+
+@action
+def difficulty(args):
+    print(make_api_request(args.action))
+
+
+@action
+def info(args):
+    print(make_api_request(args.action))
+
+
+@action
+def txs(args):
+    txs = make_api_request(args.action)
+    print("Transactions in pool:")
+    print_txs(txs)
+
+
+def run(argv):
+    parser = argparse.ArgumentParser(description='CLI for halocoin.')
+    parser.add_argument('action', help='Main action to take', choices=actions.keys())
+    parser.add_argument('--address', action="store", type=str, dest='address',
+                        help='Give a valid blockchain address')
+    parser.add_argument('--message', action="store", type=str, dest='message',
+                        help='Message to send with transaction')
+    parser.add_argument('--amount', action="store", type=int, dest='amount',
+                        help='Amount of coins that are going to be used')
+    parser.add_argument('--number', action="store", type=str, dest='number',
+                        help='Block number or range')
+    parser.add_argument('--path', action="store", type=str, dest='path',
+                        help='Path for a file, e.g. wallet')
+    parser.add_argument('--dir', action="store", type=str, dest='dir',
+                        help='Directory for halocoin to use.')
+
+    args = parser.parse_args(argv[1:])
+
+    actions[args.action](args)
+    return
 
 
 def main():

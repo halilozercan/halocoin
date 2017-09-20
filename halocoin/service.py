@@ -187,6 +187,10 @@ class Service:
         :param order: Order object
         :return: result of the execution
         """
+        #print 'Service', service.__class__.__name__, 'Running', order.action, \
+        #    'in thread', threading.current_thread().getName()
+
+        result = False
         if order.action == '__close_threaded__':
             result = True
             service.__threads[order.args[0]][0] = False

@@ -25,9 +25,8 @@ def test_database(db):
 
 
 class Engine(Service):
-    def __init__(self, wallet, config, working_dir):
+    def __init__(self, config, working_dir):
         Service.__init__(self, 'engine')
-        self.wallet = wallet
         self.config = config
         self.working_dir = working_dir
 
@@ -87,9 +86,9 @@ class Engine(Service):
             self.db.put('known_length', -1)
         self.db.put('stop', False)
 
-        self.db.put('privkey', self.wallet['privkey'])
-        self.db.put('pubkey', self.wallet['pubkey'])
-        self.db.put('address', tools.make_address([self.wallet['pubkey']], 1))
+        #self.db.put('privkey', self.wallet['privkey'])
+        #self.db.put('pubkey', self.wallet['pubkey'])
+        #self.db.put('address', tools.make_address([self.wallet['pubkey']], 1))
         # Todo: remove in a future release
         self.db.put('peers', [])
 
@@ -151,9 +150,10 @@ class Engine(Service):
         self.unregister()
 
 
-def main(wallet, config, working_dir):
-    engine_instance = Engine(wallet, config, working_dir)
+def main(config, working_dir):
+    engine_instance = Engine(config, working_dir)
     if engine_instance.register():
+        print("Halocoin is fully running...")
         engine_instance.join()
         print("Shutting down gracefully")
     else:
