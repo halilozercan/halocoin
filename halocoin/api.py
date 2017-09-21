@@ -3,6 +3,7 @@ import json
 import threading
 
 import requests
+import sys
 from jsonrpc import JSONRPCResponseManager, dispatcher
 from werkzeug.serving import run_simple
 from werkzeug.wrappers import Request, Response
@@ -68,14 +69,8 @@ def shutdown():
     requests.post(url, data=json.dumps(payload), headers=headers).json()
 
 
-def easy_add_transaction(tx_orig, privkey='default'):
+def easy_add_transaction(tx_orig, privkey):
     tx = copy.deepcopy(tx_orig)
-    if privkey in ['default', 'Default']:
-        if _engine.db.exists('privkey'):
-            privkey = _engine.db.get('privkey')
-        else:
-            return ('no private key is known, so the tx cannot be signed. Here is the tx: \n' + str(
-                tools.package(tx_orig).encode('base64').replace('\n', '')))
     pubkey = tools.privtopub(privkey)
     address = tools.make_address([pubkey], 1)
     if 'count' not in tx:
@@ -94,11 +89,6 @@ def easy_add_transaction(tx_orig, privkey='default'):
 @dispatcher.add_method
 def peers():
     return _engine.account.get_peers()
-
-
-@dispatcher.add_method
-def myaddress():
-    return _engine.db.get('address')
 
 
 @dispatcher.add_method
@@ -147,11 +137,12 @@ def history(address=None):
 
 @dispatcher.add_method
 @blockchain_synced
-def send(amount=0, address=None, message=''):
-    if amount == 0 and address is None:
-        return 'not enough inputs'
+def send(amount=0, address=None, message='', wallet=None):
+    if amount == 0 or address is None or wallet is None:
+        return 'A problem was occurred while processing inputs'
     return easy_add_transaction({'type': 'spend', 'amount': int(amount),
-                                 'to': address, 'message': message})
+                                 'to': address, 'message': message},
+                                privkey=wallet['privkey'])
 
 
 @dispatcher.add_method
@@ -216,12 +207,6 @@ def balance(address=None):
 
 
 @dispatcher.add_method
-@blockchain_synced
-def mybalance():
-    return balance()
-
-
-@dispatcher.add_method
 def stop():
     _engine.db.put('stop', True)
     _engine.stop()
@@ -229,10 +214,21 @@ def stop():
 
 
 @dispatcher.add_method
-def mine():
+def start_miner(wallet=None):
+    if _engine.miner.get_state() == Service.RUNNING:
+        return 'Miner is already running.'
+    elif wallet is None:
+        return 'Given wallet is not valid.'
+    else:
+        _engine.miner.set_wallet(wallet)
+        _engine.miner.register()
+        return 'Running miner'
+
+
+@dispatcher.add_method
+def stop_miner():
     if _engine.miner.get_state() == Service.RUNNING:
         _engine.miner.unregister()
         return 'Closed miner'
     else:
-        _engine.miner.register()
-        return 'Running miner'
+        return 'Miner is not running.'

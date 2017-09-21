@@ -180,16 +180,7 @@ def new_wallet(args):
 @action
 def info_wallet(args):
     wallet_file = open(args.path, 'r')
-    wallet_encrypted_content = wallet_file.read()
-    from getpass import getpass
-
-    while True:
-        try:
-            wallet_pw = getpass('Wallet password: ')
-            wallet = json.loads(tools.decrypt(wallet_pw, wallet_encrypted_content))
-            break
-        except ValueError:
-            print('Wrong password')
+    wallet = tools.parse_wallet(wallet_file)
 
     print("Address: {}".format(wallet['address']))
     print("Pubkey: {}".format(wallet['pubkey']))
@@ -217,7 +208,11 @@ def balance(args):
 
 @action
 def send(args):
-    print(make_api_request(args.action, address=args.address, amount=args.amount, message=args.message))
+    wallet_file = open(args.path, 'r')
+    wallet = tools.parse_wallet(wallet_file)
+    print(make_api_request(args.action, address=args.address,
+                           amount=args.amount, message=args.message,
+                           wallet=wallet))
 
 @action
 def peers(args):
@@ -237,7 +232,22 @@ def stop(args):
 
 
 @action
-def mine(args):
+def start_miner(args):
+    if args.path is None:
+        sys.stderr.write("Please provide a wallet which will be rewarded for mining\n")
+        return
+    wallet_file = open(args.path, 'r')
+    wallet = tools.parse_wallet(wallet_file)
+    print(make_api_request(args.action, wallet=wallet))
+
+
+@action
+def stop_miner(args):
+    print(make_api_request(args.action))
+
+
+@action
+def status_miner(args):
     print(make_api_request(args.action))
 
 
@@ -260,7 +270,7 @@ def txs(args):
 
 def run(argv):
     parser = argparse.ArgumentParser(description='CLI for halocoin.')
-    parser.add_argument('action', help='Main action to take', choices=actions.keys())
+    parser.add_argument('action', choices=actions.keys())
     parser.add_argument('--address', action="store", type=str, dest='address',
                         help='Give a valid blockchain address')
     parser.add_argument('--message', action="store", type=str, dest='message',

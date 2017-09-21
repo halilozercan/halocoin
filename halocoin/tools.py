@@ -194,3 +194,18 @@ def random_wallet(number_of_pairs=1):
             wallet['privkeys'].append(privkey)
             wallet['pubkeys'].append(pubkey)
     return wallet
+
+
+def parse_wallet(wallet_file):
+    from getpass import getpass
+    import json
+    wallet_encrypted_content = wallet_file.read()
+    while True:
+        try:
+            wallet_pw = getpass('Wallet password: ')
+
+            wallet = json.loads(decrypt(wallet_pw, wallet_encrypted_content))
+            break
+        except ValueError:
+            print('Wrong password')
+    return wallet

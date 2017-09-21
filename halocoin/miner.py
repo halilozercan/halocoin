@@ -22,17 +22,25 @@ class MinerService(Service):
         self.engine = engine
         self.db = None
         self.blockchain = None
+        self.wallet = None
         self.core_count = multiprocessing.cpu_count() if custom.miner_core_count == -1 else custom.miner_core_count
         self.pool = []
         self.queue = multiprocessing.Queue()
+
+    def set_wallet(self, wallet):
+        self.wallet = wallet
 
     def on_register(self):
         self.db = self.engine.db
         self.blockchain = self.engine.blockchain
 
-        return True
+        if self.wallet is not None and 'pubkey' in self.wallet:
+            return True
+        else:
+            return False
 
     def on_close(self):
+        self.wallet = None
         self.close_workers()
 
     @threaded
@@ -128,7 +136,7 @@ class MinerService(Service):
             candidate_block = self.genesis(self.db.get('pubkey'))
         else:
             prev_block = self.db.get(length)
-            candidate_block = self.make_block(prev_block, self.blockchain.tx_pool(), self.db.get('pubkey'))
+            candidate_block = self.make_block(prev_block, self.blockchain.tx_pool(), self.wallet['pubkey'])
         return candidate_block
 
     @staticmethod
