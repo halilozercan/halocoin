@@ -1,4 +1,3 @@
-from io import StringIO
 import copy
 import hashlib
 import logging
@@ -6,11 +5,11 @@ import os
 import random
 import string
 import struct
-import sys
+from io import StringIO
 from json import dumps as package
 
-import custom
-import pt
+from halocoin import custom
+from halocoin import pt
 
 
 def init_logging(working_dir):
