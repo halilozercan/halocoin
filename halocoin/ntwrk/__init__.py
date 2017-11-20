@@ -2,8 +2,8 @@ import json
 import socket
 import uuid
 
-from message import Message
-from response import Response
+from halocoin.ntwrk.message import Message
+from halocoin.ntwrk.response import Response
 
 MAX_MESSAGE_SIZE = 1024
 

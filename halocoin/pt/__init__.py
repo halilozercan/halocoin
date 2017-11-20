@@ -1,1 +1,1 @@
-from main import *
+from halocoin.pt.main import *

@@ -175,7 +175,7 @@ def decode_pubkey(pub, formt=None):
 
 
 def get_privkey_format(priv):
-    if isinstance(priv, (int, long)):
+    if isinstance(priv, int):
         return 'decimal'
     elif len(priv) == 32:
         return 'bin'
@@ -196,7 +196,7 @@ def get_privkey_format(priv):
 
 
 def encode_privkey(priv, formt, vbyte=0):
-    if not isinstance(priv, (int, long)):
+    if not isinstance(priv, int):
         return encode_privkey(decode_privkey(priv), formt, vbyte)
     if formt == 'decimal':
         return priv

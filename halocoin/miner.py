@@ -1,14 +1,14 @@
-import Queue
+import queue
 import multiprocessing
 import random
 import time
 from multiprocessing import Process
 
-import blockchain
-import custom
-import tools
-from ntwrk import Response
-from service import Service, threaded
+from halocoin import blockchain
+from halocoin import custom
+from halocoin import tools
+from halocoin.ntwrk import Response
+from halocoin.service import Service, threaded
 
 
 class MinerService(Service):
@@ -62,7 +62,7 @@ class MinerService(Service):
             try:
                 possible_block = self.queue.get(timeout=0.5)
                 break
-            except Queue.Empty:
+            except queue.Empty:
                 pass
 
         if possible_block is not None:
@@ -131,7 +131,7 @@ class MinerService(Service):
 
     def get_candidate_block(self):
         length = self.db.get('length')
-        print 'Miner working for block', (length + 1)
+        print('Miner working for block', (length + 1))
         if length == -1:
             candidate_block = self.genesis(self.db.get('pubkey'))
         else:

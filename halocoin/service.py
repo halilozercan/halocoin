@@ -1,13 +1,12 @@
-import Queue
+import queue
 import sys
 import threading
-import warnings
 
-import tools
-from ntwrk.message import Order
+from halocoin import tools
+from halocoin.ntwrk.message import Order
 
 
-class NoExceptionQueue(Queue.Queue):
+class NoExceptionQueue(queue.Queue):
     """
     In some cases, queue overflow is ignored. Necessary try, except blocks
     make the code less readable. This is a special queue class that
@@ -15,12 +14,12 @@ class NoExceptionQueue(Queue.Queue):
     """
 
     def __init__(self, maxsize=0):
-        Queue.Queue.__init__(self, maxsize)
+        queue.Queue.__init__(self, maxsize)
 
     def put(self, item, block=True, timeout=None):
         try:
-            Queue.Queue.put(self, item, block, timeout)
-        except Queue.Full:
+            queue.Queue.put(self, item, block, timeout)
+        except queue.Full:
             pass
 
 
@@ -66,7 +65,7 @@ class Service:
                     service.set_state(Service.STOPPED)
                     self.service_responses[order.id] = True
                     self.signals[order.id].set()
-                except Queue.Empty:
+                except queue.Empty:
                     pass
 
         def threaded_wrapper(func):
@@ -120,7 +119,7 @@ class Service:
         Join all side-threads and event loop in the end.
         :return: None
         """
-        for thread_name, thread_dict in self.__threads.iteritems():
+        for thread_dict in self.__threads.values():
             thread_dict["thread"].join()
 
         self.into_service_queue.join()
@@ -172,9 +171,9 @@ class Service:
                     del self.service_responses[new_order.id]
                     result = response
                 else:
-                    print 'Service wait timed out', self.__class__.__name__
+                    tools.log('Service wait timed out', self.__class__.__name__)
             except:
-                print sys.exc_info()
+                tools.log(sys.exc_info())
                 pass
         return result
 

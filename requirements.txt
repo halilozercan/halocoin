@@ -11,4 +11,3 @@ json-rpc
 m3-cdecimal
 werkzeug
 tabulate
-redis

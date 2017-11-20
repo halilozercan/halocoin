@@ -1,16 +1,16 @@
 import os
 import time
 
-import api
-import custom
-import tools
-from account import AccountService
-from blockchain import BlockchainService
-from database import DatabaseService, RedisService
-from miner import MinerService
-from peer_check import PeerCheckService
-from peer_listen import PeerListenService
-from service import Service, async
+from halocoin import api
+from halocoin import custom
+from halocoin import tools
+from halocoin.database import DatabaseService
+from halocoin.account import AccountService
+from halocoin.blockchain import BlockchainService
+from halocoin.miner import MinerService
+from halocoin.peer_check import PeerCheckService
+from halocoin.peer_listen import PeerListenService
+from halocoin.service import Service, async
 
 
 def test_database(db):
@@ -38,14 +38,7 @@ class Engine(Service):
             'peer.port': custom.port
         }
 
-        if self.config['database.type'] == 'redis':
-            self.config.update({
-                'database.name': custom.db_name,
-                'database.pass': custom.db_pass,
-                'database.port': custom.db_port
-            })
-            self.db = RedisService(self)
-        elif self.config['database.type'] == 'leveldb':
+        if self.config['database.type'] == 'leveldb':
             self.config.update({
                 'database.name': os.path.join(self.working_dir, custom.db_name)
             })

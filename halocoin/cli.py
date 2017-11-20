@@ -155,8 +155,9 @@ def start(args):
             engine.main(None, working_dir)
     except filelock.Timeout:
         print('Halocoin is already running')
-    except:
+    except Exception as e:
         print('Halocoin ran into a problem while starting!')
+        tools.log(e)
 
 
 @action
@@ -196,9 +197,9 @@ def block(args):
 @action
 def blockcount(args):
     result = make_api_request(args.action)
-    print 'We have {} blocks.'.format(result['length'])
+    print('We have {} blocks.'.format(result['length']))
     if result['length'] != result['known_length']:
-        print 'Peers are reporting {} blocks.'.format(result['known_length'])
+        print('Peers are reporting {} blocks.'.format(result['known_length']))
 
 
 @action

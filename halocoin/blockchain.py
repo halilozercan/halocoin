@@ -1,13 +1,13 @@
-import Queue
+import queue
 import copy
 import time
 from cdecimal import Decimal
 
-import custom
-import pt
-import tools
-from ntwrk import Response
-from service import Service, threaded, sync, NoExceptionQueue
+from halocoin import custom
+from halocoin import pt
+from halocoin import tools
+from halocoin.ntwrk import Response
+from halocoin.service import Service, threaded, sync, NoExceptionQueue
 
 
 class BlockchainService(Service):
@@ -33,7 +33,7 @@ class BlockchainService(Service):
     def process_blocks(self):
         try:
             candidate_block = self.blocks_queue.get(timeout=1)
-        except Queue.Empty:
+        except queue.Empty:
             return
         self.set_chain_state(BlockchainService.SYNCING)
         try:
@@ -68,7 +68,7 @@ class BlockchainService(Service):
     def process_txs(self):
         try:
             candidate_tx = self.tx_queue.get(timeout=1)
-        except Queue.Empty:
+        except queue.Empty:
             return
         self.add_tx(candidate_tx)
         self.tx_queue.task_done()
@@ -122,7 +122,7 @@ class BlockchainService(Service):
         txs_in_pool = self.tx_pool()
 
         response = Response(True, None)
-        if 'type' not in tx or not isinstance(tx['type'], (str, unicode)) \
+        if 'type' not in tx or not isinstance(tx['type'], str) \
                 or tx['type'] not in BlockchainService.tx_types:
             response.setData('type error')
             response.setFlag(False)
@@ -365,7 +365,7 @@ class BlockchainService(Service):
         """
         response = Response(True, None)
         if tx['type'] == 'spend':
-            if 'to' not in tx or not isinstance(tx['to'], (str, unicode)):
+            if 'to' not in tx or not isinstance(tx['to'], str):
                 response.setData('no to')
                 response.setFlag(False)
             if not BlockchainService.tx_signature_check(tx):

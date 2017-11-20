@@ -1,4 +1,4 @@
-import StringIO
+from io import StringIO
 import copy
 import hashlib
 import logging
@@ -117,14 +117,6 @@ def hex_sum(a, b):
 def hex_invert(n):
     # Use double-size for division, to reduce information leakage.
     return buffer_(str(hex(int('f' * 128, 16) / int(n, 16)))[2: -1], 64)
-
-
-def daemonize(f):
-    pid = os.fork()
-    if pid == 0:
-        f(*args)
-    else:
-        sys.exit(0)
 
 
 def encrypt(key, content, chunksize=64 * 1024):
