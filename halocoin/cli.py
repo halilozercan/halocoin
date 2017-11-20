@@ -237,7 +237,7 @@ def start_miner(args):
     if args.path is None:
         sys.stderr.write("Please provide a wallet which will be rewarded for mining\n")
         return
-    wallet_file = open(args.path, 'r')
+    wallet_file = open(args.path, 'rb')
     wallet = tools.parse_wallet(wallet_file)
     print(make_api_request(args.action, wallet=wallet))
 

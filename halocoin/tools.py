@@ -61,7 +61,7 @@ def hash_(x):
 
 def det_hash(x):
     """Deterministically takes sha256 of dict, list, int, or string."""
-    return hash_(package(x, sort_keys=True))
+    return hash_(x)
 
 
 def hash_without_nonce(block):
@@ -120,8 +120,9 @@ def hex_invert(n):
 
 def encrypt(key, content, chunksize=64 * 1024):
     from Crypto.Cipher import AES
-    infile = StringIO.StringIO(content)
-    outfile = StringIO.StringIO()
+    import io
+    infile = io.StringIO(content)
+    outfile = io.StringIO()
     key = hashlib.sha256(key).digest()
 
     iv = ''.join(chr(random.randint(0, 0xFF)) for i in range(16))
@@ -143,8 +144,9 @@ def encrypt(key, content, chunksize=64 * 1024):
 
 def decrypt(key, content, chunksize=24 * 1024):
     from Crypto.Cipher import AES
-    infile = StringIO.StringIO(content)
-    outfile = StringIO.StringIO()
+    import io
+    infile = io.StringIO(content)
+    outfile = io.StringIO()
 
     key = hashlib.sha256(key).digest()
 
@@ -164,9 +166,9 @@ def decrypt(key, content, chunksize=24 * 1024):
 
 def random_wallet(number_of_pairs=1):
     if number_of_pairs == 1:
-        init = ''.join(random.choice(string.lowercase) for i in range(64))
+        init = ''.join(random.choice(string.ascii_lowercase) for i in range(64)).encode()
         privkey = det_hash(init)
-        pubkey = privtopub(privkey)
+        pubkey = privtopub(privkey.encode())
         address = make_address([pubkey], 1)
         wallet = {
             'privkey': str(privkey),
@@ -179,7 +181,7 @@ def random_wallet(number_of_pairs=1):
             'pubkeys': []
         }
         for i in range(number_of_pairs):
-            init = ''.join(random.choice(string.lowercase) for i in range(64))
+            init = ''.join(random.choice(string.ascii_lowercase) for i in range(64))
             privkey = det_hash(init)
             pubkey = privtopub(privkey)
             wallet['privkeys'].append(privkey)
