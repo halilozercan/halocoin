@@ -1,8 +1,8 @@
 import copy
 
-import custom
-import tools
-from service import Service, sync
+from halocoin import custom
+from halocoin import tools
+from halocoin.service import Service, sync
 
 
 class AccountService(Service):

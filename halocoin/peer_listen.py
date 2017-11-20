@@ -3,10 +3,10 @@ import json
 import socket
 import sys
 
-import ntwrk
-import tools
-from ntwrk import Message
-from service import Service, threaded, sync
+from halocoin import ntwrk
+from halocoin import tools
+from halocoin.ntwrk import Message
+from halocoin.service import Service, threaded, sync
 
 
 class PeerListenService(Service):
