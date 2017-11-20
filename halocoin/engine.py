@@ -86,12 +86,6 @@ class Engine(Service):
             self.db.put('known_length', -1)
         self.db.put('stop', False)
 
-        #self.db.put('privkey', self.wallet['privkey'])
-        #self.db.put('pubkey', self.wallet['pubkey'])
-        #self.db.put('address', tools.make_address([self.wallet['pubkey']], 1))
-        # Todo: remove in a future release
-        self.db.put('peers', [])
-
         if not self.account.register():
             print("Account service has failed. Exiting!")
             self.unregister_sub_services()
@@ -125,24 +119,29 @@ class Engine(Service):
         api.shutdown()
         print('Closed api')
 
+        running_services = set()
         if self.miner.get_state() == Service.RUNNING:
             self.miner.unregister()
-            print('Closed miner')
+            running_services.add(self.miner)
         if self.peers_check.get_state() == Service.RUNNING:
             self.peers_check.unregister()
-            print('Closed peers check')
+            running_services.add(self.peers_check)
         if self.peer_receive.get_state() == Service.RUNNING:
             self.peer_receive.unregister()
-            print('Closed peer_receive')
+            running_services.add(self.peer_receive)
         if self.blockchain.get_state() == Service.RUNNING:
             self.blockchain.unregister()
-            print('Closed blockchain')
+            running_services.add(self.blockchain)
         if self.account.get_state() == Service.RUNNING:
             self.account.unregister()
-            print('Closed account')
+            running_services.add(self.account)
         if self.db.get_state() == Service.RUNNING:
             self.db.unregister()
-            print('Closed db')
+            running_services.add(self.db)
+
+        for service in running_services:
+            service.join()
+            print('Closed {}'.format(service.name))
 
     @async
     def stop(self):

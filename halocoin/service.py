@@ -27,7 +27,7 @@ class NoExceptionQueue(Queue.Queue):
 class Service:
     """
     Service is a background job synchronizer.
-    It constitutes of an event loop, side threads and annotation helpers.
+    It consists of an event loop, side threads and annotation helpers.
     Event loop starts listening for upcoming events after registration.
     If service is alive, all annotated methods are run in background
     thread and results return depending on annotation type.
@@ -61,12 +61,21 @@ class Service:
                         result = Service.execute_order(service, order)
                         self.service_responses[order.id] = result
                         self.signals[order.id].set()
+                    service.into_service_queue.task_done()
                 except TypeError:
                     service.set_state(Service.STOPPED)
                     self.service_responses[order.id] = True
                     self.signals[order.id].set()
                 except Queue.Empty:
                     pass
+
+        def threaded_wrapper(func):
+            def insider(*args, **kwargs):
+                while self.__threads[func.__name__]["running"]:
+                    func(*args, **kwargs)
+                return 0
+
+            return insider
 
         cont = self.on_register()
         if not cont:
@@ -79,21 +88,15 @@ class Service:
 
         # Start all side-threads
         for clsMember in self.__class__.__dict__.values():
-            if hasattr(clsMember, "decorator"):
-                if clsMember.decorator == threaded.__name__:
-                    def threaded_wrapper(func):
-                        def insider(*args, **kwargs):
-                            while self.__threads[func.__name__][0]:
-                                func(*args, **kwargs)
-                            return 0
-
-                        return insider
-
-                    new_thread = threading.Thread(target=threaded_wrapper(clsMember._original),
-                                                  args=(self,),
-                                                  name=clsMember._original.__name__)
-                    self.__threads[clsMember._original.__name__] = [True, new_thread]
-                    new_thread.start()
+            if hasattr(clsMember, "decorator") and clsMember.decorator == threaded.__name__:
+                new_thread = threading.Thread(target=threaded_wrapper(clsMember._original),
+                                              args=(self,),
+                                              name=clsMember._original.__name__)
+                self.__threads[clsMember._original.__name__] = {
+                    "running": True,
+                    "thread": new_thread
+                }
+                new_thread.start()
 
         return True
 
@@ -117,24 +120,24 @@ class Service:
         Join all side-threads and event loop in the end.
         :return: None
         """
-        for key, thread in self.__threads.iteritems():
-            thread[1].join()
+        for thread_name, thread_dict in self.__threads.iteritems():
+            thread_dict["thread"].join()
 
+        self.into_service_queue.join()
         # If join is called from the service instance, there is no need to join.
         # Thread wants to destory itself
         if threading.current_thread().name != self.event_thread.name:
             self.event_thread.join()
 
-        self.event_thread.join()
-
-    def unregister(self):
+    def unregister(self, join=False):
         """
         Disconnect the service background operations.
         Close and join all side-threads and event loop.
         :return: None
         """
         self.execute('__shutdown_service__', True, args=(), kwargs={})
-        self.join()
+        if join:
+            self.join()
         self.on_close()
 
     def execute(self, action, expect_result, args, kwargs):
@@ -148,10 +151,7 @@ class Service:
         :return: result of action or None
         """
         if self.get_state() != Service.RUNNING:
-            result = getattr(self, action)._original(self, *args, **kwargs)
-            warnings.warn('You are running a background method on an unregistered service. {} {}'
-                .format(action, self.__class__.__name__))
-            return result
+            return None
 
         result = None
         new_order = Order(action, args, kwargs)
@@ -187,17 +187,12 @@ class Service:
         :param order: Order object
         :return: result of the execution
         """
-        #print 'Service', service.__class__.__name__, 'Running', order.action, \
-        #    'in thread', threading.current_thread().getName()
-
         result = False
         if order.action == '__close_threaded__':
             result = True
-            service.__threads[order.args[0]][0] = False
+            service.__threads[order.args[0]]["running"] = False
         elif order.action == '__shutdown_service__':
             result = True
-            for thread in service.__threads:
-                thread[0] = False
             service.set_state(Service.STOPPED)
         elif hasattr(service, order.action):
             try:
@@ -223,8 +218,8 @@ class Service:
         """
         if state == Service.STOPPED or state == Service.TERMINATED:
             tools.log('{} got stopped'.format(self.__class__.__name__))
-            for thread in self.__threads.values():
-                thread[0] = False
+            for thread_name in self.__threads.keys():
+                self.__threads[thread_name]["running"] = False
         self.__state = state
 
     def close_threaded(self):
@@ -247,7 +242,7 @@ class Service:
         thread_name = threading.current_thread().name
         is_service_running = (self.get_state() == Service.RUNNING)
         try:
-            return self.__threads[thread_name][0] and is_service_running
+            return self.__threads[thread_name]["running"] and is_service_running
         except:
             return True
 
