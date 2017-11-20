@@ -3,15 +3,14 @@ import json
 import threading
 
 import requests
-import sys
 from jsonrpc import JSONRPCResponseManager, dispatcher
 from werkzeug.serving import run_simple
 from werkzeug.wrappers import Request, Response
 
-import tools
-from account import AccountService
-from blockchain import BlockchainService
-from service import Service
+from halocoin import tools
+from halocoin.account import AccountService
+from halocoin.blockchain import BlockchainService
+from halocoin.service import Service
 
 _engine = None
 

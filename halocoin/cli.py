@@ -9,9 +9,9 @@ import filelock
 import requests
 from tabulate import tabulate
 
-import custom
-import engine
-import tools
+from halocoin import custom
+from halocoin import engine
+from halocoin import tools
 
 
 class Colors:

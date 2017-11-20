@@ -4,12 +4,12 @@ import json
 import socket
 import sys
 
-import ntwrk
-import tools
-from account import AccountService
-from blockchain import BlockchainService
-from ntwrk import Message
-from service import Service, threaded
+from halocoin import ntwrk
+from halocoin import tools
+from halocoin.account import AccountService
+from halocoin.blockchain import BlockchainService
+from halocoin.ntwrk import Message
+from halocoin.service import Service, threaded
 
 
 def blockchain_synced(func):
@@ -53,7 +53,7 @@ class ApiService(Service):
             self.s.shutdown(socket.SHUT_RDWR)
             self.s.close()
         except:
-            print sys.exc_info()
+            print(sys.exc_info())
 
     @threaded
     def listen(self):
