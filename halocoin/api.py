@@ -68,23 +68,6 @@ def shutdown():
     requests.post(url, data=json.dumps(payload), headers=headers).json()
 
 
-def easy_add_transaction(tx_orig, privkey):
-    tx = copy.deepcopy(tx_orig)
-    pubkey = tools.privtopub(privkey)
-    address = tools.make_address([pubkey], 1)
-    if 'count' not in tx:
-        try:
-            tx['count'] = _engine.account.known_tx_count(address)
-        except:
-            tx['count'] = 0
-    if 'pubkeys' not in tx:
-        tx['pubkeys'] = [pubkey]
-    if 'signatures' not in tx:
-        tx['signatures'] = [tools.sign(tools.det_hash(tx), privkey)]
-    _engine.blockchain.tx_queue.put(tx)
-    return 'Tx amount:{} to:{} added to the pool'.format(tx['amount'], tx['to'])
-
-
 @dispatcher.add_method
 def peers():
     return _engine.account.get_peers()
@@ -139,9 +122,21 @@ def history(address=None):
 def send(amount=0, address=None, message='', wallet=None):
     if amount == 0 or address is None or wallet is None:
         return 'A problem was occurred while processing inputs'
-    return easy_add_transaction({'type': 'spend', 'amount': int(amount),
-                                 'to': address, 'message': message},
-                                privkey=wallet['privkey'])
+    tx = {'type': 'spend', 'amount': int(amount),
+          'to': address, 'message': message}
+    privkey, pubkey = tools.get_key_pairs_from_wallet(wallet)
+    address = tools.make_address([pubkey], 1)
+    if 'count' not in tx:
+        try:
+            tx['count'] = _engine.account.known_tx_count(address)
+        except:
+            tx['count'] = 0
+    if 'pubkeys' not in tx:
+        tx['pubkeys'] = [pubkey]
+    if 'signatures' not in tx:
+        tx['signatures'] = [tools.sign(tools.det_hash(tx), privkey)]
+    _engine.blockchain.tx_queue.put(tx)
+    return 'Tx amount:{} to:{} added to the pool'.format(tx['amount'], tx['to'])
 
 
 @dispatcher.add_method

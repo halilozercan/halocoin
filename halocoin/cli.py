@@ -173,14 +173,14 @@ def new_wallet(args):
     wallet = tools.random_wallet()
     wallet_content = json.dumps(wallet)
     wallet_encrypted_content = tools.encrypt(wallet_pw, wallet_content)
-    with open(args.path, 'w') as f:
+    with open(args.path, 'wb') as f:
         f.write(wallet_encrypted_content)
-    print('New wallet is created at {}'.format(args.wallet))
+    print('New wallet is created at {}'.format(args.path))
 
 
 @action
 def info_wallet(args):
-    wallet_file = open(args.path, 'r')
+    wallet_file = open(args.path, 'rb')
     wallet = tools.parse_wallet(wallet_file)
 
     print("Address: {}".format(wallet['address']))
@@ -209,7 +209,7 @@ def balance(args):
 
 @action
 def send(args):
-    wallet_file = open(args.path, 'r')
+    wallet_file = open(args.path, 'rb')
     wallet = tools.parse_wallet(wallet_file)
     print(make_api_request(args.action, address=args.address,
                            amount=args.amount, message=args.message,

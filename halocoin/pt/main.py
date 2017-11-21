@@ -43,7 +43,8 @@ def get_code_string(base):
 
 
 def lpad(msg, symbol, length):
-    if len(msg) >= length: return msg
+    if len(msg) >= length:
+        return msg
     return symbol * (length - len(msg)) + msg
 
 
@@ -61,7 +62,8 @@ def decode(string, base):
     base = int(base)
     code_string = get_code_string(base)
     result = 0
-    if base == 16: string = string.lower()
+    if base == 16:
+        string = string.lower()
     while len(string) > 0:
         result *= base
         result += code_string.find(string[0])
@@ -76,37 +78,46 @@ def changebase(string, frm, to, minlen=0):
 
 ### Elliptic Curve functions
 
-def isinf(p): return p[0] == 0 and p[1] == 0
+def isinf(p):
+    return p[0] == 0 and p[1] == 0
 
 
 def base10_add(a, b):
-    if isinf(a): return b[0], b[1]
-    if isinf(b): return a[0], a[1]
+    if isinf(a):
+        return b[0], b[1]
+    if isinf(b):
+        return a[0], a[1]
     if a[0] == b[0]:
         if a[1] == b[1]:
             return base10_double((a[0], a[1]))
         else:
-            return (0, 0)
+            return 0, 0
     m = ((b[1] - a[1]) * inv(b[0] - a[0], P)) % P
     x = (m * m - a[0] - b[0]) % P
     y = (m * (a[0] - x) - a[1]) % P
-    return (x, y)
+    return x, y
 
 
 def base10_double(a):
-    if isinf(a): return (0, 0)
+    if isinf(a):
+        return 0, 0
     m = ((3 * a[0] * a[0] + A) * inv(2 * a[1], P)) % P
     x = (m * m - 2 * a[0]) % P
     y = (m * (a[0] - x) - a[1]) % P
-    return (x, y)
+    return x, y
 
 
 def base10_multiply(a, n):
-    if isinf(a) or n == 0: return (0, 0)
-    if n == 1: return a
-    if n < 0 or n >= N: return base10_multiply(a, n % N)
-    if (n % 2) == 0: return base10_double(base10_multiply(a, n / 2))
-    if (n % 2) == 1: return base10_add(base10_double(base10_multiply(a, n / 2)), a)
+    if isinf(a) or n == 0:
+        return 0, 0
+    if n == 1:
+        return a
+    if n < 0 or n >= N:
+        return base10_multiply(a, n % N)
+    if (n % 2) == 0:
+        return base10_double(base10_multiply(a, n / 2))
+    if (n % 2) == 1:
+        return base10_add(base10_double(base10_multiply(a, n / 2)), a)
 
 
 # Functions for handling pubkey and privkey formats
@@ -283,14 +294,14 @@ def decompress(pubkey):
 
 
 def privkey_to_pubkey(privkey):
-    f = get_privkey_format(privkey)
-    privkey = decode_privkey(privkey, f)
+    format = get_privkey_format(privkey)
+    privkey = decode_privkey(privkey, format)
     if privkey == 0 or privkey >= N:
         raise Exception("Invalid privkey")
-    if f in ['bin', 'bin_compressed', 'hex', 'hex_compressed', 'decimal']:
-        return encode_pubkey(base10_multiply(G, privkey), f)
+    if format in ['bin', 'bin_compressed', 'hex', 'hex_compressed', 'decimal']:
+        return encode_pubkey(base10_multiply(G, privkey), format)
     else:
-        return encode_pubkey(base10_multiply(G, privkey), f.replace('wif', 'hex'))
+        return encode_pubkey(base10_multiply(G, privkey), format.replace('wif', 'hex'))
 
 
 privtopub = privkey_to_pubkey

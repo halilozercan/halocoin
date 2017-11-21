@@ -3,13 +3,9 @@ import hashlib
 import logging
 import os
 import random
-import string
 import struct
-from io import StringIO
-from json import dumps as package
 
 from halocoin import custom
-from halocoin import pt
 
 
 def init_logging(working_dir):
@@ -48,11 +44,10 @@ def tx_owner_address(tx):
 
 
 def sign(msg, privkey):
-    return pt.ecdsa_sign(msg, privkey)
-
-
-def privtopub(privkey):
-    return pt.privtopub(privkey)
+    from ecdsa import SigningKey
+    if isinstance(privkey, bytes):
+        privkey = SigningKey.from_pem(privkey.decode())
+    return privkey.sign(msg)
 
 
 def hash_(x):
@@ -61,7 +56,11 @@ def hash_(x):
 
 def det_hash(x):
     """Deterministically takes sha256 of dict, list, int, or string."""
-    return hash_(x)
+    import marshal
+    if isinstance(x, bytes):
+        x = list(x)
+    pack = marshal.dumps(x)
+    return hashlib.sha384(pack).digest()
 
 
 def hash_without_nonce(block):
@@ -71,25 +70,30 @@ def hash_without_nonce(block):
 
 
 def base58_encode(num):
-    num = int(num, 16)
+    num = int(num.hex(), 16)
     alphabet = '123456789abcdefghijkmnopqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ'
     base_count = len(alphabet)
     encode = ''
     if num < 0:
         return ''
-    while (num >= base_count):
+    while num >= base_count:
         mod = num % base_count
         encode = alphabet[mod] + encode
-        num = num / base_count
+        num = num // base_count
     if num:
         encode = alphabet[num] + encode
     return encode
 
 
 def make_address(pubkeys, n):
-    """n is the number of pubkeys required to spend from this address."""
-    return (str(len(pubkeys)) + str(n) +
-            base58_encode(det_hash({str(n): pubkeys}))[0:29])
+    """
+    n is the number of pubkeys required to spend from this address.
+    This function is compatible with string or VerifyingKey representation of keys.
+    """
+    from ecdsa import VerifyingKey
+    pubkeys_as_string = [p.to_string() if isinstance(p, VerifyingKey) else p for p in pubkeys]
+    hashed = det_hash({str(n): pubkeys_as_string})
+    return str(len(pubkeys_as_string)) + str(n) + base58_encode(hashed[0:29])
 
 
 def buffer_(str_to_pad, size):
@@ -119,13 +123,16 @@ def hex_invert(n):
 
 
 def encrypt(key, content, chunksize=64 * 1024):
-    from Crypto.Cipher import AES
     import io
-    infile = io.StringIO(content)
-    outfile = io.StringIO()
+    import Crypto.Random
+    from Crypto.Cipher import AES
+    infile = io.BytesIO(content.encode())
+    outfile = io.BytesIO()
+    if isinstance(key, str):
+        key = key.encode()
     key = hashlib.sha256(key).digest()
 
-    iv = ''.join(chr(random.randint(0, 0xFF)) for i in range(16))
+    iv = Crypto.Random.OSRNG.posix.new().read(AES.block_size)
     encryptor = AES.new(key, AES.MODE_CBC, iv)
     filesize = len(content)
 
@@ -136,7 +143,7 @@ def encrypt(key, content, chunksize=64 * 1024):
         if len(chunk) == 0:
             break
         elif len(chunk) % 16 != 0:
-            chunk += ' ' * (16 - len(chunk) % 16)
+            chunk += '\0'.encode() * (16 - len(chunk) % 16)
 
             outfile.write(encryptor.encrypt(chunk))
     return outfile.getvalue()
@@ -145,9 +152,11 @@ def encrypt(key, content, chunksize=64 * 1024):
 def decrypt(key, content, chunksize=24 * 1024):
     from Crypto.Cipher import AES
     import io
-    infile = io.StringIO(content)
-    outfile = io.StringIO()
+    infile = io.BytesIO(content)
+    outfile = io.BytesIO()
 
+    if isinstance(key, str):
+        key = key.encode()
     key = hashlib.sha256(key).digest()
 
     origsize = struct.unpack('<Q', infile.read(struct.calcsize('Q')))[0]
@@ -164,31 +173,6 @@ def decrypt(key, content, chunksize=24 * 1024):
     return outfile.getvalue()
 
 
-def random_wallet(number_of_pairs=1):
-    if number_of_pairs == 1:
-        init = ''.join(random.choice(string.ascii_lowercase) for i in range(64)).encode()
-        privkey = det_hash(init)
-        pubkey = privtopub(privkey.encode())
-        address = make_address([pubkey], 1)
-        wallet = {
-            'privkey': str(privkey),
-            'pubkey': str(pubkey),
-            'address': str(address)
-        }
-    else:
-        wallet = {
-            'privkeys': [],
-            'pubkeys': []
-        }
-        for i in range(number_of_pairs):
-            init = ''.join(random.choice(string.ascii_lowercase) for i in range(64))
-            privkey = det_hash(init)
-            pubkey = privtopub(privkey)
-            wallet['privkeys'].append(privkey)
-            wallet['pubkeys'].append(pubkey)
-    return wallet
-
-
 def parse_wallet(wallet_file):
     from getpass import getpass
     import json
@@ -197,8 +181,45 @@ def parse_wallet(wallet_file):
         try:
             wallet_pw = getpass('Wallet password: ')
 
-            wallet = json.loads(decrypt(wallet_pw, wallet_encrypted_content))
+            wallet = json.loads(decrypt(wallet_pw, wallet_encrypted_content).decode())
             break
         except ValueError:
             print('Wrong password')
     return wallet
+
+
+def random_wallet(number_of_pairs=1):
+    if number_of_pairs == 1:
+        from ecdsa import NIST192p
+        from ecdsa.util import randrange_from_seed__trytryagain
+        from ecdsa import SigningKey
+        secexp = randrange_from_seed__trytryagain(os.urandom(NIST192p.baselen), NIST192p.order)
+        privkey = SigningKey.from_secret_exponent(secexp, curve=NIST192p)
+        pubkey = privkey.get_verifying_key()
+        address = make_address([pubkey], 1)
+        wallet = {
+            'privkey': privkey.to_pem().decode(),
+            'pubkey': pubkey.to_pem().decode(),
+            'address': address
+        }
+    else:
+        wallet = {
+            'privkeys': [],
+            'pubkeys': []
+        }
+        """
+        for i in range(number_of_pairs):
+            init = ''.join(random.choice(string.ascii_lowercase) for i in range(64))
+            privkey = det_hash(init)
+            pubkey = privtopub(privkey)
+            wallet['privkeys'].append(privkey)
+            wallet['pubkeys'].append(pubkey)
+        """
+    return wallet
+
+
+def get_key_pairs_from_wallet(wallet):
+    from ecdsa import SigningKey
+    privkey = SigningKey.from_pem(wallet['privkey'].encode())
+    pubkey = privkey.get_verifying_key()
+    return privkey, pubkey
