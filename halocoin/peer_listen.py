@@ -30,7 +30,7 @@ class PeerListenService(Service):
             self.s.bind(('0.0.0.0', self.engine.config['peer.port']))
             self.s.listen(10)
             return True
-        except:
+        except Exception as e:
             tools.log("Could not start Peer Receive socket!")
             return False
 
@@ -41,7 +41,7 @@ class PeerListenService(Service):
             response, leftover = ntwrk.receive(client_sock)
             if response.getFlag():
                 message = Message.from_yaml(response.getData())
-                request = json.loads(message.get_body())
+                request = message.get_body()
                 try:
                     if hasattr(self, request['action']):
                         kwargs = copy.deepcopy(request)

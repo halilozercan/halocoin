@@ -7,6 +7,7 @@ import sys
 
 import filelock
 import requests
+import yaml
 from tabulate import tabulate
 
 from halocoin import custom
@@ -155,9 +156,7 @@ def start(args):
             engine.main(None, working_dir)
     except filelock.Timeout:
         print('Halocoin is already running')
-    except Exception as e:
-        print('Halocoin ran into a problem while starting!')
-        tools.log(e)
+
 
 
 @action
@@ -171,17 +170,17 @@ def new_wallet(args):
         wallet_pw_2 = getpass('New wallet password(again): ')
 
     wallet = tools.random_wallet()
-    wallet_content = json.dumps(wallet)
+    wallet_content = tools.wallet_to_str(wallet)
     wallet_encrypted_content = tools.encrypt(wallet_pw, wallet_content)
-    with open(args.path, 'wb') as f:
+    with open(args.wallet, 'wb') as f:
         f.write(wallet_encrypted_content)
-    print('New wallet is created at {}'.format(args.path))
+    print('New wallet is created at {}'.format(args.wallet))
 
 
 @action
 def info_wallet(args):
-    wallet_file = open(args.path, 'rb')
-    wallet = tools.parse_wallet(wallet_file)
+    wallet_file = open(args.wallet, 'rb')
+    wallet = tools.parse_wallet(wallet_file, args.pw)
 
     print("Address: {}".format(wallet['address']))
     print("Pubkey: {}".format(wallet['pubkey']))
@@ -209,8 +208,8 @@ def balance(args):
 
 @action
 def send(args):
-    wallet_file = open(args.path, 'rb')
-    wallet = tools.parse_wallet(wallet_file)
+    wallet_file = open(args.wallet, 'rb')
+    wallet = tools.parse_wallet(wallet_file, args.pw)
     print(make_api_request(args.action, address=args.address,
                            amount=args.amount, message=args.message,
                            wallet=wallet))
@@ -234,12 +233,12 @@ def stop(args):
 
 @action
 def start_miner(args):
-    if args.path is None:
+    if args.wallet is None:
         sys.stderr.write("Please provide a wallet which will be rewarded for mining\n")
         return
-    wallet_file = open(args.path, 'rb')
-    wallet = tools.parse_wallet(wallet_file)
-    print(make_api_request(args.action, wallet=wallet))
+    wallet_file = open(args.wallet, 'rb')
+    wallet = tools.parse_wallet(wallet_file, args.pw)
+    print(make_api_request(args.action, wallet=tools.wallet_to_str(wallet)))
 
 
 @action
@@ -280,8 +279,10 @@ def run(argv):
                         help='Amount of coins that are going to be used')
     parser.add_argument('--number', action="store", type=str, dest='number',
                         help='Block number or range')
-    parser.add_argument('--path', action="store", type=str, dest='path',
-                        help='Path for a file, e.g. wallet')
+    parser.add_argument('--wallet', action="store", type=str, dest='wallet',
+                        help='Path for wallet file')
+    parser.add_argument('--pw', action="store", type=str, dest='pw',
+                        help='NOT RECOMMENDED! If you want to pass wallet password as argument.')
     parser.add_argument('--dir', action="store", type=str, dest='dir',
                         help='Directory for halocoin to use.')
 

@@ -157,7 +157,8 @@ class BlockchainService(Service):
             return False
 
         # TODO: understand what is going on here
-        if block['diffLength'] != tools.hex_sum(self.db.get('diffLength'), tools.hex_invert(block['target'])):
+        if (length >= 0 and block['diffLength'] != tools.hex_sum(self.db.get('diffLength'), tools.hex_invert(block['target']))) \
+                or (length < 0 and block['diffLength'] != tools.hex_invert(block['target'])):
             tools.log(block['diffLength'])
             tools.log(tools.hex_sum(self.db.get('diffLength'), tools.hex_invert(block['target'])))
             tools.log(block['length'])
@@ -301,7 +302,7 @@ class BlockchainService(Service):
 
         def match(sig, pubs, msg):
             for p in pubs:
-                if pt.ecdsa_verify(msg, sig, p):
+                if tools.signature_verify(msg, sig, p):
                     return {'bool': True, 'pub': p}
             return {'bool': False}
 
@@ -328,7 +329,7 @@ class BlockchainService(Service):
             tools.log('pubkey error')
             return False
         if len(tx['signatures']) > len(tx['pubkeys']):
-            tools.log('there are more signatures then required')
+            tools.log('there are more signatures than required')
             return False
 
         msg = tools.det_hash(tx_copy)
@@ -390,7 +391,7 @@ class BlockchainService(Service):
     def target(self, length):
         """ Returns the target difficulty at a particular blocklength. """
         if length < 4:
-            return '0' * 4 + 'f' * 60  # Use same difficulty for first few blocks.
+            return bytearray.fromhex('0' * 4 + 'f' * 60)  # Use same difficulty for first few blocks.
 
         def targetTimesFloat(target, number):
             a = int(str(target), 16)
@@ -438,5 +439,5 @@ class BlockchainService(Service):
 
         retarget = estimate_time() / custom.blocktime
         result = targetTimesFloat(estimate_target(), retarget)
-        return result
+        return result.encode()
 

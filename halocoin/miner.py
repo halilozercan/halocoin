@@ -65,6 +65,9 @@ class MinerService(Service):
             except queue.Empty:
                 pass
 
+        if possible_block is None:
+            possible_block = self.queue.get(timeout=0.5)
+
         if possible_block is not None:
             tools.log('Mined block')
             tools.log(possible_block)
@@ -133,7 +136,7 @@ class MinerService(Service):
         length = self.db.get('length')
         print('Miner working for block', (length + 1))
         if length == -1:
-            candidate_block = self.genesis(self.db.get('pubkey'))
+            candidate_block = self.genesis(self.wallet['pubkey'])
         else:
             prev_block = self.db.get(length)
             candidate_block = self.make_block(prev_block, self.blockchain.tx_pool(), self.wallet['pubkey'])
@@ -142,18 +145,21 @@ class MinerService(Service):
     @staticmethod
     def target(candidate_block, queue):
         # Miner registered but no work is sent yet.
-        if candidate_block is None:
-            return
-        if 'nonce' in candidate_block:
-            candidate_block.pop('nonce')
-        halfHash = tools.det_hash(candidate_block)
-        candidate_block['nonce'] = random.randint(0, 10000000000000000000000000000000000000000)
-        current_hash = tools.det_hash({'nonce': candidate_block['nonce'], 'halfHash': halfHash})
-        while current_hash > candidate_block['target']:
-            candidate_block['nonce'] += 1
+        try:
+            if candidate_block is None:
+                return
+            if 'nonce' in candidate_block:
+                candidate_block.pop('nonce')
+            halfHash = tools.det_hash(candidate_block)
+            candidate_block['nonce'] = random.randint(0, 10000000000000000000000000000000000000000)
             current_hash = tools.det_hash({'nonce': candidate_block['nonce'], 'halfHash': halfHash})
-        if current_hash <= candidate_block['target']:
-            queue.put(candidate_block)
+            while current_hash > candidate_block['target']:
+                candidate_block['nonce'] += 1
+                current_hash = tools.det_hash({'nonce': candidate_block['nonce'], 'halfHash': halfHash})
+            if current_hash <= candidate_block['target']:
+                queue.put(candidate_block)
+        except Exception as e:
+            pass
 
     @staticmethod
     def is_everyone_dead(processes):

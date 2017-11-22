@@ -56,11 +56,9 @@ def hash_(x):
 
 def det_hash(x):
     """Deterministically takes sha256 of dict, list, int, or string."""
-    import marshal
-    if isinstance(x, bytes):
-        x = list(x)
-    pack = marshal.dumps(x)
-    return hashlib.sha384(pack).digest()
+    import yaml
+    pack = yaml.dump(x).encode()
+    return hashlib.sha256(pack).digest()
 
 
 def hash_without_nonce(block):
@@ -109,17 +107,22 @@ def exponential_random(r, i=0):
 def median(mylist):
     if len(mylist) < 1:
         return 0
-    return sorted(mylist)[len(mylist) / 2]
+    return sorted(mylist)[len(mylist) // 2]
 
 
 def hex_sum(a, b):
     # Sum of numbers expressed as hexidecimal strings
+    if isinstance(a, bytearray):
+        a = a.hex()
+        b = b.hex()
     return buffer_(str(hex(int(a, 16) + int(b, 16)))[2: -1], 64)
 
 
 def hex_invert(n):
     # Use double-size for division, to reduce information leakage.
-    return buffer_(str(hex(int('f' * 128, 16) / int(n, 16)))[2: -1], 64)
+    if isinstance(n, bytearray):
+        n = n.hex()
+    return buffer_(str(hex(int('f' * 128, 16) // int(n, 16)))[2: -1], 64)
 
 
 def encrypt(key, content, chunksize=64 * 1024):
@@ -173,18 +176,21 @@ def decrypt(key, content, chunksize=24 * 1024):
     return outfile.getvalue()
 
 
-def parse_wallet(wallet_file):
+def parse_wallet(wallet_file, pw=None):
     from getpass import getpass
-    import json
+    import yaml
     wallet_encrypted_content = wallet_file.read()
-    while True:
-        try:
-            wallet_pw = getpass('Wallet password: ')
+    if pw is None:
+        while True:
+            try:
+                wallet_pw = getpass('Wallet password: ')
 
-            wallet = json.loads(decrypt(wallet_pw, wallet_encrypted_content).decode())
-            break
-        except ValueError:
-            print('Wrong password')
+                wallet = yaml.load(decrypt(wallet_pw, wallet_encrypted_content).decode())
+                break
+            except ValueError:
+                print('Wrong password')
+    else:
+        wallet = yaml.load(decrypt(pw, wallet_encrypted_content).decode())
     return wallet
 
 
@@ -198,8 +204,8 @@ def random_wallet(number_of_pairs=1):
         pubkey = privkey.get_verifying_key()
         address = make_address([pubkey], 1)
         wallet = {
-            'privkey': privkey.to_pem().decode(),
-            'pubkey': pubkey.to_pem().decode(),
+            'privkey': privkey.to_string(),
+            'pubkey': pubkey.to_string(),
             'address': address
         }
     else:
@@ -223,3 +229,26 @@ def get_key_pairs_from_wallet(wallet):
     privkey = SigningKey.from_pem(wallet['privkey'].encode())
     pubkey = privkey.get_verifying_key()
     return privkey, pubkey
+
+
+def signature_verify(message, signature, pubkey):
+    from ecdsa import VerifyingKey
+    if isinstance(pubkey, str):
+        pubkey = VerifyingKey.from_string(pubkey)
+    elif isinstance(pubkey, bytes):
+        pubkey = VerifyingKey.from_string(pubkey.decode())
+
+    if isinstance(pubkey, VerifyingKey):
+        pubkey.verify(signature, message)
+    else:
+        return False
+
+
+def wallet_to_str(wallet):
+    import yaml
+    return yaml.dump(wallet)
+
+
+def wallet_from_str(wallet_str):
+    import yaml
+    return yaml.load(wallet_str)

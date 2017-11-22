@@ -1,4 +1,9 @@
-import copy
+"""
+Notes:
+    Because json cannot serialize bytes-like objects,
+    wallet objects should be passed into JSON-RPC functions
+    as serialized. They will be encoded with yaml.
+"""
 import json
 import threading
 
@@ -124,6 +129,7 @@ def send(amount=0, address=None, message='', wallet=None):
         return 'A problem was occurred while processing inputs'
     tx = {'type': 'spend', 'amount': int(amount),
           'to': address, 'message': message}
+    wallet = tools.wallet_from_str(wallet)
     privkey, pubkey = tools.get_key_pairs_from_wallet(wallet)
     address = tools.make_address([pubkey], 1)
     if 'count' not in tx:
@@ -214,6 +220,7 @@ def start_miner(wallet=None):
     elif wallet is None:
         return 'Given wallet is not valid.'
     else:
+        wallet = tools.wallet_from_str(wallet)
         _engine.miner.set_wallet(wallet)
         _engine.miner.register()
         return 'Running miner'
