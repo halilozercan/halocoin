@@ -350,7 +350,7 @@ class BlockchainService(Service):
         :return:
         """
         recent_hash = tools.det_hash(top_block_on_chain)
-        their_hashes = map(lambda x: x['prevHash'] if x['length'] > 0 else 0, newblocks)
+        their_hashes = list(map(lambda x: x['prevHash'] if x['length'] > 0 else 0, newblocks))
         their_hashes += [tools.det_hash(newblocks[-1])]
         b = (recent_hash not in their_hashes) and newblocks[0]['length'] - 1 < length < newblocks[-1]['length']
         return b
@@ -396,7 +396,7 @@ class BlockchainService(Service):
         def targetTimesFloat(target, number):
             a = int(str(target), 16)
             b = int(a * number)  # this should be rational multiplication followed by integer estimation
-            return tools.buffer_(str(hex(b))[2: -1], 64)
+            return tools.buffer_(format(b, 'x'), 64)
 
         def weights(length):  # uses float
             # returns from small to big
@@ -421,23 +421,21 @@ class BlockchainService(Service):
             targets = self.recent_blockthings('targets', custom.history_length)
             w = weights(len(targets))  # should be rat instead of float
             tw = sum(w)
-            targets = map(tools.hex_invert, targets)
+            targets = list(map(tools.hex_invert, targets))
 
-            def weighted_multiply(i):
-                return targetTimesFloat(targets[i], w[i] / tw)  # this should use rat division instead
-
-            weighted_targets = [weighted_multiply(i) for i in range(len(targets))]
+            weighted_targets = [targetTimesFloat(targets[i], w[i] / tw) for i in range(len(targets))]
             return tools.hex_invert(sumTargets(weighted_targets))
 
         def estimate_time():
             times = self.recent_blockthings('times', custom.history_length)
-            times = map(Decimal, times)
-            block_lengths = [times[i] - times[i - 1] for i in range(1, len(times))]
-            w = weights(len(block_lengths))  # Geometric weighting
+            times = list(map(Decimal, times))
+            # How long it took to generate blocks
+            block_times = [times[i] - times[i - 1] for i in range(1, len(times))]
+            w = weights(len(block_times))  # Geometric weighting
             tw = sum(w)
-            return sum([w[i] * block_lengths[i] / tw for i in range(len(block_lengths))])
+            return sum([w[i] * block_times[i] / tw for i in range(len(block_times))])
 
         retarget = estimate_time() / custom.blocktime
         result = targetTimesFloat(estimate_target(), retarget)
-        return result.encode()
+        return bytearray.fromhex(result)
 

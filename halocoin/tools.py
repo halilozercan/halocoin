@@ -50,15 +50,11 @@ def sign(msg, privkey):
     return privkey.sign(msg)
 
 
-def hash_(x):
-    return hashlib.sha384(x).hexdigest()[0:64]
-
-
 def det_hash(x):
     """Deterministically takes sha256 of dict, list, int, or string."""
     import yaml
     pack = yaml.dump(x).encode()
-    return hashlib.sha256(pack).digest()
+    return hashlib.sha384(pack).digest()[0:32]
 
 
 def hash_without_nonce(block):
@@ -115,14 +111,14 @@ def hex_sum(a, b):
     if isinstance(a, bytearray):
         a = a.hex()
         b = b.hex()
-    return buffer_(str(hex(int(a, 16) + int(b, 16)))[2: -1], 64)
+    return buffer_(format(int(a, 16) + int(b, 16), 'x'), 64)
 
 
 def hex_invert(n):
     # Use double-size for division, to reduce information leakage.
     if isinstance(n, bytearray):
         n = n.hex()
-    return buffer_(str(hex(int('f' * 128, 16) // int(n, 16)))[2: -1], 64)
+    return buffer_(format(int('f' * 128, 16) // int(n, 16), 'x'), 64)
 
 
 def encrypt(key, content, chunksize=64 * 1024):

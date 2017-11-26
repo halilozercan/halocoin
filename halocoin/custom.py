@@ -25,7 +25,7 @@ download_many = 50  # Max number of blocks to request from a peer at the same ti
 version = "0.0002"
 block_reward = 10 ** 5
 fee = 10 ** 3
-miner_core_count = 8  # -1 evaluates to number of cores
+miner_core_count = -1  # -1 evaluates to number of cores
 # Lower limits on what the "time" tag in a block can say.
 mmm = 100
 # Take the median of this many of the blocks.
@@ -36,7 +36,7 @@ history_length = 400
 # total weight.
 inflection = Decimal('0.985')
 memoized_weights = [inflection ** i for i in range(1000)]
-blocktime = 120
+blocktime = 15
 
 
 # Independent

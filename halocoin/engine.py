@@ -56,7 +56,7 @@ class Engine(Service):
             return False
 
         print("Firing up the Database")
-        time.sleep(1)
+        time.sleep(0.1)
 
         if not test_database(self.db):
             tools.log("Database service is not working.")

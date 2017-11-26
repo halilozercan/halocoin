@@ -50,7 +50,7 @@ def make_api_request(method, **kwargs):
         "id": 0,
     }
     response = requests.post(url, data=json.dumps(payload), headers=headers).json()
-    return response['result']
+    return yaml.load(response['result'])
 
 
 def print_txs(txs):
@@ -93,7 +93,7 @@ def print_blocks(blocks):
         block['time'] = datetime.datetime.fromtimestamp(
             int(block['time'])
         ).strftime('%Y-%m-%d %H:%M:%S')
-        mint_tx = filter(lambda t: t['type'] == 'mint', block['txs'])[0]
+        mint_tx = list(filter(lambda t: t['type'] == 'mint', block['txs']))[0]
         table.append([block['length'], tools.tx_owner_address(mint_tx), block['time']])
     print(Colors.WARNING + "Blocks:\n" + Colors.ENDC)
     print(tabulate(table, headers=[Colors.HEADER + 'Length' + Colors.ENDC,
