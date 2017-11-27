@@ -15,6 +15,7 @@ class DatabaseService(Service):
     """
     Database bindings for leveldb
     """
+
     def __init__(self, engine):
         Service.__init__(self, name='database')
         self.engine = engine
@@ -24,7 +25,8 @@ class DatabaseService(Service):
         self.set_state(Service.INIT)
 
     def on_register(self):
-        self.DB = RedisStore(redis.StrictRedis())
+        # TODO: Add authentication support for redis
+        self.DB = RedisStore(redis.StrictRedis(db=self.engine.config['database']['index']))
         try:
             self.salt = self.DB.get('salt').decode()
             if self.salt is None:

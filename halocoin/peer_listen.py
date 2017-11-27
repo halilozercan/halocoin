@@ -27,7 +27,7 @@ class PeerListenService(Service):
             self.s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             self.s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             self.s.settimeout(1)
-            self.s.bind(('0.0.0.0', self.engine.config['peer.port']))
+            self.s.bind(('0.0.0.0', self.engine.config['port']['peers']))
             self.s.listen(10)
             return True
         except Exception as e:

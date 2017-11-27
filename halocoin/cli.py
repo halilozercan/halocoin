@@ -27,6 +27,7 @@ class Colors:
 
 
 actions = dict()
+connection_port = 7899
 
 
 def action(func):
@@ -39,7 +40,7 @@ def action(func):
 
 
 def make_api_request(method, **kwargs):
-    url = "http://localhost:" + str(custom.api_port) + "/jsonrpc"
+    url = "http://localhost:" + str(connection_port) + "/jsonrpc"
     headers = {'content-type': 'application/json'}
 
     # Example echo method
@@ -130,8 +131,7 @@ def print_history(history):
                 custom.block_reward))
 
 
-@action
-def start(args):
+def extract_configuration(args):
     if args.dir is None:
         working_dir = tools.get_default_dir()
     else:
@@ -149,14 +149,32 @@ def start(args):
             print("Could not create a directory!")
             exit(1)
 
-    lock = filelock.FileLock(os.path.join(working_dir, 'engine_lock'))
+    if args.config is not None:
+        config = custom.read_config_file(args.config)
+    elif os.path.exists(os.path.join(working_dir, 'config')):
+        args.config = os.path.join(working_dir, 'config')
+        config = custom.read_config_file(args.config)
+    else:
+        config = custom.generate_default_config()
+        custom.write_config_file(config, os.path.join(working_dir, 'config'))
+
+    if config is None:
+        raise ValueError('Couldn\'t parse config file {}'.format(args.config))
+
+    return config, working_dir
+
+
+@action
+def start(args):
+    config, working_dir = extract_configuration(args)
+
+    lock = filelock.FileLock(os.path.join(working_dir, 'engine_lock' + str(config['port']['api'])))
     try:
         with lock.acquire(timeout=2):
-            tools.init_logging(working_dir)
-            engine.main(None, working_dir)
+            tools.init_logging(config['DEBUG'], working_dir, config['logging']['file'])
+            engine.main(config, working_dir)
     except filelock.Timeout:
         print('Halocoin is already running')
-
 
 
 @action
@@ -281,12 +299,18 @@ def run(argv):
                         help='Block number or range')
     parser.add_argument('--wallet', action="store", type=str, dest='wallet',
                         help='Path for wallet file')
+    parser.add_argument('--config', action="store", type=str, dest='config',
+                        help='Config file address. Use with start command.')
     parser.add_argument('--pw', action="store", type=str, dest='pw',
                         help='NOT RECOMMENDED! If you want to pass wallet password as argument.')
     parser.add_argument('--dir', action="store", type=str, dest='dir',
                         help='Directory for halocoin to use.')
 
     args = parser.parse_args(argv[1:])
+
+    config, working_dir = extract_configuration(args)
+    global connection_port
+    connection_port = config['port']['api']
 
     actions[args.action](args)
     return

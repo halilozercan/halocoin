@@ -8,13 +8,13 @@ import struct
 from halocoin import custom
 
 
-def init_logging(working_dir):
-    if custom.DEBUG:
+def init_logging(DEBUG, working_dir, log_file):
+    if DEBUG:
         logging.basicConfig(level=logging.INFO,
                             format='%(levelname)s on %(asctime)s\n%(message)s',
                             datefmt='%m/%d/%Y %I:%M:%S %p')
     else:
-        logging.basicConfig(filename=os.path.join(working_dir, custom.log_file),
+        logging.basicConfig(filename=os.path.join(working_dir, log_file),
                             level=logging.DEBUG,
                             format='%(levelname)s on %(asctime)s\n%(message)s',
                             datefmt='%m/%d/%Y %I:%M:%S %p')

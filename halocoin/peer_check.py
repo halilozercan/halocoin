@@ -92,7 +92,7 @@ class PeerCheckService(Service):
 
     def download_blocks(self, peer, peers_block_count, length):
         b = [max(0, length - 10), min(peers_block_count['length'] + 1,
-                                      length + self.engine.config['peer.block_request_limit'])]
+                                      length + self.engine.config['peers']['download_limit'])]
         blocks = ntwrk.command(peer, {'action': 'range_request', 'range': b})
         if not isinstance(blocks, list):
             return []
@@ -115,7 +115,7 @@ class PeerCheckService(Service):
     def give_block(self, peer, block_count_peer):
         blocks = []
         b = [max(block_count_peer - 5, 0), min(self.db.get('length'),
-                                               block_count_peer + self.engine.config['peer.block_request_limit'])]
+                                               block_count_peer + self.engine.config['peers']['download_limit'])]
         for i in range(b[0], b[1] + 1):
             blocks.append(self.db.get(i))
         ntwrk.command(peer, {'action': 'push_block',

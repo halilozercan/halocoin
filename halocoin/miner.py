@@ -23,7 +23,8 @@ class MinerService(Service):
         self.db = None
         self.blockchain = None
         self.wallet = None
-        self.core_count = multiprocessing.cpu_count() if custom.miner_core_count == -1 else custom.miner_core_count
+        config_cores = self.engine.config['miner']['cores']
+        self.core_count = multiprocessing.cpu_count() if config_cores == -1 else config_cores
         self.pool = []
         self.queue = multiprocessing.Queue()
 

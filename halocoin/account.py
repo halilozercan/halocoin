@@ -34,7 +34,7 @@ class AccountService(Service):
 
         if apply_tx_pool:
             txs = self.blockchain.tx_pool()
-            account = AccountService.update_account_with_txs(address, account, txs, add_flag=True)
+            account = self.update_account_with_txs(address, account, txs, add_flag=True)
 
         if 'tx_blocks' not in account:
             account['tx_blocks'] = []
@@ -128,8 +128,7 @@ class AccountService(Service):
 
         return flag
 
-    @staticmethod
-    def update_account_with_txs(address, account, txs, add_flag=True, only_outgoing=False, block_number=-1):
+    def update_account_with_txs(self, address, account, txs, add_flag=True, only_outgoing=False, block_number=-1):
         def apply(a, b):
             if isinstance(a, int):
                 if add_flag:
@@ -164,10 +163,10 @@ class AccountService(Service):
     def invalidate_cache(self, address):
         account = copy.deepcopy(AccountService.default_account)
 
-        for i in range(int(self.db.get('length'))+1):
+        for i in range(int(self.db.get('length')) + 1):
             block = self.db.get(str(i))
-            account = AccountService.update_account_with_txs(address, account, block['txs'],
-                                                             add_flag=True, block_number=block['length'])
+            account = self.update_account_with_txs(address, account, block['txs'],
+                                                   add_flag=True, block_number=block['length'])
 
         self.db.put(address, account)
         return 'Updated ' + str(account)
@@ -175,17 +174,17 @@ class AccountService(Service):
     def known_tx_count(self, address):
         # Returns the number of transactions that pubkey has broadcast.
         def number_of_unconfirmed_txs(_address):
-            return len(filter(lambda t: _address == tools.tx_owner_address(t), txs_in_pool))
+            return len(list(filter(lambda t: _address == tools.tx_owner_address(t), txs_in_pool)))
 
         account = self.get_account(address)
         txs_in_pool = self.blockchain.tx_pool()
         return account['count'] + number_of_unconfirmed_txs(address)
 
     def is_tx_affordable(self, address, tx):
-        account = AccountService.update_account_with_txs(address,
-                                                         self.get_account(address),
-                                                         [tx] + self.blockchain.tx_pool(),
-                                                         add_flag=True)
+        account = self.update_account_with_txs(address,
+                                               self.get_account(address),
+                                               [tx] + self.blockchain.tx_pool(),
+                                               add_flag=True)
 
         return account['amount'] >= 0
 

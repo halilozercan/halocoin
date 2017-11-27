@@ -63,13 +63,13 @@ def run(engine):
     _engine = engine
     listen_thread = threading.Thread(target=run_simple,
                                      kwargs={'hostname': 'localhost',
-                                             'port': engine.config['api.port'],
+                                             'port': engine.config['port']['api'],
                                              'application': application})
     listen_thread.start()
 
 
 def shutdown():
-    url = "http://localhost:" + str(_engine.config['api.port']) + "/jsonrpc"
+    url = "http://localhost:" + str(_engine.config['port']['api']) + "/jsonrpc"
     headers = {'content-type': 'application/json'}
 
     # Example echo method
@@ -86,21 +86,6 @@ def shutdown():
 @yaml_wrapper
 def peers():
     return _engine.account.get_peers()
-
-
-@dispatcher.add_method
-@yaml_wrapper
-@blockchain_synced
-def invalidate(address=None):
-    if address is None:
-        address = _engine.db.get('address')
-    _engine.account.invalidate_cache(address)
-    account = _engine.account.get_account(address)
-    account = AccountService.update_account_with_txs(address,
-                                                     account,
-                                                     _engine.blockchain.tx_pool(),
-                                                     only_outgoing=True)
-    return account['amount']
 
 
 @dispatcher.add_method
@@ -218,11 +203,7 @@ def difficulty():
 def balance(address=None):
     if address is None:
         address = _engine.db.get('address')
-    account = _engine.account.get_account(address)
-    account = AccountService.update_account_with_txs(address,
-                                                     account,
-                                                     _engine.blockchain.tx_pool(),
-                                                     only_outgoing=True)
+    account = _engine.account.get_account(address, apply_tx_pool=True)
     return account['amount']
 
 

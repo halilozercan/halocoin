@@ -1,12 +1,10 @@
-import os
 import time
 
 from halocoin import api
-from halocoin import custom
 from halocoin import tools
-from halocoin.database import DatabaseService
 from halocoin.account import AccountService
 from halocoin.blockchain import BlockchainService
+from halocoin.database import DatabaseService
 from halocoin.miner import MinerService
 from halocoin.peer_check import PeerCheckService
 from halocoin.peer_listen import PeerListenService
@@ -30,24 +28,11 @@ class Engine(Service):
         self.config = config
         self.working_dir = working_dir
 
-        # TODO: remove
-        self.config = {
-            'database.type': custom.db_type,
-            'api.port': custom.api_port,
-            'peer.block_request_limit': 50,
-            'peer.port': custom.port
-        }
-
-        if self.config['database.type'] == 'redis':
-            """
-            self.config.update({
-                'database.name': os.path.join(self.working_dir, custom.db_name)
-            })
-            """
+        if self.config['database']['type'] == 'redis':
             self.db = DatabaseService(self)
 
         self.blockchain = BlockchainService(self)
-        self.peers_check = PeerCheckService(self, custom.peers)
+        self.peers_check = PeerCheckService(self, self.config['peers']['list'])
         self.peer_receive = PeerListenService(self)
         self.account = AccountService(self)
         self.miner = MinerService(self)
