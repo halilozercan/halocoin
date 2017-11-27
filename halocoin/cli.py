@@ -271,12 +271,11 @@ def status_miner(args):
 
 @action
 def difficulty(args):
-    print(make_api_request(args.action))
-
-
-@action
-def info(args):
-    print(make_api_request(args.action))
+    result = make_api_request(args.action)
+    if isinstance(result, bytearray):
+        print(result.hex())
+    else:
+        print(result)
 
 
 @action

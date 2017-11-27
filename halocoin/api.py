@@ -182,7 +182,12 @@ def block(number="default"):
         _from = int(number.split("-")[0])
         _to = int(number.split("-")[1])
         _to = min(_from + 50, _to)
-        return [_engine.db.get(str(i)) for i in range(_from, _to)]
+        result = []
+        for i in range(_from, _to):
+            _block = _engine.db.get(str(i))
+            if _block is not None:
+                result.append(_block)
+        return result
     else:
         if number == "default":
             number = _engine.db.get('length')
