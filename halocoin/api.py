@@ -62,7 +62,7 @@ def run(engine):
     global _engine
     _engine = engine
     listen_thread = threading.Thread(target=run_simple,
-                                     kwargs={'hostname': 'localhost',
+                                     kwargs={'hostname': '0.0.0.0',
                                              'port': engine.config['port']['api'],
                                              'application': application})
     listen_thread.start()

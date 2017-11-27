@@ -26,7 +26,8 @@ class DatabaseService(Service):
 
     def on_register(self):
         # TODO: Add authentication support for redis
-        self.DB = RedisStore(redis.StrictRedis(db=self.engine.config['database']['index']))
+        self.DB = RedisStore(redis.StrictRedis(host=os.environ.get('REDIS_URL', 'localhost'),
+                                               db=self.engine.config['database']['index']))
         try:
             self.salt = self.DB.get('salt').decode()
             if self.salt is None:
