@@ -8,17 +8,35 @@ import json
 import threading
 
 import requests
-import yaml
 from jsonrpc import JSONRPCResponseManager, dispatcher
 from werkzeug.serving import run_simple
 from werkzeug.wrappers import Request, Response
 
 from halocoin import tools
-from halocoin.account import AccountService
 from halocoin.blockchain import BlockchainService
 from halocoin.service import Service
 
 _engine = None
+
+
+class ComplexEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, (bytes, bytearray)):
+            return obj.hex()
+        # Let the base class default method raise the TypeError
+        return json.JSONEncoder.default(self, obj)
+
+
+def json_sanitizer(func):
+    def wrapper(*args, **kwargs):
+        result = func(*args, **kwargs)
+        initial = json.dumps(result, cls=ComplexEncoder)
+        return json.loads(initial)
+
+    # To keep the function name same for RPC helper
+    wrapper.__name__ = func.__name__
+
+    return wrapper
 
 
 def blockchain_synced(func):
@@ -32,14 +50,6 @@ def blockchain_synced(func):
     # To keep the function name same for RPC helper
     wrapper.__name__ = func.__name__
 
-    return wrapper
-
-
-def yaml_wrapper(func):
-    def wrapper(*args, **kwargs):
-        return yaml.dump(func(*args, **kwargs))
-
-    wrapper.__name__ = func.__name__
     return wrapper
 
 
@@ -83,13 +93,13 @@ def shutdown():
 
 
 @dispatcher.add_method
-@yaml_wrapper
+@json_sanitizer
 def peers():
     return _engine.account.get_peers()
 
 
 @dispatcher.add_method
-@yaml_wrapper
+@json_sanitizer
 @blockchain_synced
 def history(address=None):
     if address is None:
@@ -120,7 +130,6 @@ def history(address=None):
 
 
 @dispatcher.add_method
-@yaml_wrapper
 @blockchain_synced
 def send(amount=0, address=None, message='', wallet=None):
     if amount == 0 or address is None or wallet is None:
@@ -144,26 +153,18 @@ def send(amount=0, address=None, message='', wallet=None):
 
 
 @dispatcher.add_method
-@yaml_wrapper
 def blockcount():
     return dict(length=_engine.db.get('length'),
                 known_length=_engine.db.get('known_length'))
 
 
 @dispatcher.add_method
-@yaml_wrapper
+@json_sanitizer
 def txs():
     return _engine.blockchain.tx_pool()
 
 
 @dispatcher.add_method
-@yaml_wrapper
-def pubkey():
-    return _engine.db.get('pubkey')
-
-
-@dispatcher.add_method
-@yaml_wrapper
 def delete_block(number="0"):
     counts = [0, 0]
     for i in range(int(number)):
@@ -176,7 +177,7 @@ def delete_block(number="0"):
 
 
 @dispatcher.add_method
-@yaml_wrapper
+@json_sanitizer
 def block(number="default"):
     if "-" in number:
         _from = int(number.split("-")[0])
@@ -196,14 +197,13 @@ def block(number="default"):
 
 
 @dispatcher.add_method
-@yaml_wrapper
+@json_sanitizer
 @blockchain_synced
 def difficulty():
     return _engine.blockchain.target(_engine.db.get('length'))
 
 
 @dispatcher.add_method
-@yaml_wrapper
 @blockchain_synced
 def balance(address=None):
     if address is None:
@@ -213,7 +213,6 @@ def balance(address=None):
 
 
 @dispatcher.add_method
-@yaml_wrapper
 def stop():
     _engine.db.put('stop', True)
     _engine.stop()
@@ -221,7 +220,6 @@ def stop():
 
 
 @dispatcher.add_method
-@yaml_wrapper
 def start_miner(wallet=None):
     if _engine.miner.get_state() == Service.RUNNING:
         return 'Miner is already running.'
@@ -235,7 +233,6 @@ def start_miner(wallet=None):
 
 
 @dispatcher.add_method
-@yaml_wrapper
 def stop_miner():
     if _engine.miner.get_state() == Service.RUNNING:
         _engine.miner.unregister()

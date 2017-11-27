@@ -5,9 +5,10 @@ services:
     image: redis
     ports:
       - "6379"
+    volumes:
+      - data-volume:/data
   halocoin:
     build: .
-    command: ["start"]
     tty: true
     ports:
       - "7900:7900"
@@ -16,3 +17,8 @@ services:
       - REDIS_URL=db
     depends_on:
       - db
+    volumes:
+      - data-volume:/data
+
+volumes:
+  data-volume: {}

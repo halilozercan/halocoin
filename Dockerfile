@@ -14,5 +14,7 @@ RUN pip install -r requirements.txt
 ADD . /halocoin
 RUN python setup.py install
 
+VOLUME /data
+
 ENTRYPOINT ["/usr/local/bin/halocoin"]
-CMD ["start"]
+CMD ["start", "--dir", "/data"]

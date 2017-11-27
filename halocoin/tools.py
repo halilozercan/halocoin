@@ -248,3 +248,10 @@ def wallet_to_str(wallet):
 def wallet_from_str(wallet_str):
     import yaml
     return yaml.load(wallet_str)
+
+
+def byteslike_to_hexstr(input):
+    if isinstance(input, (bytearray, bytes)):
+        return input.hex()
+    else:
+        return str(input)

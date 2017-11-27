@@ -51,7 +51,7 @@ def make_api_request(method, **kwargs):
         "id": 0,
     }
     response = requests.post(url, data=json.dumps(payload), headers=headers).json()
-    return yaml.load(response['result'])
+    return response['result']
 
 
 def print_txs(txs):
