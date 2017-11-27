@@ -15,7 +15,7 @@ setup(
         ],
     },
     install_requires=['requests', 'wheel', 'pyyaml', 'filelock',
-                      'pycrypto', 'leveldb', 'm3-cdecimal', 'simplekv',
+                      'pycrypto', 'm3-cdecimal', 'simplekv',
                       'werkzeug', 'json-rpc', 'tabulate', 'redis', 'ecdsa'],
     packages=find_packages(exclude=("tests", "tests.*")),
 )
