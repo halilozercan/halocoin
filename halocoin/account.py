@@ -110,7 +110,6 @@ class AccountService(Service):
                 recv_account = get_acc(recv_address)
 
                 send_account['amount'] = apply(send_account['amount'], -tx['amount'])
-                send_account['amount'] = apply(send_account['amount'], -custom.fee)
                 send_account['count'] = apply(send_account['count'], 1)
                 send_account['tx_blocks'] = apply(send_account['tx_blocks'], block['length'])
 
@@ -153,7 +152,6 @@ class AccountService(Service):
             elif tx['type'] == 'spend':
                 if owner == address:
                     account['amount'] = apply(account['amount'], -tx['amount'])
-                    account['amount'] = apply(account['amount'], -custom.fee)
                     account['count'] = apply(account['count'], 1)
                     if block_number != -1:
                         account['tx_blocks'] = apply(account['tx_blocks'], block_number)

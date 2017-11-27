@@ -38,10 +38,12 @@ class Engine(Service):
             'peer.port': custom.port
         }
 
-        if self.config['database.type'] == 'leveldb':
+        if self.config['database.type'] == 'redis':
+            """
             self.config.update({
                 'database.name': os.path.join(self.working_dir, custom.db_name)
             })
+            """
             self.db = DatabaseService(self)
 
         self.blockchain = BlockchainService(self)

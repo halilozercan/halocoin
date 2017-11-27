@@ -26,13 +26,13 @@ def receive(sock, **kwargs):
 
         string = args['leftover']
         while string == '':
-            received = sock.recv(MAX_MESSAGE_SIZE)
+            received = sock.recv(MAX_MESSAGE_SIZE).decode()
             if len(received) == 0:
                 raise Exception('Socket is closed')
             string += received
 
         while string.find(':') < 0:
-            received = sock.recv(MAX_MESSAGE_SIZE)
+            received = sock.recv(MAX_MESSAGE_SIZE).decode()
             if len(received) == 0:
                 raise Exception('Socket is closed')
             string += received
@@ -42,7 +42,7 @@ def receive(sock, **kwargs):
         string = string[sep_loc + 1:]
 
         while len(string) < length:
-            received = sock.recv(MAX_MESSAGE_SIZE)
+            received = sock.recv(MAX_MESSAGE_SIZE).decode()
             if len(received) == 0:
                 raise Exception('Socket is closed')
             string += received
@@ -68,8 +68,8 @@ def send(_msg, sock):
     try:
         msg = str(len(msg)) + ":" + msg
         while sent < len(msg):
-            sent += sock.send(msg[sent:])
-    except:
+            sent += sock.send(msg[sent:].encode())
+    except Exception as e:
         return False
 
     return sent == len(msg)

@@ -18,7 +18,6 @@ class DatabaseService(Service):
     def __init__(self, engine):
         Service.__init__(self, name='database')
         self.engine = engine
-        self.database_name = self.engine.config['database.name']
         self.DB = None
         self.salt = None
         self.req_count = 0

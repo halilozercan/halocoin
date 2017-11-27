@@ -10,11 +10,11 @@ They must stay here.
 
 # Configurable
 DEBUG = False
-db_type = 'leveldb'
-# db_user = 'username'
+db_type = 'redis'
+db_user = 'username'
 db_pass = 'halocoin'
 db_port = 6379
-db_name = 'halodb'
+db_name = 0
 log_file = 'log'
 port = 7900
 api_port = 7899
@@ -22,9 +22,8 @@ download_many = 50  # Max number of blocks to request from a peer at the same ti
 
 
 # Integrity of blockchain
-version = "0.0002"
-block_reward = 10 ** 5
-fee = 10 ** 3
+version = "0.0003"
+block_reward = 10 ** 2
 miner_core_count = -1  # -1 evaluates to number of cores
 # Lower limits on what the "time" tag in a block can say.
 mmm = 100
@@ -36,9 +35,9 @@ history_length = 400
 # total weight.
 inflection = Decimal('0.985')
 memoized_weights = [inflection ** i for i in range(1000)]
-blocktime = 15
+blocktime = 120
 
 
 # Independent
-peers = [['159.89.9.49', 7900]]
+peers = [['159.89.9.43', 7900]]
 

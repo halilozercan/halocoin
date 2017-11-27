@@ -11,3 +11,6 @@ json-rpc
 m3-cdecimal
 werkzeug
 tabulate
+redis
+simplekv
+ecdsa
