@@ -66,10 +66,9 @@ class DatabaseService(Service):
         in the database.
         """
         try:
-            self.DB.dexists(self.salt + str(key))
+            return (self.salt + str(key)) in self.DB
         except KeyError:
             return False
-        return True
 
     @sync
     def delete(self, key):

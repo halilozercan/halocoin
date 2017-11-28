@@ -43,6 +43,7 @@ class MinerService(Service):
     def on_close(self):
         self.wallet = None
         self.close_workers()
+        print('Miner closed')
 
     @threaded
     def worker(self):
