@@ -17,6 +17,7 @@ class PeerCheckService(Service):
         self.db = None
         self.blockchain = None
         self.account = None
+        self.node_id = "Anon"
         self.old_peers = []
 
     def on_register(self):
@@ -25,6 +26,7 @@ class PeerCheckService(Service):
         self.account = self.engine.account
         for peer in self.new_peers:
             self.account.add_peer(peer)
+        self.node_id = self.db.get('node_id')
         return True
 
     @threaded
@@ -35,10 +37,8 @@ class PeerCheckService(Service):
 
         peers = self.account.get_peers()
         if len(peers) > 0:
-            pr = sorted(peers, key=lambda x: x[1], reverse=True)
-
-            i = tools.exponential_random(3.0 / 4) % len(pr)
-            peer = pr[i]
+            i = tools.exponential_random(3.0 / 4) % len(peers)
+            peer = peers[i]
             t1 = time.time()
             r = self.peer_check(peer)
             t2 = time.time()
@@ -48,11 +48,12 @@ class PeerCheckService(Service):
                 peer[1] += 0.2 * (t2 - t1)
             else:
                 peer[1] += 0.2 * 30
+
             self.account.update_peer(peer)
 
     @sync
     def peer_check(self, peer):
-        block_count = ntwrk.command(peer[0], {'action': 'block_count'})
+        block_count = ntwrk.command(peer[0], {'action': 'block_count'}, self.node_id)
 
         if not isinstance(block_count, dict):
             return
@@ -83,17 +84,19 @@ class PeerCheckService(Service):
             self.download_blocks(peer[0], block_count, length)
 
         my_peers = self.account.get_peers()
-        their_peers = ntwrk.command(peer[0], {'action': 'peers'})
+        their_peers = ntwrk.command(peer[0], {'action': 'peers'}, self.node_id)
         if type(their_peers) == list:
             for p in their_peers:
                 self.account.add_peer(p)
             for p in my_peers:
-                ntwrk.command(peer[0], {'action': 'receive_peer', 'peer': p})
+                ntwrk.command(peer[0], {'action': 'receive_peer', 'peer': p}, self.node_id)
+
+        return 0
 
     def download_blocks(self, peer, peers_block_count, length):
         b = [max(0, length - 10), min(peers_block_count['length'] + 1,
                                       length + self.engine.config['peers']['download_limit'])]
-        blocks = ntwrk.command(peer, {'action': 'range_request', 'range': b})
+        blocks = ntwrk.command(peer, {'action': 'range_request', 'range': b}, self.node_id)
         if not isinstance(blocks, list):
             return []
         self.blockchain.blocks_queue.put(blocks)
@@ -103,9 +106,9 @@ class PeerCheckService(Service):
         T = self.blockchain.tx_pool()
         pushers = filter(lambda t: t not in txs, T)
         for push in pushers:
-            ntwrk.command(peer, {'action': 'push_tx', 'tx': push})
+            ntwrk.command(peer, {'action': 'push_tx', 'tx': push}, self.node_id)
 
-        txs = ntwrk.command(peer, {'action': 'txs'})
+        txs = ntwrk.command(peer, {'action': 'txs'}, self.node_id)
         if not isinstance(txs, list):
             return -1
         for tx in txs:
@@ -118,6 +121,5 @@ class PeerCheckService(Service):
                                                block_count_peer + self.engine.config['peers']['download_limit'])]
         for i in range(b[0], b[1] + 1):
             blocks.append(self.db.get(i))
-        ntwrk.command(peer, {'action': 'push_block',
-                             'blocks': blocks})
+        ntwrk.command(peer, {'action': 'push_block', 'blocks': blocks}, self.node_id)
         return 0

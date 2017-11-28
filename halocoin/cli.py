@@ -7,7 +7,6 @@ import sys
 
 import filelock
 import requests
-import yaml
 from tabulate import tabulate
 
 from halocoin import custom
@@ -28,6 +27,7 @@ class Colors:
 
 actions = dict()
 connection_port = 7899
+host = "localhost"
 
 
 def action(func):
@@ -40,7 +40,7 @@ def action(func):
 
 
 def make_api_request(method, **kwargs):
-    url = "http://localhost:" + str(connection_port) + "/jsonrpc"
+    url = "http://" + str(host) + ":" + str(connection_port) + "/jsonrpc"
     headers = {'content-type': 'application/json'}
 
     # Example echo method
@@ -76,7 +76,7 @@ def print_txs(txs):
 def print_peers(peers):
     table = []
     for peer in peers:
-        table.append([peer[0][0], peer[0][1], peer[1], peer[3]])
+        table.append([peer[0][0], peer[0][1], "{:10.3f}".format(peer[1]), peer[3]])
 
     print(tabulate(table,
                    headers=[Colors.HEADER + 'Address' + Colors.ENDC,

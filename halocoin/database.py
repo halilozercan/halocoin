@@ -1,12 +1,10 @@
 import os
-
-import pickle
 import random
 import string
 
+import redis
 import yaml
 from simplekv.memory.redisstore import RedisStore
-import redis
 
 from halocoin.service import Service, sync
 
@@ -41,9 +39,7 @@ class DatabaseService(Service):
     def get(self, key):
         """gets the key in args[0] using the salt"""
         try:
-            return pickle.loads(
-                self.DB.get(self.salt + str(key))
-            )
+            return yaml.load(self.DB.get(self.salt + str(key)).decode())
         except Exception as e:
             return None
 
@@ -54,7 +50,7 @@ class DatabaseService(Service):
         prepended to the key.
         """
         try:
-            self.DB.put(self.salt + str(key), pickle.dumps(value))
+            self.DB.put(self.salt + str(key), yaml.dump(value).encode())
             return True
         except Exception as e:
             return False

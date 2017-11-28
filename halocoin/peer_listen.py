@@ -2,6 +2,7 @@ import copy
 import json
 import socket
 import sys
+import uuid
 
 from halocoin import ntwrk
 from halocoin import tools
@@ -21,6 +22,9 @@ class PeerListenService(Service):
         self.db = self.engine.db
         self.blockchain = self.engine.blockchain
         self.account = self.engine.account
+
+        if not self.db.exists('node_id'):
+            self.db.put('node_id', str(uuid.uuid4()))
 
         try:
             self.s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -42,6 +46,7 @@ class PeerListenService(Service):
             if response.getFlag():
                 message = Message.from_yaml(response.getData())
                 request = message.get_body()
+                node_id = message.get_header("node_id")
                 try:
                     if hasattr(self, request['action']):
                         kwargs = copy.deepcopy(request)

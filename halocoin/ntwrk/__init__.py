@@ -94,7 +94,7 @@ def connect(host='localhost', port=3699, ssl_args=None, unix_config=None, timeou
         return None
 
 
-def command(peer, message):
+def command(peer, message, node_id):
     """
     This method is special for blockchain communication. It is a pipeline of
     connect, send and receive.
@@ -105,7 +105,7 @@ def command(peer, message):
     sock = connect(peer[0], peer[1], timeout=1)
     if sock is not None:
         message_id = uuid.uuid4()
-        result = send(Message(headers={'id': message_id}, body=message), sock)
+        result = send(Message(headers={'id': message_id, 'node_id': node_id}, body=message), sock)
         if result:
             response, leftover = receive(sock, timeout=20)
             if response.getFlag():

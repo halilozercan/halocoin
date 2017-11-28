@@ -190,7 +190,9 @@ class AccountService(Service):
 
     @sync
     def get_peers(self):
-        return self.db.get('peers')
+        peers = self.db.get('peers')
+        peers = sorted(peers, key=lambda x:x[1])
+        return peers
 
     @sync
     def add_peer(self, peer):

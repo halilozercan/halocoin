@@ -6,7 +6,7 @@ services:
     ports:
       - "6379"
     volumes:
-      - data-volume:/data
+      - ~/.halocoin-docker:/data
   halocoin:
     build: .
     tty: true
@@ -18,7 +18,4 @@ services:
     depends_on:
       - db
     volumes:
-      - data-volume:/data
-
-volumes:
-  data-volume: {}
+      - ~/.halocoin-docker:/data
