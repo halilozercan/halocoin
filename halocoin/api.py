@@ -99,6 +99,11 @@ def peers():
 
 
 @dispatcher.add_method
+def node_id():
+    return _engine.db.get('node_id')
+
+
+@dispatcher.add_method
 @json_sanitizer
 @blockchain_synced
 def history(address=None):

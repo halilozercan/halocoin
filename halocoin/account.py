@@ -14,6 +14,15 @@ class AccountService(Service):
         'mined_blocks': []
     }
 
+    default_peer = {
+        'node_id': 'Anon',
+        'ip': '',
+        'port': 0,
+        'rank': 30,
+        'diffLength': '',
+        'length': -1
+    }
+
     def __init__(self, engine):
         Service.__init__(self, name='account')
         self.engine = engine
@@ -190,48 +199,53 @@ class AccountService(Service):
 
     @sync
     def get_peers(self):
-        peers = self.db.get('peers')
-        peers = sorted(peers, key=lambda x:x[1])
+        peers = self.db.get('peer_list')
+        if peers is None:
+            peers = list()
+        peers = sorted(peers, key=lambda x: x['rank'])
         return peers
 
     @sync
     def add_peer(self, peer):
-        if not AccountService.is_peer(peer):
+        if not self.is_peer(peer):
             return
 
-        peers = self.db.get('peers')
+        peers = self.get_peers()
         for _peer in peers:
-            if peer[0] == _peer[0]:
+            if peer['node_id'] == _peer['node_id']:
                 return
 
         peers.append(peer)
-        self.db.put('peers', peers)
+        self.db.put('peer_list', peers)
 
     @sync
     def update_peer(self, peer):
-        if not AccountService.is_peer(peer):
+        # TODO: Better approach for peer updating.
+        if not self.is_peer(peer):
             return
 
-        peers = self.db.get('peers')
+        peers = self.db.get('peer_list')
         for i, _peer in enumerate(peers):
-            if peer[0] == _peer[0]:
+            if peer['node_id'] == _peer['node_id']:
                 peers[i] = peer
                 break
 
-        self.db.put('peers', peers)
+        self.db.put('peer_list', peers)
 
-    @staticmethod
-    def is_peer(peer):
-        if not isinstance(peer, list):
+    def is_peer(self, peer):
+        # Integrity check of a peer object.
+        # It should be a dictionary
+        if not isinstance(peer, dict):
             return False
 
-        if len(peer) != 4:
+        # Its key set must match default keys
+        if set(peer.keys()) != set(AccountService.default_peer.keys()):
             return False
 
-        if not isinstance(peer[0], list):
+        if not tools.validate_uuid4(peer['node_id']):
             return False
 
-        if len(peer[0]) != 2:
+        if peer['node_id'] == self.db.get('node_id'):
             return False
 
         return True

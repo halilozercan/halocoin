@@ -62,7 +62,16 @@ def generate_default_config():
     }
 
     config["peers"] = {
-        "list": [['159.89.9.43', 7900]],
+        "list": [
+            {
+                'node_id': 'Anon',
+                'ip': '159.89.9.43',
+                'port': 7900,
+                'rank': 30,
+                'diffLength': '',
+                'length': -1
+            }
+        ],
         "download_limit": 50
     }
 

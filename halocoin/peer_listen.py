@@ -17,6 +17,7 @@ class PeerListenService(Service):
         self.db = None
         self.blockchain = None
         self.account = None
+        self.node_id = None
 
     def on_register(self):
         self.db = self.engine.db
@@ -25,6 +26,8 @@ class PeerListenService(Service):
 
         if not self.db.exists('node_id'):
             self.db.put('node_id', str(uuid.uuid4()))
+
+        self.node_id = self.db.get('node_id')
 
         try:
             self.s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -46,10 +49,11 @@ class PeerListenService(Service):
             if response.getFlag():
                 message = Message.from_yaml(response.getData())
                 request = message.get_body()
-                node_id = message.get_header("node_id")
                 try:
-                    if hasattr(self, request['action']):
+                    if hasattr(self, request['action']) and message.get_header("node_id") != self.node_id:
                         kwargs = copy.deepcopy(request)
+                        if request['action'] == 'greetings':
+                            kwargs['__remote_ip__'] = client_sock.getpeername()
                         del kwargs['action']
                         result = getattr(self, request['action'])(**kwargs)
                     else:
@@ -57,12 +61,32 @@ class PeerListenService(Service):
                 except:
                     result = 'Something went wrong while evaluating.\n'
                     tools.log(sys.exc_info())
-                response = Message(headers={'ack': message.get_header('id')},
+                response = Message(headers={'ack': message.get_header('id'),
+                                            'node_id': self.node_id},
                                    body=result)
                 ntwrk.send(response, client_sock)
                 client_sock.close()
         except:
             pass
+
+    @sync
+    def greetings(self, node_id, port, __remote_ip__):
+        """
+        Called when a peer starts communicating with us.
+        If it is a new node, we should add it to our peer list.
+
+        :param node_id:
+        :param port:
+        :param __remote_ip__:
+        :return:
+        """
+        from halocoin.account import AccountService
+        peer = copy.deepcopy(AccountService.default_peer)
+        peer['node_id'] = node_id
+        peer['ip'] = __remote_ip__[0]
+        peer['port'] = port
+        self.account.add_peer(peer)
+        return True
 
     @sync
     def receive_peer(self, peer):

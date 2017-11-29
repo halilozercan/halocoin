@@ -76,7 +76,7 @@ def print_txs(txs):
 def print_peers(peers):
     table = []
     for peer in peers:
-        table.append([peer[0][0], peer[0][1], "{:10.3f}".format(peer[1]), peer[3]])
+        table.append([peer['ip'], peer['port'], "{:10.3f}".format(peer['rank']), peer['length']])
 
     print(tabulate(table,
                    headers=[Colors.HEADER + 'Address' + Colors.ENDC,
@@ -222,6 +222,11 @@ def blockcount(args):
 @action
 def balance(args):
     print(make_api_request(args.action, address=args.address))
+
+
+@action
+def node_id(args):
+    print(make_api_request(args.action))
 
 
 @action

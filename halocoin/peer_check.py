@@ -12,8 +12,7 @@ class PeerCheckService(Service):
         Service.__init__(self, 'peers_check')
         self.engine = engine
         self.new_peers = []
-        for new_peer in new_peers:
-            self.new_peers.append([new_peer, 5, '0', 0])
+        self.new_peers = new_peers
         self.db = None
         self.blockchain = None
         self.account = None
@@ -43,25 +42,37 @@ class PeerCheckService(Service):
             r = self.peer_check(peer)
             t2 = time.time()
 
-            peer[1] *= 0.8
+            peer['rank'] *= 0.8
             if r == 0:
-                peer[1] += 0.2 * (t2 - t1)
+                peer['rank'] += 0.2 * (t2 - t1)
             else:
-                peer[1] += 0.2 * 30
+                peer['rank'] += 0.2 * 30
 
             self.account.update_peer(peer)
 
     @sync
     def peer_check(self, peer):
-        block_count = ntwrk.command(peer[0], {'action': 'block_count'}, self.node_id)
+        peer_ip_port = (peer['ip'], peer['port'])
+        greeted = ntwrk.command(peer_ip_port,
+                                {
+                                    'action': 'greetings',
+                                    'node_id': self.node_id,
+                                    'port': self.engine.config['port']['peers']
+                                },
+                                self.node_id)
+
+        if not greeted:
+            return
+
+        block_count = ntwrk.command(peer_ip_port, {'action': 'block_count'}, self.node_id)
 
         if not isinstance(block_count, dict):
             return
         if 'error' in block_count.keys():
             return
 
-        peer[2] = block_count['diffLength']
-        peer[3] = block_count['length']
+        peer['diffLength'] = block_count['diffLength']
+        peer['length'] = block_count['length']
         self.account.update_peer(peer)
 
         known_length = self.db.get('known_length')
@@ -77,49 +88,49 @@ class PeerCheckService(Service):
         # We are deciding what to do with this peer. We can either
         # send them blocks, share txs or download blocks.
         if them < us:
-            self.give_block(peer[0], block_count['length'])
+            self.give_block(peer_ip_port, block_count['length'])
         elif us == them:
-            self.ask_for_txs(peer[0])
+            self.ask_for_txs(peer_ip_port)
         else:
-            self.download_blocks(peer[0], block_count, length)
+            self.download_blocks(peer_ip_port, block_count, length)
 
         my_peers = self.account.get_peers()
-        their_peers = ntwrk.command(peer[0], {'action': 'peers'}, self.node_id)
+        their_peers = ntwrk.command(peer_ip_port, {'action': 'peers'}, self.node_id)
         if type(their_peers) == list:
             for p in their_peers:
                 self.account.add_peer(p)
             for p in my_peers:
-                ntwrk.command(peer[0], {'action': 'receive_peer', 'peer': p}, self.node_id)
+                ntwrk.command(peer_ip_port, {'action': 'receive_peer', 'peer': p}, self.node_id)
 
         return 0
 
-    def download_blocks(self, peer, peers_block_count, length):
+    def download_blocks(self, peer_ip_port, peers_block_count, length):
         b = [max(0, length - 10), min(peers_block_count['length'] + 1,
                                       length + self.engine.config['peers']['download_limit'])]
-        blocks = ntwrk.command(peer, {'action': 'range_request', 'range': b}, self.node_id)
+        blocks = ntwrk.command(peer_ip_port, {'action': 'range_request', 'range': b}, self.node_id)
         if not isinstance(blocks, list):
             return []
         self.blockchain.blocks_queue.put(blocks)
         return 0
 
-    def ask_for_txs(self, peer):
+    def ask_for_txs(self, peer_ip_port):
         T = self.blockchain.tx_pool()
         pushers = filter(lambda t: t not in txs, T)
         for push in pushers:
-            ntwrk.command(peer, {'action': 'push_tx', 'tx': push}, self.node_id)
+            ntwrk.command(peer_ip_port, {'action': 'push_tx', 'tx': push}, self.node_id)
 
-        txs = ntwrk.command(peer, {'action': 'txs'}, self.node_id)
+        txs = ntwrk.command(peer_ip_port, {'action': 'txs'}, self.node_id)
         if not isinstance(txs, list):
             return -1
         for tx in txs:
             self.blockchain.tx_queue.put(tx)
         return 0
 
-    def give_block(self, peer, block_count_peer):
+    def give_block(self, peer_ip_port, block_count_peer):
         blocks = []
         b = [max(block_count_peer - 5, 0), min(self.db.get('length'),
                                                block_count_peer + self.engine.config['peers']['download_limit'])]
         for i in range(b[0], b[1] + 1):
             blocks.append(self.db.get(i))
-        ntwrk.command(peer, {'action': 'push_block', 'blocks': blocks}, self.node_id)
+        ntwrk.command(peer_ip_port, {'action': 'push_block', 'blocks': blocks}, self.node_id)
         return 0
