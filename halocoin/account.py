@@ -15,13 +15,17 @@ class AccountService(Service):
     }
 
     default_peer = {
-        'node_id': 'Anon',
-        'ip': '',
-        'port': 0,
+        'node_id': '',
+        'pub_ip': '',
+        'pub_port': 0,
+        'priv_ip': '',
+        'priv_port': 0,
         'rank': 1,
         'diffLength': '',
         'length': -1
     }
+
+    peer_keys = {'node_id', 'pub_ip', 'pub_port', 'priv_ip', 'priv_port'}
 
     def __init__(self, engine):
         Service.__init__(self, name='account')
@@ -210,12 +214,15 @@ class AccountService(Service):
         if not self.is_peer(peer):
             return
 
+        peer_to_add = copy.deepcopy(AccountService.default_peer)
+        peer_to_add.update(**peer)
+
         peers = self.get_peers()
         for _peer in peers:
-            if peer['node_id'] == _peer['node_id']:
+            if peer_to_add['node_id'] == _peer['node_id']:
                 return
 
-        peers.append(peer)
+        peers.append(peer_to_add)
         self.db.put('peer_list', peers)
 
     @sync
@@ -239,7 +246,7 @@ class AccountService(Service):
             return False
 
         # Its key set must match default keys
-        if set(peer.keys()) != set(AccountService.default_peer.keys()):
+        if not set.issubset(AccountService.peer_keys, set(peer.keys())):
             return False
 
         if not tools.validate_uuid4(peer['node_id']):

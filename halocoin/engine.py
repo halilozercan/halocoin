@@ -34,8 +34,8 @@ class Engine(Service):
             self.db = DatabaseService(self)
 
         self.blockchain = BlockchainService(self)
-        self.peers_check = PeerCheckService(self, self.config['peers']['list'])
-        self.peer_receive = PeerListenService(self)
+        self.peers_check = PeerCheckService(self, self.config['trackers'])
+        #self.peer_receive = PeerListenService(self)
         self.account = AccountService(self)
         self.miner = MinerService(self)
 
@@ -58,6 +58,7 @@ class Engine(Service):
             self.db.put('length', -1)
             self.db.put('txs', [])
             self.db.put('peer_list', [])
+            self.db.put('tracker_list', [])
             self.db.put('targets', {})
             self.db.put('times', {})
             self.db.put('mine', False)
@@ -78,11 +79,11 @@ class Engine(Service):
             return False
         print("Started Blockchain")
 
-        if not self.peer_receive.register():
-            sys.stderr.write("Peer Receive service has failed. Exiting!\n")
-            self.unregister_sub_services()
-            return False
-        print("Started Peer Receive")
+        #if not self.peer_receive.register():
+        #    sys.stderr.write("Peer Receive service has failed. Exiting!\n")
+        #    self.unregister_sub_services()
+        #    return False
+        #print("Started Peer Receive")
 
         if not self.peers_check.register():
             sys.stderr.write("Peers Check service has failed. Exiting!\n")
@@ -107,9 +108,9 @@ class Engine(Service):
         if self.peers_check.get_state() == Service.RUNNING:
             self.peers_check.unregister()
             running_services.add(self.peers_check)
-        if self.peer_receive.get_state() == Service.RUNNING:
-            self.peer_receive.unregister()
-            running_services.add(self.peer_receive)
+        #if self.peer_receive.get_state() == Service.RUNNING:
+        #    self.peer_receive.unregister()
+        #    running_services.add(self.peer_receive)
         if self.blockchain.get_state() == Service.RUNNING:
             self.blockchain.unregister()
             running_services.add(self.blockchain)

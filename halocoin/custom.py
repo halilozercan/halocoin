@@ -56,24 +56,18 @@ def generate_default_config():
         'file': 'log'
     }
 
-    config["port"] = {
-        "api": 7899,
-        "peers": 7900
+    config["api"] = {
+        "port": 7899
     }
 
-    config["peers"] = {
-        "list": [
-            {
-                'node_id': '743953de-ac7d-42f5-8eda-474a823a7372',
-                'ip': '159.89.9.43',
-                'port': 7900,
-                'rank': 1,
-                'diffLength': '',
-                'length': -1
-            }
-        ],
-        "download_limit": 50
-    }
+    config["trackers"] = [
+        {
+            'ip': '159.89.9.43',
+            'port': 5005
+        }
+    ]
+
+    config["download_limit"] = 50
 
     config["miner"] = {
         "cores": -1

@@ -1,35 +1,44 @@
+import socket
 import time
+import uuid
+from threading import Thread
 
 from halocoin import blockchain
 from halocoin import ntwrk
 from halocoin import tools
+from halocoin.ntwrk import command
 from halocoin.service import Service, threaded, sync
 
 
 class PeerCheckService(Service):
-    def __init__(self, engine, new_peers):
+    def __init__(self, engine, trackers):
         # This logic might change. Here we add new peers while initializing the service
         Service.__init__(self, 'peers_check')
         self.engine = engine
-        self.new_peers = []
-        self.new_peers = new_peers
+        self.trackers = trackers
         self.db = None
         self.blockchain = None
         self.account = None
         self.node_id = "Anon"
         self.old_peers = []
+        self.last_tracker_connection = 0
 
     def on_register(self):
         self.db = self.engine.db
         self.blockchain = self.engine.blockchain
         self.account = self.engine.account
-        for peer in self.new_peers:
-            self.account.add_peer(peer)
+
+        if not self.db.exists('node_id'):
+            self.db.put('node_id', str(uuid.uuid4()))
+
         self.node_id = self.db.get('node_id')
         return True
 
     @threaded
     def listen(self):
+        if self.should_check_trackers():
+            self.check_trackers()
+
         if self.blockchain.get_chain_state() == blockchain.BlockchainService.SYNCING:
             time.sleep(0.1)
             return
@@ -50,19 +59,61 @@ class PeerCheckService(Service):
 
             self.account.update_peer(peer)
 
-    @sync
-    def peer_check(self, peer):
-        peer_ip_port = (peer['ip'], peer['port'])
-        greeted = ntwrk.command(peer_ip_port,
-                                {
-                                    'action': 'greetings',
-                                    'node_id': self.node_id,
-                                    'port': self.engine.config['port']['peers']
-                                },
-                                self.node_id)
+    def should_check_trackers(self):
+        return time.time() - self.last_tracker_connection > 5
 
-        if not greeted:
-            return
+    def check_trackers(self):
+        try:
+            for tracker in self.trackers:
+                sa = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                sa.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+                sa.connect((tracker['ip'], tracker['port']))
+                sa.settimeout(10)
+                priv_addr = sa.getsockname()
+
+                priv_info = {
+                    "ip": priv_addr[0],
+                    "port": priv_addr[1],
+                    "node_id": self.node_id
+                }
+                pub_info = command(('', ''), priv_info, self.node_id, sock=sa)
+                clients = command(('', ''), {"ip": pub_info["ip"], "port": pub_info["port"], "node_id": self.node_id},
+                                  self.node_id, sock=sa)
+                for node_id in clients.keys():
+                    clients[node_id]['node_id'] = node_id
+                    self.account.add_peer(clients[node_id])
+                self.db.put('priv_info', priv_info)
+                sa.close()
+            self.last_tracker_connection = time.time()
+        except Exception as e:
+            pass
+
+    def peer_check(self, peer):
+        priv_info = self.db.get('priv_info')
+        threads = {
+            '0_accept': Thread(target=self.accept, args=(priv_info['port'],)),
+            '1_accept': Thread(target=self.accept, args=(peer['pub_port'],)),
+            '2_connect': Thread(target=self.connect,
+                                args=((priv_info['ip'], priv_info['port']), (peer['pub_ip'], peer['pub_port']),)),
+            '3_connect': Thread(target=self.connect,
+                                args=((priv_info['ip'], priv_info['port']), (peer['priv_ip'], peer['priv_port']),)),
+        }
+        for name in sorted(threads.keys()):
+            threads[name].start()
+
+        while threads:
+            keys = list(threads.keys())
+            for name in keys:
+                try:
+                    threads[name].join(1)
+                except TimeoutError:
+                    continue
+                if not threads[name].is_alive():
+                    threads.pop(name)
+
+        return
+
+        peer_ip_port = (peer['ip'], peer['port'])
 
         block_count = ntwrk.command(peer_ip_port, {'action': 'block_count'}, self.node_id)
 
@@ -106,7 +157,7 @@ class PeerCheckService(Service):
 
     def download_blocks(self, peer_ip_port, peers_block_count, length):
         b = [max(0, length - 10), min(peers_block_count['length'] + 1,
-                                      length + self.engine.config['peers']['download_limit'])]
+                                      length + self.engine.config['download_limit'])]
         blocks = ntwrk.command(peer_ip_port, {'action': 'range_request', 'range': b}, self.node_id)
         if not isinstance(blocks, list):
             return []
@@ -129,8 +180,34 @@ class PeerCheckService(Service):
     def give_block(self, peer_ip_port, block_count_peer):
         blocks = []
         b = [max(block_count_peer - 5, 0), min(self.db.get('length'),
-                                               block_count_peer + self.engine.config['peers']['download_limit'])]
+                                               block_count_peer + self.engine.config['download_limit'])]
         for i in range(b[0], b[1] + 1):
             blocks.append(self.db.get(i))
         ntwrk.command(peer_ip_port, {'action': 'push_block', 'blocks': blocks}, self.node_id)
         return 0
+
+    def accept(self, port):
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
+        s.bind(('', port))
+        s.listen(1)
+        s.settimeout(5)
+        while True:
+            try:
+                conn, addr = s.accept()
+            except Exception as e:
+                s.close()
+                break
+
+    def connect(self, local_addr, addr):
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
+        s.bind(local_addr)
+        while True:
+            try:
+                s.connect(addr)
+            except Exception as e:
+                s.close()
+                break

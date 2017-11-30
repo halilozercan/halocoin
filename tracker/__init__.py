@@ -82,8 +82,9 @@ class Tracker:
                     "priv_ip": priv_info['ip'],
                     "priv_port": priv_info['port']
                 }
-                response = Message(headers={'ack': message.get_header('id')},
-                                   body=self.clients)
-                send(response, client_sock)
+
+            response = Message(headers={'ack': message.get_header('id')},
+                               body=self.clients)
+            send(response, client_sock)
 
         client_sock.close()

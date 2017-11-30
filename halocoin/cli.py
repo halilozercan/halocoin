@@ -309,7 +309,7 @@ def run(argv):
 
     config, working_dir = extract_configuration(args)
     global connection_port
-    connection_port = config['port']['api']
+    connection_port = config['api']['port']
 
     actions[args.action](args)
     return

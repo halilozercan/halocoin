@@ -74,25 +74,6 @@ class PeerListenService(Service):
             time.sleep(0.5)
 
     @sync
-    def greetings(self, node_id, port, __remote_ip__):
-        """
-        Called when a peer starts communicating with us.
-        If it is a new node, we should add it to our peer list.
-
-        :param node_id:
-        :param port:
-        :param __remote_ip__:
-        :return:
-        """
-        from halocoin.account import AccountService
-        peer = copy.deepcopy(AccountService.default_peer)
-        peer['node_id'] = node_id
-        peer['ip'] = __remote_ip__[0]
-        peer['port'] = port
-        self.account.add_peer(peer)
-        return True
-
-    @sync
     def receive_peer(self, peer):
         self.account.add_peer(peer)
 

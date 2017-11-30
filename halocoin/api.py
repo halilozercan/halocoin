@@ -73,13 +73,13 @@ def run(engine):
     _engine = engine
     listen_thread = threading.Thread(target=run_simple,
                                      kwargs={'hostname': '0.0.0.0',
-                                             'port': engine.config['port']['api'],
+                                             'port': engine.config['api']['port'],
                                              'application': application})
     listen_thread.start()
 
 
 def shutdown():
-    url = "http://localhost:" + str(_engine.config['port']['api']) + "/jsonrpc"
+    url = "http://localhost:" + str(_engine.config['api']['port']) + "/jsonrpc"
     headers = {'content-type': 'application/json'}
 
     # Example echo method
