@@ -137,6 +137,8 @@ def extract_configuration(args):
     else:
         working_dir = args.dir
 
+    working_dir = os.path.join(working_dir, str(custom.version))
+
     if os.path.exists(working_dir) and not os.path.isdir(working_dir):
         print("Given path {} is not a directory.".format(working_dir))
         exit(1)

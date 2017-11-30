@@ -36,7 +36,7 @@ class PeerCheckService(Service):
 
         peers = self.account.get_peers()
         if len(peers) > 0:
-            i = tools.exponential_random(3.0 / 4) % len(peers)
+            i = tools.exponential_random(1.0 / 2) % len(peers)
             peer = peers[i]
             t1 = time.time()
             r = self.peer_check(peer)
