@@ -5,17 +5,20 @@ services:
     image: redis
     ports:
       - "6379"
+    user: $UID
     volumes:
       - ~/.halocoin-docker:/data
   halocoin:
     build: .
     tty: true
     ports:
-      - "7900:7900"
-      - "7899:7899"
-    environment: 
+      - "7900:17900"
+      - "7899:17899"
+    environment:
       - REDIS_URL=db
+      - HALOCOIN_DATA_DIR=/data
     depends_on:
       - db
+    user: $UID
     volumes:
       - ~/.halocoin-docker:/data

@@ -18,7 +18,7 @@ class AccountService(Service):
         'node_id': 'Anon',
         'ip': '',
         'port': 0,
-        'rank': 30,
+        'rank': 1,
         'diffLength': '',
         'length': -1
     }

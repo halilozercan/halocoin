@@ -17,5 +17,5 @@ setup(
     install_requires=['requests', 'wheel', 'pyyaml',
                       'pycrypto', 'm3-cdecimal', 'simplekv',
                       'werkzeug', 'json-rpc', 'tabulate', 'redis', 'ecdsa'],
-    packages=find_packages(exclude=("tests", "tests.*")),
+    packages=find_packages(exclude=("tests", "tests.*", "tracker")),
 )
