@@ -55,7 +55,7 @@ def receive(sock, **kwargs):
         return Response(False, 'timeout'), ''
     except socket.error:
         return Response(False, 'gg'), ''
-    except:
+    except Exception as e:
         import sys
         return Response(False, sys.exc_info()), ''
 
@@ -94,7 +94,7 @@ def connect(host='localhost', port=3699, ssl_args=None, unix_config=None, timeou
         return None
 
 
-def command(peer, message, node_id):
+def command(peer, message, node_id, sock=None):
     """
     This method is special for blockchain communication. It is a pipeline of
     connect, send and receive.
@@ -102,7 +102,9 @@ def command(peer, message, node_id):
     :param message: message to be sent
     :return: received response or error
     """
-    sock = connect(peer[0], peer[1], timeout=1)
+    if sock is None:
+        sock = connect(peer[0], peer[1], timeout=1)
+
     if sock is not None:
         message_id = uuid.uuid4()
         result = send(Message(headers={'id': message_id, 'node_id': node_id}, body=message), sock)

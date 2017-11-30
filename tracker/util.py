@@ -11,12 +11,12 @@ def addr_from_args(args, host='0.0.0.0', port=5005):
 
 
 def msg_to_addr(data):
-    ip, port = data.decode('utf-8').strip().split(':')
+    ip, port = data.strip().split(':')
     return ip, int(port)
 
 
 def addr_to_msg(addr):
-    return '{}:{}'.format(addr[0], str(addr[1])).encode('utf-8')
+    return '{}:{}'.format(addr[0], str(addr[1]))
 
 
 def send_msg(sock, msg):
