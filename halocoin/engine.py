@@ -1,5 +1,7 @@
 import time
 
+import sys
+
 from halocoin import api
 from halocoin import tools
 from halocoin.account import AccountService
@@ -65,25 +67,25 @@ class Engine(Service):
         self.db.put('stop', False)
 
         if not self.account.register():
-            print("Account service has failed. Exiting!")
+            sys.stderr.write("Account service has failed. Exiting!\n")
             self.unregister_sub_services()
             return False
         print("Started Account")
 
         if not self.blockchain.register():
-            print("Blockchain service has failed. Exiting!")
+            sys.stderr.write("Blockchain service has failed. Exiting!\n")
             self.unregister_sub_services()
             return False
         print("Started Blockchain")
 
         if not self.peer_receive.register():
-            print("Peer Receive service has failed. Exiting!")
+            sys.stderr.write("Peer Receive service has failed. Exiting!\n")
             self.unregister_sub_services()
             return False
         print("Started Peer Receive")
 
         if not self.peers_check.register():
-            print("Peers Check service has failed. Exiting!")
+            sys.stderr.write("Peers Check service has failed. Exiting!\n")
             self.unregister_sub_services()
             return False
         print("Started Peers Check")
@@ -94,8 +96,9 @@ class Engine(Service):
         return True
 
     def unregister_sub_services(self):
-        api.shutdown()
-        print('Closed api')
+        if api._engine is not None:
+            api.shutdown()
+            print('Closed api')
 
         running_services = set()
         if self.miner.get_state() == Service.RUNNING:

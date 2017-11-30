@@ -39,6 +39,8 @@ class PeerListenService(Service):
             return True
         except Exception as e:
             tools.log("Could not start Peer Receive socket!")
+            tools.log(e)
+            sys.stderr.write(str(e)+'\n')
             return False
 
     @threaded
@@ -66,8 +68,10 @@ class PeerListenService(Service):
                                    body=result)
                 ntwrk.send(response, client_sock)
                 client_sock.close()
-        except:
-            pass
+        except Exception as e:
+            import time
+            tools.log("PeerListen " + str(e))
+            time.sleep(0.5)
 
     @sync
     def greetings(self, node_id, port, __remote_ip__):

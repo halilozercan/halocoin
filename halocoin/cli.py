@@ -5,7 +5,6 @@ import json
 import os
 import sys
 
-import filelock
 import requests
 from tabulate import tabulate
 
@@ -169,14 +168,8 @@ def extract_configuration(args):
 @action
 def start(args):
     config, working_dir = extract_configuration(args)
-
-    lock = filelock.FileLock(os.path.join(working_dir, 'engine_lock' + str(config['port']['api'])))
-    try:
-        with lock.acquire(timeout=2):
-            tools.init_logging(config['DEBUG'], working_dir, config['logging']['file'])
-            engine.main(config, working_dir)
-    except filelock.Timeout:
-        print('Halocoin is already running')
+    tools.init_logging(config['DEBUG'], working_dir, config['logging']['file'])
+    engine.main(config, working_dir)
 
 
 @action
