@@ -75,7 +75,7 @@ def print_txs(txs):
 def print_peers(peers):
     table = []
     for peer in peers:
-        table.append([peer['ip'], peer['port'], "{:10.3f}".format(peer['rank']), peer['length']])
+        table.append([peer['pub_ip'], peer['pub_port'], "{:10.3f}".format(peer['rank']), peer['length']])
 
     print(tabulate(table,
                    headers=[Colors.HEADER + 'Address' + Colors.ENDC,

@@ -3,10 +3,14 @@ import time
 import uuid
 from threading import Thread
 
+import sys
+
+import copy
+
 from halocoin import blockchain
 from halocoin import ntwrk
 from halocoin import tools
-from halocoin.ntwrk import command
+from halocoin.ntwrk import Message
 from halocoin.service import Service, threaded, sync
 
 
@@ -47,15 +51,8 @@ class PeerCheckService(Service):
         if len(peers) > 0:
             i = tools.exponential_random(1.0 / 2) % len(peers)
             peer = peers[i]
-            t1 = time.time()
-            r = self.peer_check(peer)
-            t2 = time.time()
 
-            peer['rank'] *= 0.8
-            if r == 0:
-                peer['rank'] += 0.2 * (t2 - t1)
-            else:
-                peer['rank'] += 0.2 * 30
+            self.peer_check(peer)
 
             self.account.update_peer(peer)
 
@@ -76,9 +73,11 @@ class PeerCheckService(Service):
                     "port": priv_addr[1],
                     "node_id": self.node_id
                 }
-                pub_info = command(('', ''), priv_info, self.node_id, sock=sa)
-                clients = command(('', ''), {"ip": pub_info["ip"], "port": pub_info["port"], "node_id": self.node_id},
-                                  self.node_id, sock=sa)
+                pub_info = ntwrk.command(('', ''), priv_info, self.node_id, sock=sa)
+                clients = ntwrk.command(('', ''),  # Unused peer address, we use already connected socket
+                                        {"ip": pub_info["ip"], "port": pub_info["port"], "node_id": self.node_id},
+                                        self.node_id,  # Again unnecessary
+                                        sock=sa)
                 for node_id in clients.keys():
                     clients[node_id]['node_id'] = node_id
                     self.account.add_peer(clients[node_id])
@@ -92,11 +91,8 @@ class PeerCheckService(Service):
         priv_info = self.db.get('priv_info')
         threads = {
             '0_accept': Thread(target=self.accept, args=(priv_info['port'],)),
-            '1_accept': Thread(target=self.accept, args=(peer['pub_port'],)),
             '2_connect': Thread(target=self.connect,
-                                args=((priv_info['ip'], priv_info['port']), (peer['pub_ip'], peer['pub_port']),)),
-            '3_connect': Thread(target=self.connect,
-                                args=((priv_info['ip'], priv_info['port']), (peer['priv_ip'], peer['priv_port']),)),
+                                args=((priv_info['ip'], priv_info['port']), (peer['pub_ip'], peer['pub_port']), peer))
         }
         for name in sorted(threads.keys()):
             threads[name].start()
@@ -110,48 +106,6 @@ class PeerCheckService(Service):
                     continue
                 if not threads[name].is_alive():
                     threads.pop(name)
-
-        return
-
-        peer_ip_port = (peer['ip'], peer['port'])
-
-        block_count = ntwrk.command(peer_ip_port, {'action': 'block_count'}, self.node_id)
-
-        if not isinstance(block_count, dict):
-            return
-        if 'error' in block_count.keys():
-            return
-
-        peer['diffLength'] = block_count['diffLength']
-        peer['length'] = block_count['length']
-        self.account.update_peer(peer)
-
-        known_length = self.db.get('known_length')
-        if block_count['length'] > known_length:
-            self.db.put('known_length', block_count['length'])
-
-        length = self.db.get('length')
-        diff_length = self.db.get('diffLength')
-        size = max(len(diff_length), len(block_count['diffLength']))
-        us = tools.buffer_(diff_length, size)
-        them = tools.buffer_(block_count['diffLength'], size)
-        # This is the most important peer operation part
-        # We are deciding what to do with this peer. We can either
-        # send them blocks, share txs or download blocks.
-        if them < us:
-            self.give_block(peer_ip_port, block_count['length'])
-        elif us == them:
-            self.ask_for_txs(peer_ip_port)
-        else:
-            self.download_blocks(peer_ip_port, block_count, length)
-
-        my_peers = self.account.get_peers()
-        their_peers = ntwrk.command(peer_ip_port, {'action': 'peers'}, self.node_id)
-        if type(their_peers) == list:
-            for p in their_peers:
-                self.account.add_peer(p)
-            for p in my_peers:
-                ntwrk.command(peer_ip_port, {'action': 'receive_peer', 'peer': p}, self.node_id)
 
         return 0
 
@@ -193,21 +147,118 @@ class PeerCheckService(Service):
         s.bind(('', port))
         s.listen(1)
         s.settimeout(5)
-        while True:
-            try:
-                conn, addr = s.accept()
-            except Exception as e:
-                s.close()
-                break
+        try:
+            conn, addr = s.accept()
+            # Question answer procedure
+            tools.log("Successfully connected {}".format(addr))
+            while True:
+                response, leftover = ntwrk.receive(conn, timeout=5)
+                if response.getFlag():
+                    message = Message.from_yaml(response.getData())
+                    request = message.get_body()
+                    try:
+                        if hasattr(self, request['action']) and message.get_header("node_id") != self.node_id:
+                            kwargs = copy.deepcopy(request)
+                            del kwargs['action']
+                            result = getattr(self, request['action'])(**kwargs)
+                        else:
+                            result = 'Received action is not valid'
+                    except:
+                        result = 'Something went wrong while evaluating.\n'
+                        tools.log(sys.exc_info())
+                    response = Message(headers={'ack': message.get_header('id'),
+                                                'node_id': self.node_id},
+                                       body=result)
+                    ntwrk.send(response, conn)
+                else:
+                    raise Exception('Failed to receive anything')
+        except Exception as e:
+            s.close()
 
-    def connect(self, local_addr, addr):
+    def connect(self, local_addr, addr, peer):
+        t1 = time.time()
+        peer['rank'] *= 0.8
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
         s.bind(local_addr)
-        while True:
-            try:
-                s.connect(addr)
-            except Exception as e:
-                s.close()
-                break
+        try:
+            s.connect(addr)
+            # Ask question service
+            tools.log("Successfully connected {}".format(addr))
+            peer_ip_port = ('', '')
+
+            block_count = ntwrk.command(peer_ip_port, {'action': 'block_count'}, self.node_id, sock=s)
+
+            if not isinstance(block_count, dict):
+                return
+            if 'error' in block_count.keys():
+                return
+
+            peer['diffLength'] = block_count['diffLength']
+            peer['length'] = block_count['length']
+            self.account.update_peer(peer)
+
+            known_length = self.db.get('known_length')
+            if block_count['length'] > known_length:
+                self.db.put('known_length', block_count['length'])
+
+            length = self.db.get('length')
+            diff_length = self.db.get('diffLength')
+            size = max(len(diff_length), len(block_count['diffLength']))
+            us = tools.buffer_(diff_length, size)
+            them = tools.buffer_(block_count['diffLength'], size)
+            # This is the most important peer operation part
+            # We are deciding what to do with this peer. We can either
+            # send them blocks, share txs or download blocks.
+            if them < us:
+                self.give_block(peer_ip_port, block_count['length'])
+            elif us == them:
+                self.ask_for_txs(peer_ip_port)
+            else:
+                self.download_blocks(peer_ip_port, block_count, length)
+
+            t2 = time.time()
+            peer['rank'] += 0.2 * (t2 - t1)
+        except Exception as e:
+            peer['rank'] += 0.2 * 30
+            s.close()
+
+        self.account.update_peer(peer)
+
+    @sync
+    def block_count(self):
+        length = self.db.get('length')
+        d = '0'
+        if length >= 0:
+            d = self.db.get('diffLength')
+        return {'length': length, 'diffLength': d}
+
+    @sync
+    def range_request(self, range):
+        out = []
+        counter = 0
+        while range[0] + counter <= range[1]:
+            block = self.db.get(range[0] + counter)
+            if block and 'length' in block:
+                out.append(block)
+            counter += 1
+        return out
+
+    @sync
+    def peers(self):
+        return self.account.get_peers()
+
+    @sync
+    def txs(self):
+        return self.blockchain.tx_pool()
+
+    @sync
+    def push_tx(self, tx):
+        self.blockchain.tx_queue.put(tx)
+        return 'success'
+
+    @sync
+    def push_block(self, blocks):
+        self.blockchain.blocks_queue.put(blocks)
+        return 'success'

@@ -74,10 +74,6 @@ class PeerListenService(Service):
             time.sleep(0.5)
 
     @sync
-    def receive_peer(self, peer):
-        self.account.add_peer(peer)
-
-    @sync
     def block_count(self):
         length = self.db.get('length')
         d = '0'
