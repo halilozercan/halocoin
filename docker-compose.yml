@@ -2,19 +2,21 @@ version: '3'
 
 services:
   db:
-    image: redis
+    image: halilozercan:redis
     ports:
       - "6379"
     volumes:
-      - ~/.halocoin-docker:/data
+      - ~/.halocoin-docker-redis:/data
   halocoin:
     build: .
     tty: true
     ports:
-      - "7900:7900"
-      - "7899:7899"
+      - "6899:6899"
+      - "6900:6900"
     environment: 
       - REDIS_URL=db
+      - HALOCOIN_API_PORT=6899
+      - HALOCOIN_PEERS_PORT=6900
     depends_on:
       - db
     volumes:

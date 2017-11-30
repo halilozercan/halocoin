@@ -26,7 +26,7 @@ class Colors:
 
 actions = dict()
 connection_port = 7899
-host = "localhost"
+host = os.environ.get('API_HOST', "localhost")
 
 
 def action(func):
@@ -75,10 +75,11 @@ def print_txs(txs):
 def print_peers(peers):
     table = []
     for peer in peers:
-        table.append([peer['ip'], peer['port'], "{:10.3f}".format(peer['rank']), peer['length']])
+        table.append([peer['node_id'], peer['ip'], peer['port'], "{:10.3f}".format(peer['rank']), peer['length']])
 
     print(tabulate(table,
-                   headers=[Colors.HEADER + 'Address' + Colors.ENDC,
+                   headers=[Colors.HEADER + 'Node ID' + Colors.ENDC,
+                            Colors.HEADER + 'Address' + Colors.ENDC,
                             Colors.HEADER + 'Port' + Colors.ENDC,
                             Colors.HEADER + 'Rank' + Colors.ENDC,
                             Colors.HEADER + 'Length' + Colors.ENDC],

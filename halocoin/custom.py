@@ -1,3 +1,4 @@
+import os
 from cdecimal import Decimal
 
 """
@@ -57,8 +58,8 @@ def generate_default_config():
     }
 
     config["port"] = {
-        "api": 7899,
-        "peers": 7900
+        "api": int(os.environ.get('HALOCOIN_API_PORT', '7899')),
+        "peers": int(os.environ.get('HALOCOIN_PEERS_PORT', '7900'))
     }
 
     config["peers"] = {

@@ -70,7 +70,6 @@ class PeerListenService(Service):
                 client_sock.close()
         except Exception as e:
             import time
-            tools.log("PeerListen " + str(e))
             time.sleep(0.5)
 
     @sync
