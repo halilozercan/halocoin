@@ -7,6 +7,7 @@ Notes:
 import json
 import threading
 
+import os
 import requests
 from jsonrpc import JSONRPCResponseManager, dispatcher
 from werkzeug.serving import run_simple
@@ -71,11 +72,13 @@ def application(request):
 def run(engine):
     global _engine
     _engine = engine
+    host = os.environ.get('HALOCOIN_API_HOST', "0.0.0.0")
     listen_thread = threading.Thread(target=run_simple,
-                                     kwargs={'hostname': '0.0.0.0',
+                                     kwargs={'hostname': host,
                                              'port': engine.config['port']['api'],
                                              'application': application})
     listen_thread.start()
+    print("Started API on {}:{}".format(host, engine.config['port']['api']))
 
 
 def shutdown():

@@ -22,11 +22,13 @@ class BlockchainService(Service):
         self.tx_queue = NoExceptionQueue(100)
         self.db = None
         self.account = None
+        self.in_memory_db = {}
         self.__state = BlockchainService.IDLE
 
     def on_register(self):
         self.db = self.engine.db
         self.account = self.engine.account
+        print("Started Blockchain")
         return True
 
     @threaded
@@ -47,7 +49,7 @@ class BlockchainService(Service):
                         break
 
                 if integrity_flag:
-                    length = self.db.get('length') - 1
+                    length = self.db.get('length')
                     for i in range(20):
                         block = self.db.get(length)
                         if BlockchainService.fork_check(blocks, length, block):
@@ -194,6 +196,7 @@ class BlockchainService(Service):
         self.db.put('length', block['length'])
         self.db.put('diffLength', block['diffLength'])
 
+        """
         targets = self.db.get('targets')
         targets.update({str(block['length']): block['target']})
         self.db.put('targets', targets)
@@ -201,6 +204,7 @@ class BlockchainService(Service):
         times = self.db.get('times')
         times.update({str(block['length']): block['time']})
         self.db.put('times', times)
+        """
 
         orphans = self.tx_pool_pop_all()
 
@@ -284,14 +288,18 @@ class BlockchainService(Service):
         if length == 0:
             length = self.db.get('length')
 
-        storage = self.db.get(key)
+        if key in self.in_memory_db:
+            storage = self.in_memory_db[key]
+        else:
+            storage = self.db.get(key)
         start = max((length - size), 0)
         result = []
         for i in range(start, length):
             leng = str(i)
             if not leng in storage:
-                storage[leng] = self.db.get(leng)[key[:-1]]
+                storage[leng] = self.db.get(leng)[key[:-1]]  # Remove last character that is 's' e.g. targets => target
             result.append(storage[leng])
+        self.in_memory_db[key] = storage
         self.db.put(key, storage)
         return result
 

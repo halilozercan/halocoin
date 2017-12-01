@@ -68,7 +68,15 @@ def generate_default_config():
                 'node_id': '743953de-ac7d-42f5-8eda-474a823a7372',
                 'ip': '159.89.9.43',
                 'port': 7900,
-                'rank': 30,
+                'rank': 1,
+                'diffLength': '',
+                'length': -1
+            },
+            {
+                'node_id': '3bb52c7d-3442-40fd-a5b3-20499de59012',
+                'ip': '139.179.21.17',
+                'port': 6900,
+                'rank': 1,
                 'diffLength': '',
                 'length': -1
             }

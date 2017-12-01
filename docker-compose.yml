@@ -15,6 +15,7 @@ services:
       - "6900:6900"
     environment: 
       - REDIS_URL=db
+      - HALOCOIN_API_HOST=halocoin
       - HALOCOIN_API_PORT=6899
       - HALOCOIN_PEERS_PORT=6900
     depends_on:

@@ -26,7 +26,7 @@ class Colors:
 
 actions = dict()
 connection_port = 7899
-host = os.environ.get('API_HOST', "localhost")
+host = os.environ.get('HALOCOIN_API_HOST', 'localhost')
 
 
 def action(func):

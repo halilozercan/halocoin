@@ -64,34 +64,30 @@ class Engine(Service):
             self.db.put('diffLength', '0')
             self.db.put('accounts', {})
             self.db.put('known_length', -1)
+        self.db.put('peer_list', [])
         self.db.put('stop', False)
 
         if not self.account.register():
             sys.stderr.write("Account service has failed. Exiting!\n")
             self.unregister_sub_services()
             return False
-        print("Started Account")
 
         if not self.blockchain.register():
             sys.stderr.write("Blockchain service has failed. Exiting!\n")
             self.unregister_sub_services()
             return False
-        print("Started Blockchain")
 
         if not self.peer_receive.register():
             sys.stderr.write("Peer Receive service has failed. Exiting!\n")
             self.unregister_sub_services()
             return False
-        print("Started Peer Receive")
 
         if not self.peers_check.register():
             sys.stderr.write("Peers Check service has failed. Exiting!\n")
             self.unregister_sub_services()
             return False
-        print("Started Peers Check")
 
         api.run(self)
-        print("Started API")
 
         return True
 

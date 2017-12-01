@@ -32,6 +32,7 @@ class AccountService(Service):
     def on_register(self):
         self.db = self.engine.db
         self.blockchain = self.engine.blockchain
+        print("Started Account")
         return True
 
     @sync

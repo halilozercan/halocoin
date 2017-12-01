@@ -26,6 +26,7 @@ class PeerCheckService(Service):
         for peer in self.new_peers:
             self.account.add_peer(peer)
         self.node_id = self.db.get('node_id')
+        print("Started Peers Check")
         return True
 
     @threaded
