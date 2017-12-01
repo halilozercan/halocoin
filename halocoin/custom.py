@@ -71,6 +71,14 @@ def generate_default_config():
                 'rank': 1,
                 'diffLength': '',
                 'length': -1
+            },
+            {
+                'node_id': '9c80ac46-18eb-4c39-b167-ce5ad64e40db',
+                'ip': '159.89.9.43',
+                'port': 7900,
+                'rank': 1,
+                'diffLength': '',
+                'length': -1
             }
         ],
         "download_limit": 50
