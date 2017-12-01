@@ -4,7 +4,7 @@ import socket
 import sys
 import uuid
 
-from halocoin import ntwrk
+from halocoin import ntwrk, custom
 from halocoin import tools
 from halocoin.ntwrk import Message
 from halocoin.service import Service, threaded, sync
@@ -53,11 +53,14 @@ class PeerListenService(Service):
                 message = Message.from_yaml(response.getData())
                 request = message.get_body()
                 try:
-                    if hasattr(self, request['action']) and message.get_header("node_id") != self.node_id:
+                    if hasattr(self, request['action']) \
+                            and request['version'] == custom.version \
+                            and message.get_header("node_id") != self.node_id:
                         kwargs = copy.deepcopy(request)
                         if request['action'] == 'greetings':
                             kwargs['__remote_ip__'] = client_sock.getpeername()
                         del kwargs['action']
+                        del kwargs['version']
                         result = getattr(self, request['action'])(**kwargs)
                     else:
                         result = 'Received action is not valid'
@@ -74,27 +77,43 @@ class PeerListenService(Service):
             time.sleep(0.5)
 
     @sync
-    def greetings(self, node_id, port, __remote_ip__):
+    def greetings(self, node_id, port, length, diffLength, __remote_ip__):
         """
         Called when a peer starts communicating with us.
-        If it is a new node, we should add it to our peer list.
+        'Greetings' type peer addition.
 
-        :param node_id:
-        :param port:
-        :param __remote_ip__:
-        :return:
+        :param node_id: Node id of remote host
+        :param port: At which port they are listening to peers.
+        :param __remote_ip__: IP address of remote as seen from this network.
+        :return: Our own greetings message
         """
         from halocoin.account import AccountService
         peer = copy.deepcopy(AccountService.default_peer)
-        peer['node_id'] = node_id
-        peer['ip'] = __remote_ip__[0]
-        peer['port'] = port
-        self.account.add_peer(peer)
-        return True
+        peer.update(
+            node_id=node_id,
+            ip=__remote_ip__[0],
+            port=port,
+            length=length,
+            diffLength=diffLength,
+            rank=1
+        )
+        self.account.add_peer(peer, 'greetings')
+        return {
+            'node_id': self.node_id,
+            'port': self.engine.config['port']['peers'],
+            'length': self.db.get('length'),
+            'diffLength': self.db.get('diffLength')
+        }
 
     @sync
     def receive_peer(self, peer):
-        self.account.add_peer(peer)
+        """
+        'Friend of mine' type peer addition.
+        :param peer: a peer dict, sent by another peer we are communicating with.
+        :return: None
+        """
+        peer.update(rank=1)  # We do not care about earlier rank.
+        self.account.add_peer(peer, 'friend_of_mine')
 
     @sync
     def block_count(self):

@@ -18,7 +18,7 @@ class AccountService(Service):
         'node_id': 'Anon',
         'ip': '',
         'port': 0,
-        'rank': 30,
+        'rank': 1,
         'diffLength': '',
         'length': -1
     }
@@ -207,21 +207,73 @@ class AccountService(Service):
         return peers
 
     @sync
-    def add_peer(self, peer):
+    def add_peer(self, peer, type):
+        """
+        Add peer can be triggered by 2 different actions: Greetings, Friend of mine
+        - Greetings:
+          - Peer introduces itself
+          - We find out their IP.
+          - They report their node_id, port, length, diffLength
+          - Rank is initialized to 1
+          - If <node_id, ip, port> exists, do nothing.
+          - If <node_id> exists, <ip, port> does not, update the peer at node_id.
+          - If <ip, port> exists, <node_id> does not, remove all <ip, port> peers. Add new one.
+        - Frind of mine:
+          - Somebody reports their peer list.
+          - Every detail including rank is given by peer.
+          - If <node_id> exists, do nothing.
+          - If <ip, port> exists, do nothing.
+          - Otherwise, add.
+
+        In this sceme, ultimate resolver is greetings messages.
+        If we cannot communicate(greet) with a peer in last 24 hours or 50 tries, whichever comes later,
+        we drop this peer from the list.
+        :param peer: Peer dict to be added
+        :param type: Its origin
+        :return: None
+        """
         if not self.is_peer(peer):
             return
 
         peers = self.get_peers()
-        for _peer in peers:
-            if peer['node_id'] == _peer['node_id']:
-                return
 
-        peers.append(peer)
+        if type == 'greetings':
+            same_node = []
+            same_ip_port = []
+            for i, _peer in enumerate(peers):
+                if _peer['node_id'] == peer['node_id'] and _peer['ip'] == peer['ip'] and \
+                                _peer['port'] == peer['port']:
+                    self.update_peer(peer)
+                    return
+                elif _peer['node_id'] == peer['node_id']:
+                    same_node.append(i)
+                elif _peer['port'] == peer['port'] and _peer['ip'] == peer['ip']:
+                    same_ip_port.append(i)
+
+            for i in same_node:
+                peers[i]['ip'] = peer['ip']
+                peers[i]['port'] = peer['port']
+
+            for i in reversed(same_ip_port):
+                del peers[i]
+            peers.append(peer)
+
+        elif type == 'friend_of_mine':
+            for _peer in peers:
+                if peer['node_id'] == _peer['node_id'] or \
+                        (peer['ip'] == _peer['ip'] and peer['port'] == _peer['port']):
+                    return
+            peers.append(peer)
+
         self.db.put('peer_list', peers)
 
     @sync
     def update_peer(self, peer):
-        # TODO: Better approach for peer updating.
+        """
+        Update peer at node_id=peer['node_id']
+        :param peer: A peer dictionary
+        :return: None
+        """
         if not self.is_peer(peer):
             return
 

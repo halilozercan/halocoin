@@ -102,9 +102,11 @@ def command(peer, message, node_id):
     :param message: message to be sent
     :return: received response or error
     """
+    from halocoin import custom
     sock = connect(peer[0], peer[1], timeout=1)
     if sock is not None:
         message_id = uuid.uuid4()
+        message['version'] = custom.version
         result = send(Message(headers={'id': message_id, 'node_id': node_id}, body=message), sock)
         if result:
             response, leftover = receive(sock, timeout=20)

@@ -24,7 +24,7 @@ class PeerCheckService(Service):
         self.blockchain = self.engine.blockchain
         self.account = self.engine.account
         for peer in self.new_peers:
-            self.account.add_peer(peer)
+            self.account.add_peer(peer, 'friend_of_mine')
         self.node_id = self.db.get('node_id')
         print("Started Peers Check")
         return True
@@ -58,55 +58,52 @@ class PeerCheckService(Service):
                                 {
                                     'action': 'greetings',
                                     'node_id': self.node_id,
-                                    'port': self.engine.config['port']['peers']
+                                    'port': self.engine.config['port']['peers'],
+                                    'length': self.db.get('length'),
+                                    'diffLength': self.db.get('diffLength')
                                 },
                                 self.node_id)
 
-        if not greeted:
+        if not isinstance(greeted, dict):
+            return
+        if 'error' in greeted.keys():
             return
 
-        block_count = ntwrk.command(peer_ip_port, {'action': 'block_count'}, self.node_id)
-
-        if not isinstance(block_count, dict):
-            return
-        if 'error' in block_count.keys():
-            return
-
-        peer['diffLength'] = block_count['diffLength']
-        peer['length'] = block_count['length']
+        peer['diffLength'] = greeted['diffLength']
+        peer['length'] = greeted['length']
         self.account.update_peer(peer)
 
         known_length = self.db.get('known_length')
-        if block_count['length'] > known_length:
-            self.db.put('known_length', block_count['length'])
+        if greeted['length'] > known_length:
+            self.db.put('known_length', greeted['length'])
 
         length = self.db.get('length')
         diff_length = self.db.get('diffLength')
-        size = max(len(diff_length), len(block_count['diffLength']))
+        size = max(len(diff_length), len(greeted['diffLength']))
         us = tools.buffer_(diff_length, size)
-        them = tools.buffer_(block_count['diffLength'], size)
+        them = tools.buffer_(greeted['diffLength'], size)
         # This is the most important peer operation part
         # We are deciding what to do with this peer. We can either
         # send them blocks, share txs or download blocks.
         if them < us:
-            self.give_block(peer_ip_port, block_count['length'])
+            self.give_block(peer_ip_port, greeted['length'])
         elif us == them:
             self.ask_for_txs(peer_ip_port)
         else:
-            self.download_blocks(peer_ip_port, block_count, length)
+            self.download_blocks(peer_ip_port, greeted['length'], length)
 
         my_peers = self.account.get_peers()
         their_peers = ntwrk.command(peer_ip_port, {'action': 'peers'}, self.node_id)
         if type(their_peers) == list:
             for p in their_peers:
-                self.account.add_peer(p)
+                self.account.add_peer(p, 'friend_of_mine')
             for p in my_peers:
                 ntwrk.command(peer_ip_port, {'action': 'receive_peer', 'peer': p}, self.node_id)
 
         return 0
 
-    def download_blocks(self, peer_ip_port, peers_block_count, length):
-        b = [max(0, length - 10), min(peers_block_count['length'] + 1,
+    def download_blocks(self, peer_ip_port, block_count_peer, length):
+        b = [max(0, length - 10), min(block_count_peer + 1,
                                       length + self.engine.config['peers']['download_limit'])]
         blocks = ntwrk.command(peer_ip_port, {'action': 'range_request', 'range': b}, self.node_id)
         if not isinstance(blocks, list):
