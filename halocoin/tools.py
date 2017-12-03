@@ -46,7 +46,7 @@ def tx_owner_address(tx):
 def sign(msg, privkey):
     from ecdsa import SigningKey
     if isinstance(privkey, bytes):
-        privkey = SigningKey.from_pem(privkey.decode())
+        privkey = SigningKey.from_string(privkey)
     return privkey.sign(msg)
 
 
@@ -222,7 +222,7 @@ def random_wallet(number_of_pairs=1):
 
 def get_key_pairs_from_wallet(wallet):
     from ecdsa import SigningKey
-    privkey = SigningKey.from_pem(wallet['privkey'].encode())
+    privkey = SigningKey.from_string(wallet['privkey'])
     pubkey = privkey.get_verifying_key()
     return privkey, pubkey
 
@@ -232,10 +232,10 @@ def signature_verify(message, signature, pubkey):
     if isinstance(pubkey, str):
         pubkey = VerifyingKey.from_string(pubkey)
     elif isinstance(pubkey, bytes):
-        pubkey = VerifyingKey.from_string(pubkey.decode())
+        pubkey = VerifyingKey.from_string(pubkey)
 
     if isinstance(pubkey, VerifyingKey):
-        pubkey.verify(signature, message)
+        return pubkey.verify(signature, message)
     else:
         return False
 

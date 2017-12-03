@@ -1,24 +1,26 @@
+# docker-compose file to execute necessary services
 version: '3'
 
 services:
   db:
     build: redis-docker
-    ports:
-      - "6379"
     volumes:
-      - ~/.halocoin-docker-redis:/data
+      - db_volume:/data
   halocoin:
     build: .
     tty: true
     ports:
       - "6899:6899"
-      - "6900:6900"
-    environment: 
-      - REDIS_URL=db
-      - HALOCOIN_API_HOST=halocoin
+    environment:
+      - REDIS_URL=db # Must be equal to service name of redis database (db)
+      - HALOCOIN_API_HOST=halocoin # Must be equal to service name of halocoin (halocoin)
       - HALOCOIN_API_PORT=6899
       - HALOCOIN_PEERS_PORT=6900
     depends_on:
       - db
     volumes:
-      - ~/.halocoin-docker:/data
+      - halocoin_volume:/data
+
+volumes:
+  db_volume:
+  halocoin_volume:

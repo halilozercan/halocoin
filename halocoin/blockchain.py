@@ -331,8 +331,6 @@ class BlockchainService(Service):
         if 'pubkeys' not in tx or not isinstance(tx['pubkeys'], (list,)):
             tools.log('no pubkeys')
             return False
-
-        tx_copy.pop('signatures')
         if len(tx['pubkeys']) == 0:
             tools.log('pubkey error')
             return False
@@ -340,6 +338,7 @@ class BlockchainService(Service):
             tools.log('there are more signatures than required')
             return False
 
+        tx_copy.pop('signatures')
         msg = tools.det_hash(tx_copy)
         if not BlockchainService.sigs_match(copy.deepcopy(tx['signatures']),
                                             copy.deepcopy(tx['pubkeys']), msg):
@@ -386,11 +385,6 @@ class BlockchainService(Service):
             if 'amount' not in tx or not isinstance(tx['amount'], (int)):
                 response.setData('no amount')
                 response.setFlag(False)
-            # TODO: This is new. Check this voting transactions
-            if 'vote_id' in tx:
-                if not tx['to'][:-29] == '11':
-                    response.setData('cannot hold votecoins in a multisig address')
-                    response.setFlag(False)
         else:
             response.setFlag(False)
             response.setData('only spend transactions can be cheched')

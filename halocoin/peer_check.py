@@ -31,6 +31,11 @@ class PeerCheckService(Service):
 
     @threaded
     def listen(self):
+        """
+        Pseudorandomly select a peer to check.
+        If blockchain is synchronizing, don't check anyone.
+        :return:
+        """
         if self.blockchain.get_chain_state() == blockchain.BlockchainService.SYNCING:
             time.sleep(0.1)
             return

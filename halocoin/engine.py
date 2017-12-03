@@ -64,7 +64,6 @@ class Engine(Service):
             self.db.put('diffLength', '0')
             self.db.put('accounts', {})
             self.db.put('known_length', -1)
-        self.db.put('peer_list', [])
         self.db.put('stop', False)
 
         if not self.account.register():
@@ -92,10 +91,6 @@ class Engine(Service):
         return True
 
     def unregister_sub_services(self):
-        if api._engine is not None:
-            api.shutdown()
-            print('Closed api')
-
         running_services = set()
         if self.miner.get_state() == Service.RUNNING:
             self.miner.unregister()

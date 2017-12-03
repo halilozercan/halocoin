@@ -44,6 +44,12 @@ class PeerListenService(Service):
             sys.stderr.write(str(e)+'\n')
             return False
 
+    def on_close(self):
+        try:
+            self.s.close()
+        except:
+            pass
+
     @threaded
     def listen(self):
         try:

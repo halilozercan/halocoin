@@ -39,18 +39,11 @@ def action(func):
 
 
 def make_api_request(method, **kwargs):
-    url = "http://" + str(host) + ":" + str(connection_port) + "/jsonrpc"
+    url = "http://" + str(host) + ":" + str(connection_port) + "/" + method
     headers = {'content-type': 'application/json'}
 
-    # Example echo method
-    payload = {
-        "method": method,
-        "params": kwargs,
-        "jsonrpc": "2.0",
-        "id": 0,
-    }
-    response = requests.post(url, data=json.dumps(payload), headers=headers).json()
-    return response['result']
+    response = requests.post(url, data=json.dumps(kwargs), headers=headers).json()
+    return response
 
 
 def print_txs(txs):
@@ -231,7 +224,7 @@ def send(args):
     wallet = tools.parse_wallet(wallet_file, args.pw)
     print(make_api_request(args.action, address=args.address,
                            amount=args.amount, message=args.message,
-                           wallet=wallet))
+                           wallet=tools.wallet_to_str(wallet)))
 
 @action
 def peers(args):

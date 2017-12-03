@@ -65,14 +65,6 @@ def generate_default_config():
     config["peers"] = {
         "list": [
             {
-                'node_id': 'c90c2c76-512f-4e2e-a75c-be3ba8237faf',
-                'ip': '139.179.21.5',
-                'port': 7900,
-                'rank': 1,
-                'diffLength': '',
-                'length': -1
-            },
-            {
                 'node_id': '9c80ac46-18eb-4c39-b167-ce5ad64e40db',
                 'ip': '159.89.9.43',
                 'port': 7900,
