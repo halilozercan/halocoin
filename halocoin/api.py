@@ -64,6 +64,45 @@ def run(engine):
     print("Started API on {}:{}".format(host, engine.config['port']['api']))
 
 
+@app.route("/upload_wallet", methods=['GET', 'POST'])
+def upload_wallet():
+    wallet_file = request.files['wallet_file']
+    wallet_content = wallet_file.stream.read()
+    index = get_engine().account.add_wallet(wallet_content)
+    return generate_json_response({
+        "success": True,
+        "wallet_index": index
+    })
+
+
+@app.route('/info_wallet', methods=['GET', 'POST'])
+def info_wallet():
+    wallet_index = request.values.get('index', -1)
+    pw = request.values.get('password', '')
+    encrypted_wallet_content = get_engine().account.get_wallet(int(wallet_index))
+    if encrypted_wallet_content is not None:
+        try:
+            wallet = tools.wallet_from_str(tools.decrypt(pw, encrypted_wallet_content).decode())
+            return generate_json_response(wallet)
+        except:
+            return generate_json_response("Password incorrect")
+    else:
+        return generate_json_response("Error occurred")
+
+
+@app.route('/new_wallet', methods=['GET', 'POST'])
+def new_wallet():
+    pw = request.values.get('password', '')
+    wallet = tools.random_wallet()
+    wallet_content = tools.wallet_to_str(wallet)
+    wallet_encrypted_content = tools.encrypt(pw, wallet_content)
+    index = get_engine().account.add_wallet(wallet_encrypted_content)
+    return generate_json_response({
+        "index": index,
+        "success": True
+    })
+
+
 @app.route('/peers', methods=['GET', 'POST'])
 def peers():
     return get_engine().account.get_peers()
@@ -77,7 +116,7 @@ def node_id():
 @app.route('/history', methods=['GET', 'POST'])
 @blockchain_synced
 def history():
-    address = request.args.get('address', None)
+    address = request.values.get('address', None)
     if address is None:
         address = get_engine().db.get('address')
     account = get_engine().account.get_account(address)
@@ -108,10 +147,10 @@ def history():
 @app.route('/send', methods=['GET', 'POST'])
 @blockchain_synced
 def send():
-    amount = request.args.get('amount', 0)
-    address = request.args.get('address', None)
-    message = request.args.get('message', '')
-    wallet = request.args.get('wallet', None)
+    amount = request.values.get('amount', 0)
+    address = request.values.get('address', None)
+    message = request.values.get('message', '')
+    wallet = request.values.get('wallet', None)
 
     if amount == 0 or address is None or wallet is None:
         return 'A problem was occurred while processing inputs'
@@ -148,7 +187,7 @@ def txs():
 
 @app.route('/block', methods=['GET', 'POST'])
 def block():
-    number = request.args.get('number', 'default')
+    number = request.values.get('number', 'default')
     if "-" in number:
         _from = int(number.split("-")[0])
         _to = int(number.split("-")[1])
@@ -176,7 +215,7 @@ def difficulty():
 @app.route('/balance', methods=['GET', 'POST'])
 @blockchain_synced
 def balance():
-    address = request.args.get('address', None)
+    address = request.values.get('address', None)
     if address is None:
         address = get_engine().db.get('address')
     account = get_engine().account.get_account(address, apply_tx_pool=True)
@@ -194,7 +233,7 @@ def stop():
 
 @app.route('/start_miner', methods=['GET', 'POST'])
 def start_miner():
-    wallet = request.args.get('wallet', None)
+    wallet = request.values.get('wallet', None)
     if get_engine().miner.get_state() == Service.RUNNING:
         return 'Miner is already running.'
     elif wallet is None:

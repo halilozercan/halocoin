@@ -38,11 +38,20 @@ def action(func):
     return wrapper
 
 
-def make_api_request(method, **kwargs):
+def make_api_request(method, files=None, **kwargs):
+    from requests_toolbelt import MultipartEncoder
+    if files is None:
+        files = {}
     url = "http://" + str(host) + ":" + str(connection_port) + "/" + method
-    headers = {'content-type': 'application/json'}
 
-    response = requests.post(url, data=json.dumps(kwargs), headers=headers).json()
+    if len(files) > 0:
+        fields = {}
+        fields.update(kwargs)
+        fields.update(files)
+        m = MultipartEncoder(fields=fields)
+        response = requests.post(url, data=m, headers={'Content-Type': m.content_type}).json()
+    else:
+        response = requests.post(url, data=kwargs).json()
     return response
 
 
@@ -170,28 +179,45 @@ def start(args):
 def new_wallet(args):
     from getpass import getpass
 
-    wallet_pw = 'w'
-    wallet_pw_2 = 'w2'
-    while wallet_pw != wallet_pw_2:
-        wallet_pw = getpass('New wallet password: ')
-        wallet_pw_2 = getpass('New wallet password(again): ')
+    if args.pw is None:
+        wallet_pw = 'w'
+        wallet_pw_2 = 'w2'
+        while wallet_pw != wallet_pw_2:
+            wallet_pw = getpass('New wallet password: ')
+            wallet_pw_2 = getpass('New wallet password(again): ')
+    else:
+        wallet_pw = args.pw
 
-    wallet = tools.random_wallet()
-    wallet_content = tools.wallet_to_str(wallet)
-    wallet_encrypted_content = tools.encrypt(wallet_pw, wallet_content)
-    with open(args.wallet, 'wb') as f:
-        f.write(wallet_encrypted_content)
-    print('New wallet is created at {}'.format(args.wallet))
+    print(make_api_request(args.action, password=wallet_pw))
 
 
 @action
 def info_wallet(args):
-    wallet_file = open(args.wallet, 'rb')
-    wallet = tools.parse_wallet(wallet_file, args.pw)
+    from getpass import getpass
+    if args.pw is None:
+        wallet_pw = getpass('Wallet password: ')
+    else:
+        wallet_pw = args.pw
 
-    print("Address: {}".format(wallet['address']))
-    print("Pubkey: {}".format(wallet['pubkey']))
-    print("Privkey: {}".format(wallet['privkey']))
+    information = make_api_request(args.action, index=args.index, password=wallet_pw)
+
+    if isinstance(information, dict):
+        print("Address: {}".format(information['address']))
+        print("Pubkey: {}".format(information['pubkey']))
+        print("Privkey: {}".format(information['privkey']))
+    else:
+        print(information)
+
+
+@action
+def upload_wallet(args):
+    files = {
+        "wallet_file": ('wallet_file', open(args.wallet, 'rb'))
+    }
+    print(make_api_request(args.action, files=files))
+
+
+# TODO: Download wallet
 
 
 @action
@@ -288,6 +314,8 @@ def run(argv):
                         help='Message to send with transaction')
     parser.add_argument('--amount', action="store", type=int, dest='amount',
                         help='Amount of coins that are going to be used')
+    parser.add_argument('--index', action="store", type=int, dest='index',
+                        help='Wallet index to be used')
     parser.add_argument('--number', action="store", type=str, dest='number',
                         help='Block number or range')
     parser.add_argument('--wallet', action="store", type=str, dest='wallet',

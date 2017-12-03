@@ -315,3 +315,34 @@ class AccountService(Service):
             return False
 
         return True
+
+    @sync
+    def get_wallets(self):
+        if self.db.exists("wallets"):
+            return self.db.get("wallets")
+        return []
+
+    @sync
+    def get_wallet(self, index_number):
+        wallets = self.get_wallets()
+        if len(wallets) > index_number >= 0:
+            return wallets[index_number]
+        else:
+            return None
+
+    @sync
+    def add_wallet(self, str_wallet):
+        wallets = self.get_wallets()
+        wallets.append(str_wallet)
+        self.db.put("wallets", wallets)
+        return len(wallets)-1
+
+    @sync
+    def remove_wallet(self, index):
+        try:
+            wallets = self.get_wallets()
+            del wallets[index]
+            self.db.put("wallets", wallets)
+            return True
+        except Exception as e:
+            return False
