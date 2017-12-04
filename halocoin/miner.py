@@ -35,7 +35,7 @@ class MinerService(Service):
         self.db = self.engine.db
         self.blockchain = self.engine.blockchain
 
-        if self.wallet is not None and 'pubkey' in self.wallet:
+        if self.wallet is not None and hasattr(self.wallet, 'privkey'):
             return True
         else:
             return False
@@ -127,10 +127,10 @@ class MinerService(Service):
         length = self.db.get('length')
         print('Miner working for block', (length + 1))
         if length == -1:
-            candidate_block = self.genesis(self.wallet['pubkey'])
+            candidate_block = self.genesis(self.wallet.get_pubkey_str())
         else:
             prev_block = self.db.get(length)
-            candidate_block = self.make_block(prev_block, self.blockchain.tx_pool(), self.wallet['pubkey'])
+            candidate_block = self.make_block(prev_block, self.blockchain.tx_pool(), self.wallet.get_pubkey_str())
         return candidate_block
 
     @staticmethod

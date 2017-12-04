@@ -335,7 +335,7 @@ class AccountService(Service):
         wallets = self.get_wallets()
         if wallet_obj.name in wallets:
             return False
-        wallets[wallet_obj.name] = tools.encrypt(enc_key, wallet_obj.to_string()).encode()
+        wallets[wallet_obj.name] = tools.encrypt(enc_key, wallet_obj.to_string())
         self.db.put("wallets", wallets)
         return True
 

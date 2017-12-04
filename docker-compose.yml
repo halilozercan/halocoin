@@ -10,13 +10,13 @@ services:
     build: .
     tty: true
     ports:
-      - "127.0.0.1:6899:6899" # Only host should have access to API
-      - "6999:6999"
+      - "127.0.0.1:7001:7001" # Only host should have access to API
+      - "7002:7002"
     environment:
       - REDIS_URL=db # Must be equal to service name of redis database (db)
       - HALOCOIN_API_HOST=halocoin # Must be equal to service name of halocoin (halocoin)
-      - HALOCOIN_API_PORT=6899
-      - HALOCOIN_PEERS_PORT=6900
+      - HALOCOIN_API_PORT=7001
+      - HALOCOIN_PEERS_PORT=7002
     depends_on:
       - db
     volumes:

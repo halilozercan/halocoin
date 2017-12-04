@@ -66,7 +66,7 @@ def run(engine):
 
 @app.route("/upload_wallet", methods=['GET', 'POST'])
 def upload_wallet():
-    wallet_name = request.values.get('name', None)
+    wallet_name = request.values.get('wallet_name', None)
     wallet_file = request.files['wallet_file']
     wallet_content = wallet_file.stream.read()
     success = get_engine().account.upload_Wallet(wallet_name, wallet_content)
@@ -79,12 +79,12 @@ def upload_wallet():
 @app.route('/info_wallet', methods=['GET', 'POST'])
 def info_wallet():
     from halocoin.model.wallet import Wallet
-    name = request.values.get('name', '')
+    name = request.values.get('wallet_name', '')
     pw = request.values.get('password', '')
     encrypted_wallet_content = get_engine().account.get_wallet(name)
     if encrypted_wallet_content is not None:
         try:
-            wallet = Wallet.from_string(tools.decrypt(pw, encrypted_wallet_content).decode())
+            wallet = Wallet.from_string(tools.decrypt(pw, encrypted_wallet_content))
             return generate_json_response({
                 "name": wallet.name,
                 "pubkey": wallet.get_pubkey_str(),
@@ -100,7 +100,7 @@ def info_wallet():
 @app.route('/new_wallet', methods=['GET', 'POST'])
 def new_wallet():
     from halocoin.model.wallet import Wallet
-    wallet_name = request.values.get('name', '')
+    wallet_name = request.values.get('wallet_name', '')
     pw = request.values.get('password', '')
     wallet = Wallet(wallet_name)
     success = get_engine().account.new_wallet(pw, wallet)
@@ -119,12 +119,12 @@ def wallets():
 
 @app.route('/peers', methods=['GET', 'POST'])
 def peers():
-    return get_engine().account.get_peers()
+    return generate_json_response(get_engine().account.get_peers())
 
 
 @app.route('/node_id', methods=['GET', 'POST'])
 def node_id():
-    return get_engine().db.get('node_id')
+    return generate_json_response(get_engine().db.get('node_id'))
 
 
 @app.route('/history', methods=['GET', 'POST'])
@@ -161,27 +161,36 @@ def history():
 @app.route('/send', methods=['GET', 'POST'])
 @blockchain_synced
 def send():
+    from halocoin.model.wallet import Wallet
     amount = request.values.get('amount', 0)
     address = request.values.get('address', None)
     message = request.values.get('message', '')
-    wallet = request.values.get('wallet', None)
+    wallet_name = request.values.get('wallet_name', None)
+    wallet_pw = request.values.get('password', None)
 
-    if amount == 0 or address is None or wallet is None:
-        return 'A problem was occurred while processing inputs'
+    if amount == 0 or address is None or wallet_name is None or wallet_pw is None:
+        return generate_json_response('Some of arguments is missing')
     tx = {'type': 'spend', 'amount': int(amount),
           'to': address, 'message': message}
-    wallet = tools.wallet_from_str(wallet)
-    privkey, pubkey = tools.get_key_pairs_from_wallet(wallet)
-    address = tools.make_address([pubkey], 1)
+
+    encrypted_wallet_content = get_engine().account.get_wallet(wallet_name)
+    if encrypted_wallet_content is not None:
+        try:
+            wallet = Wallet.from_string(tools.decrypt(wallet_pw, encrypted_wallet_content))
+        except:
+            return generate_json_response("Wallet password incorrect")
+    else:
+        return generate_json_response("Error occurred")
+
     if 'count' not in tx:
         try:
             tx['count'] = get_engine().account.known_tx_count(address)
         except:
             tx['count'] = 0
     if 'pubkeys' not in tx:
-        tx['pubkeys'] = [pubkey.to_string()]  # We use pubkey as string
+        tx['pubkeys'] = [wallet.get_pubkey_str()]  # We use pubkey as string
     if 'signatures' not in tx:
-        tx['signatures'] = [tools.sign(tools.det_hash(tx), privkey)]
+        tx['signatures'] = [tools.sign(tools.det_hash(tx), wallet.privkey)]
     get_engine().blockchain.tx_queue.put(tx)
     return 'Tx amount:{} to:{} added to the pool'.format(tx['amount'], tx['to'])
 
@@ -247,16 +256,26 @@ def stop():
 
 @app.route('/start_miner', methods=['GET', 'POST'])
 def start_miner():
-    wallet = request.values.get('wallet', None)
-    if get_engine().miner.get_state() == Service.RUNNING:
-        return 'Miner is already running.'
-    elif wallet is None:
-        return 'Given wallet is not valid.'
+    from halocoin.model.wallet import Wallet
+    name = request.values.get('wallet_name', '')
+    pw = request.values.get('password', '')
+    encrypted_wallet_content = get_engine().account.get_wallet(name)
+    if encrypted_wallet_content is not None:
+        try:
+            wallet = Wallet.from_string(tools.decrypt(pw, encrypted_wallet_content))
+        except:
+            return generate_json_response("Wallet password incorrect")
     else:
-        wallet = tools.wallet_from_str(wallet)
+        return generate_json_response("Error occurred")
+
+    if get_engine().miner.get_state() == Service.RUNNING:
+        return generate_json_response('Miner is already running.')
+    elif wallet is None:
+        return generate_json_response('Given wallet is not valid.')
+    else:
         get_engine().miner.set_wallet(wallet)
         get_engine().miner.register()
-        return 'Running miner'
+        return generate_json_response('Running miner')
 
 
 @app.route('/stop_miner', methods=['GET', 'POST'])
