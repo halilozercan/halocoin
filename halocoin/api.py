@@ -66,24 +66,31 @@ def run(engine):
 
 @app.route("/upload_wallet", methods=['GET', 'POST'])
 def upload_wallet():
+    wallet_name = request.values.get('name', None)
     wallet_file = request.files['wallet_file']
     wallet_content = wallet_file.stream.read()
-    index = get_engine().account.add_wallet(wallet_content)
+    success = get_engine().account.upload_Wallet(wallet_name, wallet_content)
     return generate_json_response({
-        "success": True,
-        "wallet_index": index
+        "success": success,
+        "wallet_name": wallet_name
     })
 
 
 @app.route('/info_wallet', methods=['GET', 'POST'])
 def info_wallet():
-    wallet_index = request.values.get('index', -1)
+    from halocoin.model.wallet import Wallet
+    name = request.values.get('name', '')
     pw = request.values.get('password', '')
-    encrypted_wallet_content = get_engine().account.get_wallet(int(wallet_index))
+    encrypted_wallet_content = get_engine().account.get_wallet(name)
     if encrypted_wallet_content is not None:
         try:
-            wallet = tools.wallet_from_str(tools.decrypt(pw, encrypted_wallet_content).decode())
-            return generate_json_response(wallet)
+            wallet = Wallet.from_string(tools.decrypt(pw, encrypted_wallet_content).decode())
+            return generate_json_response({
+                "name": wallet.name,
+                "pubkey": wallet.get_pubkey_str(),
+                "privkey": wallet.get_privkey_str(),
+                "address": wallet.address
+            })
         except:
             return generate_json_response("Password incorrect")
     else:
@@ -92,14 +99,21 @@ def info_wallet():
 
 @app.route('/new_wallet', methods=['GET', 'POST'])
 def new_wallet():
+    from halocoin.model.wallet import Wallet
+    wallet_name = request.values.get('name', '')
     pw = request.values.get('password', '')
-    wallet = tools.random_wallet()
-    wallet_content = tools.wallet_to_str(wallet)
-    wallet_encrypted_content = tools.encrypt(pw, wallet_content)
-    index = get_engine().account.add_wallet(wallet_encrypted_content)
+    wallet = Wallet(wallet_name)
+    success = get_engine().account.new_wallet(pw, wallet)
     return generate_json_response({
-        "index": index,
-        "success": True
+        "name": wallet_name,
+        "success": success
+    })
+
+
+@app.route('/wallets', methods=['GET', 'POST'])
+def wallets():
+    return generate_json_response({
+        'wallets': get_engine().account.get_wallets()
     })
 
 

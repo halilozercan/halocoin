@@ -320,28 +320,39 @@ class AccountService(Service):
     def get_wallets(self):
         if self.db.exists("wallets"):
             return self.db.get("wallets")
-        return []
+        return {}
 
     @sync
-    def get_wallet(self, index_number):
+    def get_wallet(self, name):
         wallets = self.get_wallets()
-        if len(wallets) > index_number >= 0:
-            return wallets[index_number]
+        if name in wallets:
+            return wallets[name]
         else:
             return None
 
     @sync
-    def add_wallet(self, str_wallet):
+    def new_wallet(self, enc_key, wallet_obj):
         wallets = self.get_wallets()
-        wallets.append(str_wallet)
+        if wallet_obj.name in wallets:
+            return False
+        wallets[wallet_obj.name] = tools.encrypt(enc_key, wallet_obj.to_string()).encode()
         self.db.put("wallets", wallets)
-        return len(wallets)-1
+        return True
 
     @sync
-    def remove_wallet(self, index):
+    def upload_wallet(self, wallet_name, wallet_str):
+        wallets = self.get_wallets()
+        if wallet_name in wallets:
+            return False
+        wallets[wallet_name] = wallet_str
+        self.db.put("wallets", wallets)
+        return True
+
+    @sync
+    def remove_wallet(self, name):
         try:
             wallets = self.get_wallets()
-            del wallets[index]
+            del wallets[name]
             self.db.put("wallets", wallets)
             return True
         except Exception as e:
