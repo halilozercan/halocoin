@@ -6,9 +6,9 @@ RUN addgroup -S redis && adduser -S -G redis redis
 # grab su-exec for easy step-down from root
 RUN apk add --no-cache 'su-exec>=0.2'
 
-ENV REDIS_VERSION 4.0.5
-ENV REDIS_DOWNLOAD_URL http://download.redis.io/releases/redis-4.0.5.tar.gz
-ENV REDIS_DOWNLOAD_SHA d52bf355b96e20905916482962235e0442634c849934adb034f85362b31ed978
+ENV REDIS_VERSION 4.0.4
+ENV REDIS_DOWNLOAD_URL http://download.redis.io/releases/redis-4.0.4.tar.gz
+ENV REDIS_DOWNLOAD_SHA 45ca3a8f3576c96721743ea9d589259f30e6dc42d4d5e5b51d842fa9aede8911
 
 # for redis-sentinel see: http://redis.io/topics/sentinel
 RUN set -ex; \
@@ -45,8 +45,8 @@ RUN set -ex; \
 apk del .build-deps
 
 RUN mkdir /data && chown redis:redis /data
-VOLUME /data
-WORKDIR /data
+VOLUME /backup
+WORKDIR /backup
 
 COPY docker-entrypoint.sh /usr/local/bin/
 COPY redis.conf /etc/redis/
