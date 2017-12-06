@@ -4,7 +4,6 @@ import time
 from cdecimal import Decimal
 
 from halocoin import custom
-from halocoin import pt
 from halocoin import tools
 from halocoin.ntwrk import Response
 from halocoin.service import Service, threaded, sync, NoExceptionQueue
@@ -158,7 +157,6 @@ class BlockchainService(Service):
             # tools.log('Length is not valid')
             return False
 
-        # TODO: understand what is going on here
         if (length >= 0 and block['diffLength'] != tools.hex_sum(self.db.get('diffLength'), tools.hex_invert(block['target']))) \
                 or (length < 0 and block['diffLength'] != tools.hex_invert(block['target'])):
             tools.log(block['diffLength'])
@@ -195,16 +193,6 @@ class BlockchainService(Service):
         self.db.put(block['length'], block)
         self.db.put('length', block['length'])
         self.db.put('diffLength', block['diffLength'])
-
-        """
-        targets = self.db.get('targets')
-        targets.update({str(block['length']): block['target']})
-        self.db.put('targets', targets)
-
-        times = self.db.get('times')
-        times.update({str(block['length']): block['time']})
-        self.db.put('times', times)
-        """
 
         orphans = self.tx_pool_pop_all()
 

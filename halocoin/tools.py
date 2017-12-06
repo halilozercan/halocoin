@@ -190,43 +190,6 @@ def parse_wallet(wallet_file, pw=None):
     return wallet
 
 
-def random_wallet(number_of_pairs=1):
-    if number_of_pairs == 1:
-        from ecdsa import NIST192p
-        from ecdsa.util import randrange_from_seed__trytryagain
-        from ecdsa import SigningKey
-        secexp = randrange_from_seed__trytryagain(os.urandom(NIST192p.baselen), NIST192p.order)
-        privkey = SigningKey.from_secret_exponent(secexp, curve=NIST192p)
-        pubkey = privkey.get_verifying_key()
-        address = make_address([pubkey], 1)
-        wallet = {
-            'privkey': privkey.to_string(),
-            'pubkey': pubkey.to_string(),
-            'address': address
-        }
-    else:
-        wallet = {
-            'privkeys': [],
-            'pubkeys': []
-        }
-        """
-        for i in range(number_of_pairs):
-            init = ''.join(random.choice(string.ascii_lowercase) for i in range(64))
-            privkey = det_hash(init)
-            pubkey = privtopub(privkey)
-            wallet['privkeys'].append(privkey)
-            wallet['pubkeys'].append(pubkey)
-        """
-    return wallet
-
-
-def get_key_pairs_from_wallet(wallet):
-    from ecdsa import SigningKey
-    privkey = SigningKey.from_string(wallet['privkey'])
-    pubkey = privkey.get_verifying_key()
-    return privkey, pubkey
-
-
 def signature_verify(message, signature, pubkey):
     from ecdsa import VerifyingKey
     if isinstance(pubkey, str):

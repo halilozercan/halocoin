@@ -2,7 +2,7 @@ import json
 import os
 import threading
 
-from flask import Flask, request, Response
+from flask import Flask, request, Response, render_template
 from werkzeug.serving import run_simple
 
 from halocoin import tools
@@ -32,12 +32,8 @@ def blockchain_synced(func):
     return wrapper
 
 
-app = Flask(__name__)
-
-
-@app.route('/')
-def hello_world():
-    return 'Hello, World!'
+app = Flask(__name__, template_folder="templates", static_folder="static")
+app.config['TEMPLATES_AUTO_RELOAD'] = True
 
 
 def get_engine():
@@ -62,6 +58,16 @@ def run(engine):
                                              'application': app})
     listen_thread.start()
     print("Started API on {}:{}".format(host, engine.config['port']['api']))
+
+
+@app.route('/')
+def dashboard():
+    return render_template('dashboard.html')
+
+
+@app.route('/block_explorer')
+def block_explorer():
+    return render_template('block_explorer.html')
 
 
 @app.route("/upload_wallet", methods=['GET', 'POST'])
@@ -210,39 +216,44 @@ def txs():
 
 @app.route('/block', methods=['GET', 'POST'])
 def block():
-    number = request.values.get('number', 'default')
-    if "-" in number:
-        _from = int(number.split("-")[0])
-        _to = int(number.split("-")[1])
-        _to = min(_from + 50, _to)
-        result = []
-        for i in range(_from, _to):
-            _block = get_engine().db.get(str(i))
-            if _block is not None:
-                result.append(_block)
-        return generate_json_response(result)
-    else:
-        if number == "default":
-            number = get_engine().db.get('length')
-        number = int(number)
-        return generate_json_response([get_engine().db.get(str(number))])
+    start = int(request.values.get('start', '-1'))
+    end = int(request.values.get('end', '-1'))
+    length = get_engine().db.get('length')
+    if start == -1 and end == -1:
+        end = length
+        start = max(end-20, 0)
+    elif start == -1:
+        start = max(end - 20, 0)
+    elif end == -1:
+        end = min(length, start+20)
+
+    result = {
+        "start": start,
+        "end": end,
+        "blocks": []
+    }
+    for i in range(start, end+1):
+        block = get_engine().db.get(str(i))
+        mint_tx = list(filter(lambda t: t['type'] == 'mint', block['txs']))[0]
+        block['miner'] = tools.tx_owner_address(mint_tx)
+        result["blocks"].append(block)
+    result["blocks"] = list(reversed(result["blocks"]))
+    return generate_json_response(result)
 
 
 @app.route('/difficulty', methods=['GET', 'POST'])
 @blockchain_synced
 def difficulty():
     diff = get_engine().blockchain.target(get_engine().db.get('length'))
-    return generate_json_response(diff)
+    return generate_json_response({"difficulty": diff})
 
 
 @app.route('/balance', methods=['GET', 'POST'])
 @blockchain_synced
 def balance():
     address = request.values.get('address', None)
-    if address is None:
-        address = get_engine().db.get('address')
     account = get_engine().account.get_account(address, apply_tx_pool=True)
-    return account['amount']
+    return generate_json_response(account['amount'])
 
 
 @app.route('/stop', methods=['GET', 'POST'])

@@ -246,11 +246,9 @@ def node_id(args):
 
 @action
 def send(args):
-    wallet_file = open(args.wallet, 'rb')
-    wallet = tools.parse_wallet(wallet_file, args.pw)
     print(make_api_request(args.action, address=args.address,
                            amount=args.amount, message=args.message,
-                           wallet=tools.wallet_to_str(wallet)))
+                           wallet_name=args.wallet_name))
 
 @action
 def peers(args):
@@ -314,12 +312,10 @@ def run(argv):
                         help='Message to send with transaction')
     parser.add_argument('--amount', action="store", type=int, dest='amount',
                         help='Amount of coins that are going to be used')
-    parser.add_argument('--index', action="store", type=int, dest='index',
-                        help='Wallet index to be used')
     parser.add_argument('--number', action="store", type=str, dest='number',
                         help='Block number or range')
-    parser.add_argument('--wallet', action="store", type=str, dest='wallet',
-                        help='Path for wallet file')
+    parser.add_argument('--wallet', action="store", type=str, dest='wallet_name',
+                        help='Wallet name')
     parser.add_argument('--config', action="store", type=str, dest='config',
                         help='Config file address. Use with start command.')
     parser.add_argument('--pw', action="store", type=str, dest='pw',
