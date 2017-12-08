@@ -11,18 +11,15 @@ class MSidebar extends Component {
         </div>
         <div className="sidebar-wrapper">
           <ul className="nav">
-            <li className="active">
-              <a>
-                <i className="material-icons">dashboard</i>
-                <p>Dashboard</p>
-              </a>
-            </li>
-            <li>
-              <a>
-                <i className="material-icons">explore</i>
-                <p>Block Explorer</p>
-              </a>
-            </li>
+            {Object.keys(this.props.pages).map((key, index) => {
+            	let _class = (key === this.props.currentPage) ? "active":"";
+            	return <li key={key} className={_class} onClick={() => {this.props.pageChange(key)} }>
+			              <a>
+			                <i className="material-icons">{this.props.pages[key]}</i>
+			                <p>{key}</p>
+			              </a>
+			            </li>;
+            })}
           </ul>
         </div>
       </div>

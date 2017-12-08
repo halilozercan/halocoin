@@ -45,7 +45,7 @@ class MCardTable extends Component {
               <p className="category">{this.props.description}</p>
           </div>
           <div className="card-content table-responsive">
-            <table className="table table-hover">
+            <table className="table table-hover" style={{"font-family": "monospace"}}>
               <thead className="text-warning">
                 <tr>
                   {Object.values(this.props.columns).map((name, index) => {

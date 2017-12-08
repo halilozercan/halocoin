@@ -44,7 +44,7 @@ class MainPage extends Component {
       const columns = {'ip': 'IP Addres', 'port': 'Port', 'rank': 'Rank', 'length': 'Blockcount'};
       const rows = [];
       data.map((row, i) => {
-        if(row.rank !== 30) {
+        if(row.rank !== 30 && rows.length < 10) {
           let new_row = [];
           Object.keys(columns).map((col, j) => {
             new_row.push(row[col]);
@@ -64,15 +64,17 @@ class MainPage extends Component {
 
     $.get("/block", (data) => {
       data = data.blocks;
-      const columns = {'length': 'Height', 'time': 'Timestamp', 'txs_count': 'Transaction Count', 'miner': 'Mined by'};
+      const columns = {'length': 'Height', 'time': 'Timestamp', 'txs_count': 'Transactions', 'miner': 'Mined by'};
       const rows = [];
       data.map((row, i) => {
-        let new_row = [];
-        new_row.push(row.length);
-        new_row.push(timestampToDatetime(row.time));
-        new_row.push(row.txs.length);
-        new_row.push(row.miner);
-        rows.push(new_row);
+        if(rows.length < 10) {
+          let new_row = [];
+          new_row.push(row.length);
+          new_row.push(timestampToDatetime(row.time));
+          new_row.push(row.txs.length);
+          new_row.push(row.miner);
+          rows.push(new_row);
+        }
       });
 
       this.setState((state) => {
