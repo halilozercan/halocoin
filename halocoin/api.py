@@ -85,12 +85,18 @@ def upload_wallet():
 @app.route('/info_wallet', methods=['GET', 'POST'])
 def info_wallet():
     from halocoin.model.wallet import Wallet
-    name = request.values.get('wallet_name', '')
-    pw = request.values.get('password', '')
-    encrypted_wallet_content = get_engine().account.get_wallet(name)
+    wallet_name = request.values.get('wallet_name', None)
+    password = request.values.get('password', None)
+    if wallet_name is None:
+        default_wallet = get_engine().account.get_default_wallet()
+        if default_wallet is not None:
+            wallet_name = default_wallet['wallet_name']
+            password = default_wallet['password']
+
+    encrypted_wallet_content = get_engine().account.get_wallet(wallet_name)
     if encrypted_wallet_content is not None:
         try:
-            wallet = Wallet.from_string(tools.decrypt(pw, encrypted_wallet_content))
+            wallet = Wallet.from_string(tools.decrypt(password, encrypted_wallet_content))
             return generate_json_response({
                 "name": wallet.name,
                 "pubkey": wallet.get_pubkey_str(),
@@ -106,8 +112,8 @@ def info_wallet():
 @app.route('/new_wallet', methods=['GET', 'POST'])
 def new_wallet():
     from halocoin.model.wallet import Wallet
-    wallet_name = request.values.get('wallet_name', '')
-    pw = request.values.get('password', '')
+    wallet_name = request.values.get('wallet_name', None)
+    pw = request.values.get('password', None)
     wallet = Wallet(wallet_name)
     success = get_engine().account.new_wallet(pw, wallet)
     return generate_json_response({
@@ -118,8 +124,14 @@ def new_wallet():
 
 @app.route('/wallets', methods=['GET', 'POST'])
 def wallets():
+    default_wallet = get_engine().account.get_default_wallet()
+    if default_wallet is None:
+        wallet_name = ''
+    else:
+        wallet_name = default_wallet['wallet_name']
     return generate_json_response({
-        'wallets': get_engine().account.get_wallets()
+        'wallets': get_engine().account.get_wallets(),
+        'default_wallet': wallet_name
     })
 
 
@@ -131,6 +143,21 @@ def peers():
 @app.route('/node_id', methods=['GET', 'POST'])
 def node_id():
     return generate_json_response(get_engine().db.get('node_id'))
+
+
+@app.route('/set_default_wallet', methods=['GET', 'POST'])
+def set_default_wallet():
+    wallet_name = request.values.get('wallet_name', None)
+    password = request.values.get('password', None)
+    delete = request.values.get('delete', None)
+    if delete is not None:
+        return generate_json_response({
+            "success": get_engine().account.delete_default_wallet()
+        })
+    else:
+        return generate_json_response({
+            "success": get_engine().account.set_default_wallet(wallet_name, password)
+        })
 
 
 @app.route('/history', methods=['GET', 'POST'])
@@ -168,25 +195,42 @@ def history():
 @blockchain_synced
 def send():
     from halocoin.model.wallet import Wallet
-    amount = request.values.get('amount', 0)
+    amount = int(request.values.get('amount', 0))
     address = request.values.get('address', None)
     message = request.values.get('message', '')
     wallet_name = request.values.get('wallet_name', None)
-    wallet_pw = request.values.get('password', None)
+    password = request.values.get('password', None)
 
-    if amount == 0 or address is None or wallet_name is None or wallet_pw is None:
-        return generate_json_response('Some of arguments is missing')
+    if wallet_name is None:
+        default_wallet = get_engine().account.get_default_wallet()
+        if default_wallet is not None:
+            wallet_name = default_wallet['wallet_name']
+            password = default_wallet['password']
+
+    response = {"success": False}
+    if amount <= 0:
+        response['error'] = "Amount cannot be lower than or equalto 0"
+        return generate_json_response(response)
+    elif address is None:
+        response['error'] = "You need to specify a receiving address for transaction"
+        return generate_json_response(response)
+    elif wallet_name is None:
+        response['error'] = "Wallet name is not given and there is no default wallet"
+        return generate_json_response(response)
+
     tx = {'type': 'spend', 'amount': int(amount),
           'to': address, 'message': message}
 
     encrypted_wallet_content = get_engine().account.get_wallet(wallet_name)
     if encrypted_wallet_content is not None:
         try:
-            wallet = Wallet.from_string(tools.decrypt(wallet_pw, encrypted_wallet_content))
+            wallet = Wallet.from_string(tools.decrypt(password, encrypted_wallet_content))
         except:
-            return generate_json_response("Wallet password incorrect")
+            response['error'] = "Wallet password incorrect"
+            return generate_json_response(response)
     else:
-        return generate_json_response("Error occurred")
+        response['error'] = "Error occurred"
+        return generate_json_response(response)
 
     if 'count' not in tx:
         try:
@@ -198,7 +242,9 @@ def send():
     if 'signatures' not in tx:
         tx['signatures'] = [tools.sign(tools.det_hash(tx), wallet.privkey)]
     get_engine().blockchain.tx_queue.put(tx)
-    return 'Tx amount:{} to:{} added to the pool'.format(tx['amount'], tx['to'])
+    response["success"] = True
+    response["message"] = 'Tx amount:{} to:{} added to the pool'.format(tx['amount'], tx['to'])
+    return generate_json_response(response)
 
 
 @app.route('/blockcount', methods=['GET', 'POST'])
@@ -251,7 +297,17 @@ def difficulty():
 @app.route('/balance', methods=['GET', 'POST'])
 @blockchain_synced
 def balance():
+    from halocoin.model.wallet import Wallet
     address = request.values.get('address', None)
+    if address is None:
+        default_wallet = get_engine().account.get_default_wallet()
+        if default_wallet is not None:
+            wallet_name = default_wallet['wallet_name']
+            password = default_wallet['password']
+            encrypted_wallet_content = get_engine().account.get_wallet(wallet_name)
+            wallet = Wallet.from_string(tools.decrypt(password, encrypted_wallet_content))
+            address = wallet.address
+
     account = get_engine().account.get_account(address, apply_tx_pool=True)
     return generate_json_response(account['amount'])
 
@@ -268,12 +324,19 @@ def stop():
 @app.route('/start_miner', methods=['GET', 'POST'])
 def start_miner():
     from halocoin.model.wallet import Wallet
-    name = request.values.get('wallet_name', '')
-    pw = request.values.get('password', '')
-    encrypted_wallet_content = get_engine().account.get_wallet(name)
+    wallet_name = request.values.get('wallet_name', None)
+    password = request.values.get('password', None)
+
+    if wallet_name is None:
+        default_wallet = get_engine().account.get_default_wallet()
+        if default_wallet is not None:
+            wallet_name = default_wallet['wallet_name']
+            password = default_wallet['password']
+
+    encrypted_wallet_content = get_engine().account.get_wallet(wallet_name)
     if encrypted_wallet_content is not None:
         try:
-            wallet = Wallet.from_string(tools.decrypt(pw, encrypted_wallet_content))
+            wallet = Wallet.from_string(tools.decrypt(password, encrypted_wallet_content))
         except:
             return generate_json_response("Wallet password incorrect")
     else:

@@ -357,3 +357,33 @@ class AccountService(Service):
             return True
         except Exception as e:
             return False
+
+    @sync
+    def get_default_wallet(self):
+        if self.db.exists('default_wallet'):
+            return self.db.get('default_wallet')
+        else:
+            return None
+
+    @sync
+    def set_default_wallet(self, wallet_name, password):
+        try:
+            from halocoin.model.wallet import Wallet
+            encrypted_wallet_content = self.get_wallet(wallet_name)
+            wallet = Wallet.from_string(tools.decrypt(password, encrypted_wallet_content))
+            if wallet.name == wallet_name:
+                self.db.put('default_wallet', {
+                    "wallet_name": wallet_name,
+                    "password": password
+                })
+                return True
+            else:
+                return False
+        except Exception as e:
+            tools.log(e)
+            return False
+
+    @sync
+    def delete_default_wallet(self):
+        self.db.delete('default_wallet')
+        return True
