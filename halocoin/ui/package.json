@@ -6,6 +6,7 @@
   "dependencies": {
     "jquery": "2.x",
     "react": "^16.2.0",
+    "react-bs-notifier": "^4.4.5",
     "react-dom": "^16.2.0",
     "react-scripts": "1.0.17"
   },

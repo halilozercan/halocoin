@@ -97,11 +97,13 @@ def info_wallet():
     if encrypted_wallet_content is not None:
         try:
             wallet = Wallet.from_string(tools.decrypt(password, encrypted_wallet_content))
+            account = get_engine().account.get_account(wallet.address, apply_tx_pool=True)
             return generate_json_response({
                 "name": wallet.name,
                 "pubkey": wallet.get_pubkey_str(),
                 "privkey": wallet.get_privkey_str(),
-                "address": wallet.address
+                "address": wallet.address,
+                "balance": account['amount']
             })
         except:
             return generate_json_response("Password incorrect")
@@ -309,7 +311,7 @@ def balance():
             address = wallet.address
 
     account = get_engine().account.get_account(address, apply_tx_pool=True)
-    return generate_json_response(account['amount'])
+    return generate_json_response({'balance': account['amount']})
 
 
 @app.route('/stop', methods=['GET', 'POST'])

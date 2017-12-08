@@ -1,19 +1,24 @@
 import React, { Component } from 'react';
-import MButton from './components/button.js';
 import {MCardStats, MCardTable} from './components/card.js';
 import $ from "jquery";
+import Blockcount from './widgets/blockcount.js';
+import Balance from './widgets/balance.js';
+import Address from './widgets/address.js';
+import {timestampToDatetime} from './tools.js';
 
 class MainPage extends Component {
 
   constructor(props){
     super(props);
     this.state = {
-      'length': '-',
-      'known_length': '-',
       'default_wallet': null,
       'peers': {
-        'columns': [],
-        'rows': []
+        'columns': {},
+        'rows': null
+      },
+      'blocks': {
+        'columns': {},
+        'rows': null
       }
     }
   }
@@ -29,33 +34,25 @@ class MainPage extends Component {
         this.setState((state) => {
           state['default_wallet'] = data;
           return state;
-        }, this.initWalletStats);
+        });
       }
     });
   }
 
   initBlockchainStats() {
-    $.get("/blockcount", (data) => {
-      this.setState((state) => {
-        state['length'] = data.length;
-        state['known_length'] = data.known_length;
-        return state;
-      });
-    });
-
     $.get("/peers", (data) => {
-      const columns = [];
+      const columns = {'ip': 'IP Addres', 'port': 'Port', 'rank': 'Rank', 'length': 'Blockcount'};
       const rows = [];
       data.map((row, i) => {
-        rows.push(row);
-        if(i==0) {
-          for(var col in row) {
-            columns.push(col);
-          }
+        if(row.rank !== 30) {
+          let new_row = [];
+          Object.keys(columns).map((col, j) => {
+            new_row.push(row[col]);
+          });
+          rows.push(new_row);
         }
       });
-      console.log(rows);
-      console.log(columns);
+
       this.setState((state) => {
         state['peers'] = {
           'rows': rows,
@@ -64,48 +61,52 @@ class MainPage extends Component {
         return state;
       });
     });
-  }
 
-  initWalletStats() {
-    $.get("/balance", (data) => {
+    $.get("/block", (data) => {
+      data = data.blocks;
+      const columns = {'length': 'Height', 'time': 'Timestamp', 'txs_count': 'Transaction Count', 'miner': 'Mined by'};
+      const rows = [];
+      data.map((row, i) => {
+        let new_row = [];
+        new_row.push(row.length);
+        new_row.push(timestampToDatetime(row.time));
+        new_row.push(row.txs.length);
+        new_row.push(row.miner);
+        rows.push(new_row);
+      });
+
       this.setState((state) => {
-        state['balance'] = data;
+        state['blocks'] = {
+          'rows': rows,
+          'columns': columns
+        }
         return state;
       });
     });
   }
 
   render() {
-    const default_wallet_exists = (this.state.default_wallet !== null);
-    let stats = null;
-    if(default_wallet_exists) {
-      stats = <div className="col-lg-3 col-md-6 col-sm-6">
-                <MCardStats color="green" header_icon="info_outline" title="Balance"
-                 content={this.state.balance} 
-                 footer_icon="local_offer" alt_text={'Default wallet: ' + this.state.default_wallet.name}/>
-              </div>;
-    }
-    else {
-      stats = <div className="col-lg-3 col-md-6 col-sm-6">
-                <MCardStats color="red" header_icon="warning" title="Default Wallet"
-                 content="Not selected!" footer_icon="local_offer" 
-                 alt_text='Choose one to easily inspect and manage'/>
-              </div>;
+    let balance = null;
+    let address = null;
+    if(this.state.default_wallet !== null ) {
+      balance = <Balance balance={this.state.default_wallet.balance} name={this.state.default_wallet.name} />;
+      address = <Address address={this.state.default_wallet.address} name={this.state.default_wallet.name} />;
     }
     return (
       <div className="container-fluid">
         <div className="row">
-          <div className="col-lg-3 col-md-6 col-sm-6">
-            <MCardStats color="orange" header_icon="content_copy" title="Block Count"
-             content={this.state.length + '/' + this.state.known_length} 
-             footer_icon="update" alt_text="Just Updated"/>
-          </div>
-          {stats}
+          <Blockcount />
+          {balance}
+          {address}
         </div>
         <div className="row">
           <div className="col-lg-6 col-md-12">
             <MCardTable color="purple" title="Peers" description="List of top ranked peers in your network"
              columns={this.state.peers.columns} rows={this.state.peers.rows}/>
+          </div>
+          <div className="col-lg-6 col-md-12">
+            <MCardTable color="blue" title="Blocks" description="Most recent blocks"
+             columns={this.state.blocks.columns} rows={this.state.blocks.rows}/>
           </div>
         </div>
       </div>

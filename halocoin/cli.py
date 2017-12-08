@@ -250,6 +250,7 @@ def send(args):
                            amount=args.amount, message=args.message,
                            wallet_name=args.wallet_name))
 
+
 @action
 def peers(args):
     peers = make_api_request(args.action)

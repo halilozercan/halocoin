@@ -1,5 +1,4 @@
 import React, { Component } from 'react';
-import MButton from './components/button.js';
 import MSidebar from './components/sidebar.js';
 import MNavbar from './components/navbar.js';
 import MainPage from './MainPage.js';

@@ -22,35 +22,60 @@ class MCardStats extends Component {
   }
 }
 
+class CardRow extends Component {
+  render() {
+    return(
+      <tr key={this.props.index}>
+        {Object.values(this.props.row).map((col, j) => {
+          return <td key={j}>{col}</td>;
+        }
+        )}
+      </tr>
+    );
+  }
+}
+
 class MCardTable extends Component {
   render() {
-
-    return (
-      <div className="card">
-        <div className="card-header" data-background-color={this.props.color}>
-            <h4 className="title">{this.props.title}</h4>
-            <p className="category">{this.props.description}</p>
-        </div>
-        <div className="card-content table-responsive">
-          <table className="table table-hover">
-            <thead className="text-warning">
-              {this.props.columns.map((name, index) => {
-                <th key={ index }>{name}</th>
-              })}
-            </thead>
-            <tbody>
-              {this.props.rows.forEach((row, i) =>
-                <tr key={i}>
-                  {Object.keys(row).map((col, j) =>
-                    <td key={j}>{col}</td>
-                  )}
+    if(this.props.rows !== null) {
+      return (
+        <div className="card">
+          <div className="card-header" data-background-color={this.props.color}>
+              <h4 className="title">{this.props.title}</h4>
+              <p className="category">{this.props.description}</p>
+          </div>
+          <div className="card-content table-responsive">
+            <table className="table table-hover">
+              <thead className="text-warning">
+                <tr>
+                  {Object.values(this.props.columns).map((name, index) => {
+                    return <th key={ index }>{name}</th>;
+                  })}
                 </tr>
-              )}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {this.props.rows.map((_row, i) => {
+                  return <CardRow key={i} row={_row} index={i}/>;
+                }
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
-      </div>
-    );
+      );
+    } else {
+      return (
+        <div className="card">
+          <div className="card-header" data-background-color={this.props.color}>
+              <h4 className="title">{this.props.title}</h4>
+              <p className="category">{this.props.description}</p>
+          </div>
+          <div className="card-content">
+            Loading
+          </div>
+        </div>
+      );
+    }
   }
 }
 
