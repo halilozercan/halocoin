@@ -2,6 +2,7 @@ import json
 import os
 import threading
 
+import jinja2
 from flask import Flask, request, Response, render_template
 from flask_socketio import SocketIO
 
@@ -34,6 +35,10 @@ def blockchain_synced(func):
 
 app = Flask(__name__, template_folder="templates", static_folder="static")
 app.config['TEMPLATES_AUTO_RELOAD'] = True
+app.jinja_loader = jinja2.ChoiceLoader([
+    app.jinja_loader,
+    jinja2.PackageLoader(__name__)
+])
 socketio = SocketIO(app)
 
 
