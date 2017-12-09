@@ -78,7 +78,7 @@ class Balance extends Component {
                 <span className="material-input"></span></div>
               </div>
             </div>
-            <button type="submit" className="btn btn-primary pull-right">Submit
+            <button type="submit" className="btn btn-primary pull-right">Send
               <div className="ripple-container"></div>
             </button>
             <div className="clearfix"></div>

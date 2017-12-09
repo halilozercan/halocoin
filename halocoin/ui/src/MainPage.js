@@ -123,10 +123,17 @@ class MainPage extends Component {
   render() {
     let balance = null;
     let address = null;
+    let txs = null;
     if(this.state.default_wallet !== null ) {
       balance = <Balance balance={this.state.default_wallet.balance} name={this.state.default_wallet.name} 
                          notify={this.props.notify} refresh={() => {this.getDefaultWallet(); this.initBlockchainStats();}} />;
       address = <Address address={this.state.default_wallet.address} name={this.state.default_wallet.name} notify={this.props.notify} />;
+    }
+    if(this.state.txs.rows !== null && this.state.txs.rows.length > 0) {
+      txs = <div className="col-lg-6 col-md-12">
+              <MCardTable color="green" title="Waiting Transactions" description="List of waiting transactions in the pool"
+               columns={this.state.txs.columns} rows={this.state.txs.rows}/>
+            </div>;
     }
     return (
       <div className="container-fluid">
@@ -136,18 +143,7 @@ class MainPage extends Component {
           {balance}
         </div>
         <div className="row">
-          {() => {
-            if(this.state.txs.rows !== null && this.state.txs.rows.length > 0) {
-              return <div className="col-lg-6 col-md-12">
-                      <MCardTable color="green" title="Waiting Transactions" description="List of waiting transactions in the pool"
-                       columns={this.state.txs.columns} rows={this.state.txs.rows}/>
-                    </div>;
-            }
-            else{
-              return <div/>;
-            }
-          }}
-          
+          {txs}
           <div className="col-lg-6 col-md-12">
             <MCardTable color="blue" title="Blocks" description="Most recent blocks"
              columns={this.state.blocks.columns} rows={this.state.blocks.rows}/>
