@@ -3,7 +3,7 @@ import os
 import threading
 
 from flask import Flask, request, Response, render_template
-from werkzeug.serving import run_simple
+from flask_socketio import SocketIO
 
 from halocoin import tools
 from halocoin.blockchain import BlockchainService
@@ -34,6 +34,7 @@ def blockchain_synced(func):
 
 app = Flask(__name__, template_folder="templates", static_folder="static")
 app.config['TEMPLATES_AUTO_RELOAD'] = True
+socketio = SocketIO(app)
 
 
 def get_engine():
@@ -49,15 +50,21 @@ def shutdown_server():
 
 
 def run(engine):
+    def thread_target():
+        socketio.run(app, host=host, port=engine.config['port']['api'])
+
     with app.app_context():
         setattr(app, 'engine', engine)
     host = os.environ.get('HALOCOIN_API_HOST', "0.0.0.0")
-    listen_thread = threading.Thread(target=run_simple,
-                                     kwargs={'hostname': host,
-                                             'port': engine.config['port']['api'],
-                                             'application': app})
+    listen_thread = threading.Thread(target=thread_target)
     listen_thread.start()
     print("Started API on {}:{}".format(host, engine.config['port']['api']))
+
+
+@socketio.on('connect')
+def connect():
+    print("%s connected" % request.sid)
+    return ""
 
 
 @app.route('/')
@@ -403,7 +410,24 @@ def status_miner():
     })
 
 
-
 def generate_json_response(obj):
     result_text = json.dumps(obj, cls=ComplexEncoder)
     return Response(response=result_text, headers={"Content-Type": "application/json"})
+
+
+@app.route('/notify')
+def notify():
+    new_block()
+    return "ok"
+
+
+def new_block():
+    socketio.emit('new_block')
+
+
+def peer_update():
+    socketio.emit('peer_update')
+
+
+def new_tx_in_pool():
+    socketio.emit('new_tx_in_pool')

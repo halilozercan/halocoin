@@ -1,9 +1,9 @@
-import queue
 import copy
+import queue
 import time
 from cdecimal import Decimal
 
-from halocoin import custom
+from halocoin import custom, api
 from halocoin import tools
 from halocoin.ntwrk import Response
 from halocoin.service import Service, threaded, sync, NoExceptionQueue
@@ -100,6 +100,7 @@ class BlockchainService(Service):
         """
         txs = self.db.get('txs')
         txs.append(tx)
+        api.new_tx_in_pool()
         self.db.put('txs', txs)
 
     @sync
@@ -201,6 +202,8 @@ class BlockchainService(Service):
         for orphan in sorted(orphans, key=lambda x: x['count']):
             self.add_tx(orphan)
 
+        from halocoin import api
+        api.new_block()
         return True
 
     def delete_block(self):

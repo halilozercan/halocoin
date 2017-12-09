@@ -15,7 +15,7 @@ class Address extends Component {
     textField.select();
     document.execCommand('copy');
     textField.remove();
-    this.props.notify('Address is copied to clipboard', 'info');
+    this.props.notify('Address is copied to clipboard', 'info', 'tc');
   }
 
   render() {

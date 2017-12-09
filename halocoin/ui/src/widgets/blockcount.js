@@ -12,6 +12,10 @@ class Blockcount extends Component {
   }
 
   componentWillMount() {
+    this.update();
+  }
+
+  update() {
     $.get("/blockcount", (data) => {
       this.setState((state) => {
         state['length'] = data.length;

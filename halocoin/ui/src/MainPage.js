@@ -28,7 +28,7 @@ class MainPage extends Component {
     this.getDefaultWallet = this.getDefaultWallet.bind(this);
   }
 
-  componentWillMount() {
+  componentDidMount() {
     this.getDefaultWallet();
     this.initBlockchainStats();
   }
@@ -51,6 +51,12 @@ class MainPage extends Component {
   }
 
   initBlockchainStats() {
+    this.updateTxs();
+    this.updatePeers();
+    this.updateBlocks();
+  }
+
+  updateTxs() {
     $.get("/txs", (data) => {
       const columns = {'from': 'Sender', 'to': 'Receiver', 'amount': 'Value'};
       const rows = [];
@@ -72,7 +78,9 @@ class MainPage extends Component {
         return state;
       });
     });
+  }
 
+  updatePeers() {
     $.get("/peers", (data) => {
       const columns = {'ip': 'IP Addres', 'port': 'Port', 'rank': 'Rank', 'length': 'Blockcount'};
       const rows = [];
@@ -94,7 +102,9 @@ class MainPage extends Component {
         return state;
       });
     });
+  }
 
+  updateBlocks() {
     $.get("/block", (data) => {
       data = data.blocks;
       const columns = {'length': 'Height', 'time': 'Timestamp', 'txs_count': 'Transactions', 'miner': 'Mined by'};
@@ -118,6 +128,8 @@ class MainPage extends Component {
         return state;
       });
     });
+
+    this.blockcount.update();
   }
 
   render() {
@@ -138,7 +150,7 @@ class MainPage extends Component {
     return (
       <div className="container-fluid">
         <div className="row">
-          <Blockcount />
+          <Blockcount ref={(input)=>{this.blockcount = input;}}/>
           {address}
           {balance}
         </div>

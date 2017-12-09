@@ -10,7 +10,8 @@
     "react-bs-notifier": "^4.4.5",
     "react-dom": "^16.2.0",
     "react-notification-system": "^0.2.16",
-    "react-scripts": "1.0.17"
+    "react-scripts": "1.0.17",
+    "socket.io-client": "^2.0.4"
   },
   "scripts": {
     "start": "react-scripts start",
