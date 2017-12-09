@@ -2,7 +2,8 @@ import React, { Component } from 'react';
 import $ from 'jquery';
 import DefaultWallet from './widgets/default_wallet.js';
 import WalletList from './widgets/wallet_list.js';
-import MAlert from './components/alert.js';
+import NewWalletForm from './widgets/new_wallet_form.js';
+import axios from 'axios';
 
 class WalletManagement extends Component {
 
@@ -12,6 +13,8 @@ class WalletManagement extends Component {
       'default_wallet': null,
       'wallets': null
     }
+    this.getDefaultWallet = this.getDefaultWallet.bind(this);
+    this.getWallets = this.getWallets.bind(this);
   }
 
   componentDidMount() {
@@ -20,10 +23,17 @@ class WalletManagement extends Component {
   }
 
   getDefaultWallet() {
-    $.get("/info_wallet", (data) => {
+    axios.get("/info_wallet").then((response) => {
+      let data = response.data;
       if(data.hasOwnProperty('address')) {
         this.setState((state) => {
           state['default_wallet'] = data;
+          return state;
+        });
+      }
+      else {
+        this.setState((state) => {
+          state['default_wallet'] = null;
           return state;
         });
       }
@@ -31,7 +41,9 @@ class WalletManagement extends Component {
   }
 
   getWallets() {
-    $.get("/wallets", (data) => {
+    axios.get("/wallets").then((response) => {
+      let data = response.data;
+      console.log(data);
       if(data.hasOwnProperty('wallets')) {
         this.setState((state) => {
           state['wallets'] = Object.keys(data.wallets);
@@ -45,10 +57,16 @@ class WalletManagement extends Component {
     return (
       <div className="container-fluid">
         <div className="row">
-          <DefaultWallet wallet={this.state.default_wallet} />
+          <DefaultWallet wallet={this.state.default_wallet} refresh={() => {this.getWallets(); this.getDefaultWallet();}} />
         </div>
         <div className="row">
-          <WalletList wallets={this.state.wallets} />
+          <div className="col-lg-6 col-md-12 col-sm-12">
+            <WalletList refresh={() => {this.getWallets(); this.getDefaultWallet();}} wallets={this.state.wallets} 
+                        default_wallet={this.state.default_wallet} notify={this.props.notify} />
+          </div>
+          <div className="col-lg-3 col-md-6 col-sm-6">
+            <NewWalletForm refresh={this.getWallets} notify={this.props.notify}/>
+          </div>
         </div>
       </div>
     );

@@ -16,11 +16,16 @@ class MainPage extends Component {
         'columns': {},
         'rows': null
       },
+      'txs': {
+        'columns': {},
+        'rows': null
+      },
       'blocks': {
         'columns': {},
         'rows': null
       }
     }
+    this.getDefaultWallet = this.getDefaultWallet.bind(this);
   }
 
   componentWillMount() {
@@ -36,10 +41,38 @@ class MainPage extends Component {
           return state;
         });
       }
+      else {
+        this.setState((state) => {
+          state['default_wallet'] = null;
+          return state;
+        });
+      }
     });
   }
 
   initBlockchainStats() {
+    $.get("/txs", (data) => {
+      const columns = {'from': 'Sender', 'to': 'Receiver', 'amount': 'Value'};
+      const rows = [];
+      data.map((row, i) => {
+        if(rows.length < 20) {
+          let new_row = [];
+          Object.keys(columns).map((col, j) => {
+            new_row.push(row[col]);
+          });
+          rows.push(new_row);
+        }
+      });
+
+      this.setState((state) => {
+        state['txs'] = {
+          'rows': rows,
+          'columns': columns
+        }
+        return state;
+      });
+    });
+
     $.get("/peers", (data) => {
       const columns = {'ip': 'IP Addres', 'port': 'Port', 'rank': 'Rank', 'length': 'Blockcount'};
       const rows = [];
@@ -91,24 +124,37 @@ class MainPage extends Component {
     let balance = null;
     let address = null;
     if(this.state.default_wallet !== null ) {
-      balance = <Balance balance={this.state.default_wallet.balance} name={this.state.default_wallet.name} />;
-      address = <Address address={this.state.default_wallet.address} name={this.state.default_wallet.name} />;
+      balance = <Balance balance={this.state.default_wallet.balance} name={this.state.default_wallet.name} 
+                         notify={this.props.notify} refresh={() => {this.getDefaultWallet(); this.initBlockchainStats();}} />;
+      address = <Address address={this.state.default_wallet.address} name={this.state.default_wallet.name} notify={this.props.notify} />;
     }
     return (
       <div className="container-fluid">
         <div className="row">
           <Blockcount />
-          {balance}
           {address}
+          {balance}
         </div>
         <div className="row">
-          <div className="col-lg-6 col-md-12">
-            <MCardTable color="purple" title="Peers" description="List of top ranked peers in your network"
-             columns={this.state.peers.columns} rows={this.state.peers.rows}/>
-          </div>
+          {() => {
+            if(this.state.txs.rows !== null && this.state.txs.rows.length > 0) {
+              return <div className="col-lg-6 col-md-12">
+                      <MCardTable color="green" title="Waiting Transactions" description="List of waiting transactions in the pool"
+                       columns={this.state.txs.columns} rows={this.state.txs.rows}/>
+                    </div>;
+            }
+            else{
+              return <div/>;
+            }
+          }}
+          
           <div className="col-lg-6 col-md-12">
             <MCardTable color="blue" title="Blocks" description="Most recent blocks"
              columns={this.state.blocks.columns} rows={this.state.blocks.rows}/>
+          </div>
+          <div className="col-lg-6 col-md-12">
+            <MCardTable color="purple" title="Peers" description="List of top ranked peers in your network"
+             columns={this.state.peers.columns} rows={this.state.peers.rows}/>
           </div>
         </div>
       </div>

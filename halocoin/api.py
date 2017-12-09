@@ -62,12 +62,7 @@ def run(engine):
 
 @app.route('/')
 def dashboard():
-    return render_template('dashboard.html')
-
-
-@app.route('/block_explorer')
-def block_explorer():
-    return render_template('block_explorer.html')
+    return render_template('index.html')
 
 
 @app.route("/upload_wallet", methods=['GET', 'POST'])
@@ -109,6 +104,39 @@ def info_wallet():
             return generate_json_response("Password incorrect")
     else:
         return generate_json_response("Error occurred")
+
+
+@app.route('/remove_wallet', methods=['GET', 'POST'])
+def remove_wallet():
+    from halocoin.model.wallet import Wallet
+    wallet_name = request.values.get('wallet_name', None)
+    password = request.values.get('password', None)
+    default_wallet = get_engine().account.get_default_wallet()
+    if default_wallet is not None and default_wallet['wallet_name'] == wallet_name:
+        return generate_json_response({
+            'success': False,
+            'error': 'Cannot remove default wallet. First remove its default state!'
+        })
+
+    encrypted_wallet_content = get_engine().account.get_wallet(wallet_name)
+    if encrypted_wallet_content is not None:
+        try:
+            Wallet.from_string(tools.decrypt(password, encrypted_wallet_content))
+            get_engine().account.remove_wallet(wallet_name)
+            return generate_json_response({
+                "success": True,
+                "message": "Successfully removed wallet"
+            })
+        except:
+            return generate_json_response({
+                "success": False,
+                "error": "Password incorrect"
+            })
+    else:
+        return generate_json_response({
+                "success": False,
+                "error": "Unidentified error occurred!"
+            })
 
 
 @app.route('/new_wallet', methods=['GET', 'POST'])
@@ -207,7 +235,6 @@ def send():
         default_wallet = get_engine().account.get_default_wallet()
         if default_wallet is not None:
             wallet_name = default_wallet['wallet_name']
-            password = default_wallet['password']
 
     response = {"success": False}
     if amount <= 0:
@@ -218,6 +245,9 @@ def send():
         return generate_json_response(response)
     elif wallet_name is None:
         response['error'] = "Wallet name is not given and there is no default wallet"
+        return generate_json_response(response)
+    elif password is None:
+        response['error'] = "Password missing!"
         return generate_json_response(response)
 
     tx = {'type': 'spend', 'amount': int(amount),
@@ -236,7 +266,7 @@ def send():
 
     if 'count' not in tx:
         try:
-            tx['count'] = get_engine().account.known_tx_count(address)
+            tx['count'] = get_engine().account.known_tx_count(wallet.address)
         except:
             tx['count'] = 0
     if 'pubkeys' not in tx:
@@ -259,7 +289,10 @@ def blockcount():
 
 @app.route('/txs', methods=['GET', 'POST'])
 def txs():
-    return generate_json_response(get_engine().blockchain.tx_pool())
+    pool = get_engine().blockchain.tx_pool()
+    for i, tx in enumerate(pool):
+        pool[i]['from'] = tools.tx_owner_address(tx)
+    return generate_json_response(pool)
 
 
 @app.route('/block', methods=['GET', 'POST'])
@@ -361,6 +394,14 @@ def stop_miner():
         return 'Closed miner'
     else:
         return 'Miner is not running.'
+
+
+@app.route('/status_miner', methods=['GET', 'POST'])
+def status_miner():
+    return generate_json_response({
+        'running': get_engine().miner.get_state() == Service.RUNNING
+    })
+
 
 
 def generate_json_response(obj):

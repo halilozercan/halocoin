@@ -1,5 +1,5 @@
 import React, { Component } from 'react';
-import {MCardStats, MCardTable} from '../components/card.js';
+import {MCardStats} from '../components/card.js';
 import $ from "jquery";
 
 class Blockcount extends Component {

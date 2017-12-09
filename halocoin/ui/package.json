@@ -4,10 +4,12 @@
   "private": true,
   "proxy": "http://0.0.0.0:7001",
   "dependencies": {
+    "axios": "^0.17.1",
     "jquery": "2.x",
     "react": "^16.2.0",
     "react-bs-notifier": "^4.4.5",
     "react-dom": "^16.2.0",
+    "react-notification-system": "^0.2.16",
     "react-scripts": "1.0.17"
   },
   "scripts": {

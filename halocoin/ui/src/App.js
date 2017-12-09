@@ -4,6 +4,7 @@ import MNavbar from './components/navbar.js';
 import MainPage from './MainPage.js';
 import WalletManagement from './WalletManagement.js';
 import './App.css';
+import NotificationSystem from 'react-notification-system';
 
 class App extends Component {
   constructor(props) {
@@ -12,9 +13,10 @@ class App extends Component {
       "page": "Dasboard"
     }
     this.pageChanged = this.pageChanged.bind(this);
+    this.notify = this.notify.bind(this);
     this.pagesList = {
-      "Dasboard": <MainPage />,
-      "Wallet Manager": <WalletManagement />
+      "Dasboard": <MainPage notify={this.notify}/>,
+      "Wallet Manager": <WalletManagement notify={this.notify}/>
     }
     this.pagesIcons = {
       "Dasboard": "dashboard",
@@ -22,8 +24,20 @@ class App extends Component {
     }
   }
 
+  componentDidMount() {
+    this._notificationSystem = this.refs.notificationSystem;
+  }
+
   pageChanged(newPage) {
     this.setState({"page": newPage});
+  }
+
+  notify(message, type) {
+    this._notificationSystem.addNotification({
+      message: message,
+      level: type,
+      position: 'bc'
+    });
   }
 
   render() {
@@ -36,6 +50,7 @@ class App extends Component {
             {this.pagesList[this.state.page]}
           </div>
         </div>
+        <NotificationSystem ref="notificationSystem" />
       </div>
     );
   }

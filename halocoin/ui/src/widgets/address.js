@@ -1,6 +1,5 @@
 import React, { Component } from 'react';
-import {MCardStats, MCardTable} from '../components/card.js';
-import { Alert, AlertList } from "react-bs-notifier";
+import {MCardStats} from '../components/card.js';
 
 class Address extends Component {
 
@@ -16,6 +15,7 @@ class Address extends Component {
     textField.select();
     document.execCommand('copy');
     textField.remove();
+    this.props.notify('Address is copied to clipboard', 'info');
   }
 
   render() {
