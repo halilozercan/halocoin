@@ -5,6 +5,7 @@ import Blockcount from './widgets/blockcount.js';
 import Balance from './widgets/balance.js';
 import Address from './widgets/address.js';
 import {timestampToDatetime} from './tools.js';
+import axios from 'axios';
 
 class MainPage extends Component {
 
@@ -57,7 +58,8 @@ class MainPage extends Component {
   }
 
   updateTxs() {
-    $.get("/txs", (data) => {
+    axios.get("/txs").then((response) => {
+      let data = response.data;
       const columns = {'from': 'Sender', 'to': 'Receiver', 'amount': 'Value'};
       const rows = [];
       data.map((row, i) => {
@@ -81,11 +83,12 @@ class MainPage extends Component {
   }
 
   updatePeers() {
-    $.get("/peers", (data) => {
+    axios.get("/peers").then((response) => {
+      let data = response.data;
       const columns = {'ip': 'IP Addres', 'port': 'Port', 'rank': 'Rank', 'length': 'Blockcount'};
       const rows = [];
       data.map((row, i) => {
-        if(row.rank !== 30 && rows.length < 10) {
+        if(row.rank < 30 && rows.length < 10) {
           let new_row = [];
           Object.keys(columns).map((col, j) => {
             new_row.push(row[col]);
@@ -105,8 +108,8 @@ class MainPage extends Component {
   }
 
   updateBlocks() {
-    $.get("/block", (data) => {
-      data = data.blocks;
+    axios.get("/block").then((response) => {
+      let data = response.data.blocks;
       const columns = {'length': 'Height', 'time': 'Timestamp', 'txs_count': 'Transactions', 'miner': 'Mined by'};
       const rows = [];
       data.map((row, i) => {

@@ -49,6 +49,16 @@ class WalletList extends Component {
     })
   }
 
+  downloadWallet(wallet_name) {
+    setTimeout(() => {
+      // server sent the url to the file!
+      // now, let's download:
+      window.open('/download_wallet?wallet_name=' + wallet_name);
+      // you could also do:
+      // window.location.href = response.file;
+    }, 100);
+  }
+
   render() {
     let content = <div>Loading</div>;
     let default_wallet_name = (this.props.default_wallet === null) ? null:this.props.default_wallet.name;
@@ -68,7 +78,7 @@ class WalletList extends Component {
                                 Options
                               </button>
                               <ul className="dropdown-menu">
-                                <li><a href="#">Download</a></li>
+                                <li><a href="#" onClick={()=>{this.downloadWallet(_row);}}>Backup</a></li>
                                 <li><a href="#" onClick={()=>{this.removeWallet(_row);}}>Delete</a></li>
                                 {defaultButton}
                               </ul>

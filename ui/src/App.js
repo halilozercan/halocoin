@@ -20,18 +20,17 @@ class App extends Component {
     }
     this.socket = io();
     this.socket.on('new_block', (socket) => {
-      this.notify('A new block is mined!', 'success', 'tr');
-      if(this.page == "Dashboard")
+      if(this.state.page == "Dashboard")
         this.mainPage.updateBlocks();
     });
 
     this.socket.on('peer_update', (socket) => {
-      if(this.page == "Dashboard")
+      if(this.state.page == "Dashboard")
         this.mainPage.updatePeers();
     });
 
     this.socket.on('new_tx_in_pool', (socket) => {
-      if(this.page == "Dashboard")
+      if(this.state.page == "Dashboard")
         this.mainPage.updateTxs();
     });
   }

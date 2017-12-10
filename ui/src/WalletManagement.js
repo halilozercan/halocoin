@@ -64,6 +64,8 @@ class WalletManagement extends Component {
             <WalletList refresh={() => {this.getWallets(); this.getDefaultWallet();}} wallets={this.state.wallets} 
                         default_wallet={this.state.default_wallet} notify={this.props.notify} />
           </div>
+        </div>
+        <div className="row">
           <div className="col-lg-3 col-md-6 col-sm-6">
             <NewWalletForm refresh={this.getWallets} notify={this.props.notify}/>
           </div>
