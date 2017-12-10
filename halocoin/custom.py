@@ -45,7 +45,7 @@ def generate_default_config():
     config["peers"] = {
         "list": [
             {
-                'node_id': '01a64235-6939-4e7e-b2ce-c18e79c0a439',
+                'node_id': '52e6eb49-6d59-4bf3-af96-ca3252408a4e',
                 'ip': '159.89.9.43',
                 'port': 7002,
                 'rank': 1,

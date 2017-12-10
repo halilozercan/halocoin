@@ -30,7 +30,7 @@ def block_reward(length):
     import math
     a = length // custom.halve_at
     b = custom.block_reward / math.pow(2, a)
-    return b
+    return int(b)
 
 
 def log(message):
