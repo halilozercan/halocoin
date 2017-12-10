@@ -1,5 +1,4 @@
 import copy
-import json
 import socket
 import sys
 import uuid
@@ -33,7 +32,7 @@ class PeerListenService(Service):
             self.s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             self.s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             self.s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-            self.s.settimeout(1)
+            self.s.settimeout(2)
             self.s.bind(('0.0.0.0', self.engine.config['port']['peers']))
             self.s.listen(10)
             print("Started Peer Listen on 0.0.0.0:{}".format(self.engine.config['port']['peers']))

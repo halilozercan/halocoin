@@ -1,6 +1,6 @@
-import time
-
+import signal
 import sys
+import time
 
 from halocoin import api
 from halocoin import tools
@@ -22,6 +22,9 @@ def test_database(db):
             return delete_response
 
     return False
+
+
+instance = None
 
 
 class Engine(Service):
@@ -86,7 +89,7 @@ class Engine(Service):
             self.unregister_sub_services()
             return False
 
-        api.run(self)
+        api.run()
 
         return True
 
@@ -121,11 +124,19 @@ class Engine(Service):
         self.unregister()
 
 
+def signal_handler(signal, frame):
+    sys.stderr.write('Detected interrupt, initiating shutdown\n')
+    if instance is not None:
+        instance.stop()
+
+
 def main(config, working_dir):
-    engine_instance = Engine(config, working_dir)
-    if engine_instance.register():
+    global instance
+    instance = Engine(config, working_dir)
+    if instance.register():
         print("Halocoin is fully running...")
-        engine_instance.join()
+        signal.signal(signal.SIGINT, signal_handler)
+        instance.join()
         print("Shutting down gracefully")
     else:
         print("Couldn't start halocoin")

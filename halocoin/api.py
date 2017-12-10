@@ -2,13 +2,12 @@ import json
 import os
 import tempfile
 import threading
-import uuid
 
 import jinja2
 from flask import Flask, request, Response, render_template, send_file
 from flask_socketio import SocketIO
 
-from halocoin import tools
+from halocoin import tools, engine
 from halocoin.blockchain import BlockchainService
 from halocoin.service import Service
 
@@ -23,11 +22,11 @@ class ComplexEncoder(json.JSONEncoder):
 
 def blockchain_synced(func):
     def wrapper(*args, **kwargs):
-        if get_engine().blockchain.get_chain_state() == BlockchainService.IDLE:
+        if engine.instance.blockchain.get_chain_state() == BlockchainService.IDLE:
             return func(*args, **kwargs)
         else:
             return 'Blockchain is syncing. This method is not reliable while operation continues.\n' + \
-                   str(get_engine().db.get('length')) + '-' + str(get_engine().db.get('known_length'))
+                   str(engine.instance.db.get('length')) + '-' + str(engine.instance.db.get('known_length'))
 
     # To keep the function name same for RPC helper
     wrapper.__name__ = func.__name__
@@ -42,11 +41,7 @@ app.jinja_loader = jinja2.ChoiceLoader([
     jinja2.PackageLoader(__name__)
 ])
 socketio = SocketIO(app)
-
-
-def get_engine():
-    with app.app_context():
-        return getattr(app, 'engine', None)
+listen_thread = None
 
 
 def shutdown_server():
@@ -56,16 +51,15 @@ def shutdown_server():
     func()
 
 
-def run(engine):
+def run():
     def thread_target():
-        socketio.run(app, host=host, port=engine.config['port']['api'])
+        socketio.run(app, host=host, port=engine.instance.config['port']['api'])
 
-    with app.app_context():
-        setattr(app, 'engine', engine)
+    global listen_thread
     host = os.environ.get('HALOCOIN_API_HOST', "0.0.0.0")
-    listen_thread = threading.Thread(target=thread_target)
+    listen_thread = threading.Thread(target=thread_target, daemon=True)
     listen_thread.start()
-    print("Started API on {}:{}".format(host, engine.config['port']['api']))
+    print("Started API on {}:{}".format(host, engine.instance.config['port']['api']))
 
 
 @socketio.on('connect')
@@ -84,11 +78,31 @@ def upload_wallet():
     wallet_name = request.values.get('wallet_name', None)
     wallet_file = request.files['wallet_file']
     wallet_content = wallet_file.stream.read()
-    success = get_engine().account.upload_wallet(wallet_name, wallet_content)
+    success = engine.instance.account.upload_wallet(wallet_name, wallet_content)
     return generate_json_response({
         "success": success,
         "wallet_name": wallet_name
     })
+
+
+@app.route('/download_wallet', methods=['GET', 'POST'])
+def download_wallet():
+    wallet_name = request.values.get('wallet_name', None)
+    if wallet_name is None:
+        return generate_json_response({
+            "success": False,
+            "error": "Give a valid wallet name"
+        })
+    wallet_content = engine.instance.account.get_wallet(wallet_name)
+    if wallet_content is None:
+        return generate_json_response({
+            "success": False,
+            "error": "Wallet doesn't exist"
+        })
+    f = tempfile.NamedTemporaryFile()
+    f.write(wallet_content)
+    f.seek(0)
+    return send_file(f, as_attachment=True, attachment_filename=wallet_name)
 
 
 @app.route('/info_wallet', methods=['GET', 'POST'])
@@ -97,16 +111,16 @@ def info_wallet():
     wallet_name = request.values.get('wallet_name', None)
     password = request.values.get('password', None)
     if wallet_name is None:
-        default_wallet = get_engine().account.get_default_wallet()
+        default_wallet = engine.instance.account.get_default_wallet()
         if default_wallet is not None:
             wallet_name = default_wallet['wallet_name']
             password = default_wallet['password']
 
-    encrypted_wallet_content = get_engine().account.get_wallet(wallet_name)
+    encrypted_wallet_content = engine.instance.account.get_wallet(wallet_name)
     if encrypted_wallet_content is not None:
         try:
             wallet = Wallet.from_string(tools.decrypt(password, encrypted_wallet_content))
-            account = get_engine().account.get_account(wallet.address, apply_tx_pool=True)
+            account = engine.instance.account.get_account(wallet.address, apply_tx_pool=True)
             return generate_json_response({
                 "name": wallet.name,
                 "pubkey": wallet.get_pubkey_str(),
@@ -125,18 +139,18 @@ def remove_wallet():
     from halocoin.model.wallet import Wallet
     wallet_name = request.values.get('wallet_name', None)
     password = request.values.get('password', None)
-    default_wallet = get_engine().account.get_default_wallet()
+    default_wallet = engine.instance.account.get_default_wallet()
     if default_wallet is not None and default_wallet['wallet_name'] == wallet_name:
         return generate_json_response({
             'success': False,
             'error': 'Cannot remove default wallet. First remove its default state!'
         })
 
-    encrypted_wallet_content = get_engine().account.get_wallet(wallet_name)
+    encrypted_wallet_content = engine.instance.account.get_wallet(wallet_name)
     if encrypted_wallet_content is not None:
         try:
             Wallet.from_string(tools.decrypt(password, encrypted_wallet_content))
-            get_engine().account.remove_wallet(wallet_name)
+            engine.instance.account.remove_wallet(wallet_name)
             return generate_json_response({
                 "success": True,
                 "message": "Successfully removed wallet"
@@ -159,7 +173,7 @@ def new_wallet():
     wallet_name = request.values.get('wallet_name', None)
     pw = request.values.get('password', None)
     wallet = Wallet(wallet_name)
-    success = get_engine().account.new_wallet(pw, wallet)
+    success = engine.instance.account.new_wallet(pw, wallet)
     return generate_json_response({
         "name": wallet_name,
         "success": success
@@ -168,25 +182,25 @@ def new_wallet():
 
 @app.route('/wallets', methods=['GET', 'POST'])
 def wallets():
-    default_wallet = get_engine().account.get_default_wallet()
+    default_wallet = engine.instance.account.get_default_wallet()
     if default_wallet is None:
         wallet_name = ''
     else:
         wallet_name = default_wallet['wallet_name']
     return generate_json_response({
-        'wallets': get_engine().account.get_wallets(),
+        'wallets': engine.instance.account.get_wallets(),
         'default_wallet': wallet_name
     })
 
 
 @app.route('/peers', methods=['GET', 'POST'])
 def peers():
-    return generate_json_response(get_engine().account.get_peers())
+    return generate_json_response(engine.instance.account.get_peers())
 
 
 @app.route('/node_id', methods=['GET', 'POST'])
 def node_id():
-    return generate_json_response(get_engine().db.get('node_id'))
+    return generate_json_response(engine.instance.db.get('node_id'))
 
 
 @app.route('/set_default_wallet', methods=['GET', 'POST'])
@@ -196,11 +210,11 @@ def set_default_wallet():
     delete = request.values.get('delete', None)
     if delete is not None:
         return generate_json_response({
-            "success": get_engine().account.delete_default_wallet()
+            "success": engine.instance.account.delete_default_wallet()
         })
     else:
         return generate_json_response({
-            "success": get_engine().account.set_default_wallet(wallet_name, password)
+            "success": engine.instance.account.set_default_wallet(wallet_name, password)
         })
 
 
@@ -209,15 +223,15 @@ def set_default_wallet():
 def history():
     address = request.values.get('address', None)
     if address is None:
-        address = get_engine().db.get('address')
-    account = get_engine().account.get_account(address)
+        address = engine.instance.db.get('address')
+    account = engine.instance.account.get_account(address)
     txs = {
         "send": [],
         "recv": [],
         "mine": []
     }
     for block_index in reversed(account['tx_blocks']):
-        block = get_engine().db.get(str(block_index))
+        block = engine.instance.db.get(str(block_index))
         for tx in block['txs']:
             tx['block'] = block_index
             owner = tools.tx_owner_address(tx)
@@ -226,7 +240,7 @@ def history():
             elif tx['type'] == 'spend' and tx['to'] == address:
                 txs['recv'].append(tx)
     for block_index in reversed(account['mined_blocks']):
-        block = get_engine().db.get(str(block_index))
+        block = engine.instance.db.get(str(block_index))
         for tx in block['txs']:
             tx['block'] = block_index
             owner = tools.tx_owner_address(tx)
@@ -246,7 +260,7 @@ def send():
     password = request.values.get('password', None)
 
     if wallet_name is None:
-        default_wallet = get_engine().account.get_default_wallet()
+        default_wallet = engine.instance.account.get_default_wallet()
         if default_wallet is not None:
             wallet_name = default_wallet['wallet_name']
 
@@ -267,7 +281,7 @@ def send():
     tx = {'type': 'spend', 'amount': int(amount),
           'to': address, 'message': message}
 
-    encrypted_wallet_content = get_engine().account.get_wallet(wallet_name)
+    encrypted_wallet_content = engine.instance.account.get_wallet(wallet_name)
     if encrypted_wallet_content is not None:
         try:
             wallet = Wallet.from_string(tools.decrypt(password, encrypted_wallet_content))
@@ -280,14 +294,14 @@ def send():
 
     if 'count' not in tx:
         try:
-            tx['count'] = get_engine().account.known_tx_count(wallet.address)
+            tx['count'] = engine.instance.account.known_tx_count(wallet.address)
         except:
             tx['count'] = 0
     if 'pubkeys' not in tx:
         tx['pubkeys'] = [wallet.get_pubkey_str()]  # We use pubkey as string
     if 'signatures' not in tx:
         tx['signatures'] = [tools.sign(tools.det_hash(tx), wallet.privkey)]
-    get_engine().blockchain.tx_queue.put(tx)
+    engine.instance.blockchain.tx_queue.put(tx)
     response["success"] = True
     response["message"] = 'Tx amount:{} to:{} added to the pool'.format(tx['amount'], tx['to'])
     return generate_json_response(response)
@@ -295,15 +309,15 @@ def send():
 
 @app.route('/blockcount', methods=['GET', 'POST'])
 def blockcount():
-    result = dict(length=get_engine().db.get('length'),
-                  known_length=get_engine().db.get('known_length'))
+    result = dict(length=engine.instance.db.get('length'),
+                  known_length=engine.instance.db.get('known_length'))
     result_text = json.dumps(result)
     return Response(response=result_text, headers={"Content-Type": "application/json"})
 
 
 @app.route('/txs', methods=['GET', 'POST'])
 def txs():
-    pool = get_engine().blockchain.tx_pool()
+    pool = engine.instance.blockchain.tx_pool()
     for i, tx in enumerate(pool):
         pool[i]['from'] = tools.tx_owner_address(tx)
     return generate_json_response(pool)
@@ -313,7 +327,7 @@ def txs():
 def block():
     start = int(request.values.get('start', '-1'))
     end = int(request.values.get('end', '-1'))
-    length = get_engine().db.get('length')
+    length = engine.instance.db.get('length')
     if start == -1 and end == -1:
         end = length
         start = max(end-20, 0)
@@ -328,7 +342,9 @@ def block():
         "blocks": []
     }
     for i in range(start, end+1):
-        block = get_engine().db.get(str(i))
+        block = engine.instance.db.get(str(i))
+        if block is None:
+            break
         mint_tx = list(filter(lambda t: t['type'] == 'mint', block['txs']))[0]
         block['miner'] = tools.tx_owner_address(mint_tx)
         result["blocks"].append(block)
@@ -339,7 +355,7 @@ def block():
 @app.route('/difficulty', methods=['GET', 'POST'])
 #@blockchain_synced
 def difficulty():
-    diff = get_engine().blockchain.target(get_engine().db.get('length'))
+    diff = engine.instance.blockchain.target(engine.instance.db.get('length'))
     return generate_json_response({"difficulty": diff})
 
 
@@ -349,24 +365,24 @@ def balance():
     from halocoin.model.wallet import Wallet
     address = request.values.get('address', None)
     if address is None:
-        default_wallet = get_engine().account.get_default_wallet()
+        default_wallet = engine.instance.account.get_default_wallet()
         if default_wallet is not None:
             wallet_name = default_wallet['wallet_name']
             password = default_wallet['password']
-            encrypted_wallet_content = get_engine().account.get_wallet(wallet_name)
+            encrypted_wallet_content = engine.instance.account.get_wallet(wallet_name)
             wallet = Wallet.from_string(tools.decrypt(password, encrypted_wallet_content))
             address = wallet.address
 
-    account = get_engine().account.get_account(address, apply_tx_pool=True)
+    account = engine.instance.account.get_account(address, apply_tx_pool=True)
     return generate_json_response({'balance': account['amount']})
 
 
 @app.route('/stop', methods=['GET', 'POST'])
 def stop():
-    get_engine().db.put('stop', True)
+    engine.instance.db.put('stop', True)
     shutdown_server()
     print('Closed API')
-    get_engine().stop()
+    engine.instance.stop()
     return generate_json_response('Shutting down')
 
 
@@ -377,12 +393,12 @@ def start_miner():
     password = request.values.get('password', None)
 
     if wallet_name is None:
-        default_wallet = get_engine().account.get_default_wallet()
+        default_wallet = engine.instance.account.get_default_wallet()
         if default_wallet is not None:
             wallet_name = default_wallet['wallet_name']
             password = default_wallet['password']
 
-    encrypted_wallet_content = get_engine().account.get_wallet(wallet_name)
+    encrypted_wallet_content = engine.instance.account.get_wallet(wallet_name)
     if encrypted_wallet_content is not None:
         try:
             wallet = Wallet.from_string(tools.decrypt(password, encrypted_wallet_content))
@@ -391,20 +407,20 @@ def start_miner():
     else:
         return generate_json_response("Error occurred")
 
-    if get_engine().miner.get_state() == Service.RUNNING:
+    if engine.instance.miner.get_state() == Service.RUNNING:
         return generate_json_response('Miner is already running.')
     elif wallet is None:
         return generate_json_response('Given wallet is not valid.')
     else:
-        get_engine().miner.set_wallet(wallet)
-        get_engine().miner.register()
+        engine.instance.miner.set_wallet(wallet)
+        engine.instance.miner.register()
         return generate_json_response('Running miner')
 
 
 @app.route('/stop_miner', methods=['GET', 'POST'])
 def stop_miner():
-    if get_engine().miner.get_state() == Service.RUNNING:
-        get_engine().miner.unregister()
+    if engine.instance.miner.get_state() == Service.RUNNING:
+        engine.instance.miner.unregister()
         return 'Closed miner'
     else:
         return 'Miner is not running.'
@@ -413,28 +429,8 @@ def stop_miner():
 @app.route('/status_miner', methods=['GET', 'POST'])
 def status_miner():
     return generate_json_response({
-        'running': get_engine().miner.get_state() == Service.RUNNING
+        'running': engine.instance.miner.get_state() == Service.RUNNING
     })
-
-
-@app.route('/download_wallet', methods=['GET', 'POST'])
-def download_wallet():
-    wallet_name = request.values.get('wallet_name', None)
-    if wallet_name is None:
-        return generate_json_response({
-            "success": False,
-            "error": "Give a valid wallet name"
-        })
-    wallet_content = get_engine().account.get_wallet(wallet_name)
-    if wallet_content is None:
-        return generate_json_response({
-            "success": False,
-            "error": "Wallet doesn't exist"
-        })
-    f = tempfile.NamedTemporaryFile()
-    f.write(wallet_content)
-    f.seek(0)
-    return send_file(f, as_attachment=True, attachment_filename=wallet_name)
 
 
 def generate_json_response(obj):

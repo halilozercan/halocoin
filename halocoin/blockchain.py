@@ -32,7 +32,6 @@ class BlockchainService(Service):
 
     @threaded
     def process_blocks(self):
-        added_block = False
         try:
             candidate_block = self.blocks_queue.get(timeout=1)
         except queue.Empty:
@@ -58,9 +57,9 @@ class BlockchainService(Service):
                         else:
                             break
                     for block in blocks:
-                        added_block &= self.add_block(block)
+                        self.add_block(block)
             else:
-                added_block &= self.add_block(candidate_block)
+                self.add_block(candidate_block)
             self.set_chain_state(BlockchainService.IDLE)
         except:
             self.set_chain_state(BlockchainService.IDLE)
@@ -182,7 +181,7 @@ class BlockchainService(Service):
             tools.log('wrong target')
             return False
 
-        recent_time_values = self.recent_blockthings('times', custom.mmm, self.db.get('length'))
+        recent_time_values = self.recent_blockthings('times', custom.median_block_time_limit, self.db.get('length'))
         median_block = tools.median(recent_time_values)
         if block['time'] < median_block:
             tools.log('Received block is generated earlier than median.')
@@ -203,8 +202,8 @@ class BlockchainService(Service):
         for orphan in sorted(orphans, key=lambda x: x['count']):
             self.add_tx(orphan)
 
+        from halocoin import api
         api.new_block()
-
         return True
 
     def delete_block(self):
@@ -383,10 +382,6 @@ class BlockchainService(Service):
         return response
 
     def target(self, length):
-        """ Returns the target difficulty at a particular blocklength. """
-        if length < 4:
-            return bytearray.fromhex('0' * 4 + 'f' * 60)  # Use same difficulty for first few blocks.
-
         def targetTimesFloat(target, number):
             a = int(str(target), 16)
             b = int(a * number)  # this should be rational multiplication followed by integer estimation
@@ -429,7 +424,14 @@ class BlockchainService(Service):
             tw = sum(w)
             return sum([w[i] * block_times[i] / tw for i in range(len(block_times))])
 
-        retarget = estimate_time() / custom.blocktime
-        result = targetTimesFloat(estimate_target(), retarget)
-        return bytearray.fromhex(result)
+        """ Returns the target difficulty at a particular blocklength. """
+        if length < 100:
+            return bytearray.fromhex('0' * 4 + 'f' * 60)  # Use same difficulty for first few blocks.
+        if length == 100 or length % custom.recalculate_target_at == 0:
+            retarget = estimate_time() / custom.blocktime
+            result = targetTimesFloat(estimate_target(), retarget)
+            return bytearray.fromhex(result)
+        else:
+            last_block = length - (length % custom.recalculate_target_at)
+            return self.db.get(last_block)['target']
 
