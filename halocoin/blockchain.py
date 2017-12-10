@@ -431,6 +431,8 @@ class BlockchainService(Service):
             retarget = estimate_time() / custom.blocktime
             result = targetTimesFloat(estimate_target(), retarget)
             return bytearray.fromhex(result)
+        elif 100 < length < custom.recalculate_target_at:
+            return self.db.get(100)['target']
         else:
             last_block = length - (length % custom.recalculate_target_at)
             return self.db.get(last_block)['target']
