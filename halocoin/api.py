@@ -1,9 +1,11 @@
 import json
 import os
+import tempfile
 import threading
+import uuid
 
 import jinja2
-from flask import Flask, request, Response, render_template
+from flask import Flask, request, Response, render_template, send_file
 from flask_socketio import SocketIO
 
 from halocoin import tools
@@ -82,7 +84,7 @@ def upload_wallet():
     wallet_name = request.values.get('wallet_name', None)
     wallet_file = request.files['wallet_file']
     wallet_content = wallet_file.stream.read()
-    success = get_engine().account.upload_Wallet(wallet_name, wallet_content)
+    success = get_engine().account.upload_wallet(wallet_name, wallet_content)
     return generate_json_response({
         "success": success,
         "wallet_name": wallet_name
@@ -203,7 +205,7 @@ def set_default_wallet():
 
 
 @app.route('/history', methods=['GET', 'POST'])
-@blockchain_synced
+#@blockchain_synced
 def history():
     address = request.values.get('address', None)
     if address is None:
@@ -234,7 +236,7 @@ def history():
 
 
 @app.route('/send', methods=['GET', 'POST'])
-@blockchain_synced
+#@blockchain_synced
 def send():
     from halocoin.model.wallet import Wallet
     amount = int(request.values.get('amount', 0))
@@ -335,14 +337,14 @@ def block():
 
 
 @app.route('/difficulty', methods=['GET', 'POST'])
-@blockchain_synced
+#@blockchain_synced
 def difficulty():
     diff = get_engine().blockchain.target(get_engine().db.get('length'))
     return generate_json_response({"difficulty": diff})
 
 
 @app.route('/balance', methods=['GET', 'POST'])
-@blockchain_synced
+#@blockchain_synced
 def balance():
     from halocoin.model.wallet import Wallet
     address = request.values.get('address', None)
@@ -413,6 +415,26 @@ def status_miner():
     return generate_json_response({
         'running': get_engine().miner.get_state() == Service.RUNNING
     })
+
+
+@app.route('/download_wallet', methods=['GET', 'POST'])
+def download_wallet():
+    wallet_name = request.values.get('wallet_name', None)
+    if wallet_name is None:
+        return generate_json_response({
+            "success": False,
+            "error": "Give a valid wallet name"
+        })
+    wallet_content = get_engine().account.get_wallet(wallet_name)
+    if wallet_content is None:
+        return generate_json_response({
+            "success": False,
+            "error": "Wallet doesn't exist"
+        })
+    f = tempfile.NamedTemporaryFile()
+    f.write(wallet_content)
+    f.seek(0)
+    return send_file(f, as_attachment=True, attachment_filename=wallet_name)
 
 
 def generate_json_response(obj):

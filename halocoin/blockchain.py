@@ -32,6 +32,7 @@ class BlockchainService(Service):
 
     @threaded
     def process_blocks(self):
+        added_block = False
         try:
             candidate_block = self.blocks_queue.get(timeout=1)
         except queue.Empty:
@@ -57,9 +58,9 @@ class BlockchainService(Service):
                         else:
                             break
                     for block in blocks:
-                        self.add_block(block)
+                        added_block &= self.add_block(block)
             else:
-                self.add_block(candidate_block)
+                added_block &= self.add_block(candidate_block)
             self.set_chain_state(BlockchainService.IDLE)
         except:
             self.set_chain_state(BlockchainService.IDLE)
@@ -202,8 +203,8 @@ class BlockchainService(Service):
         for orphan in sorted(orphans, key=lambda x: x['count']):
             self.add_tx(orphan)
 
-        from halocoin import api
         api.new_block()
+
         return True
 
     def delete_block(self):

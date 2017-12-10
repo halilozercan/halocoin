@@ -212,12 +212,15 @@ def info_wallet(args):
 @action
 def upload_wallet(args):
     files = {
-        "wallet_file": ('wallet_file', open(args.wallet, 'rb'))
+        "wallet_file": ('wallet_file', open(args.wallet_path, 'rb')),
+        "wallet_name": args.wallet_name
     }
     print(make_api_request(args.action, files=files))
 
 
-# TODO: Download wallet
+@action
+def download_wallet(args):
+    print(make_api_request(args.action, wallet_name=args.wallet))
 
 
 @action
@@ -317,6 +320,8 @@ def run(argv):
                         help='Block number or range')
     parser.add_argument('--wallet', action="store", type=str, dest='wallet_name',
                         help='Wallet name')
+    parser.add_argument('--wallet-path', action="store", type=str, dest='wallet_path',
+                        help='Wallet path for uploading')
     parser.add_argument('--config', action="store", type=str, dest='config',
                         help='Config file address. Use with start command.')
     parser.add_argument('--pw', action="store", type=str, dest='pw',
