@@ -4,7 +4,7 @@ from cdecimal import Decimal
 version = "0.0004"
 block_reward = 10 ** 3  # Initial block reward
 halve_at = 525600  # Approximately one year
-recalculate_target_at = 24*60  # It's everyday bro!
+recalculate_target_at = 1440  # It's everyday bro!
 miner_core_count = -1  # -1 evaluates to number of cores
 # Lower limits on what the "time" tag in a block can say.
 median_block_time_limit = 100

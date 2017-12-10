@@ -425,9 +425,9 @@ class BlockchainService(Service):
             return sum([w[i] * block_times[i] / tw for i in range(len(block_times))])
 
         """ Returns the target difficulty at a particular blocklength. """
-        if length < 4:
+        if length < 100:
             return bytearray.fromhex('0' * 4 + 'f' * 60)  # Use same difficulty for first few blocks.
-        if length % custom.recalculate_target_at == 0:
+        if length == 100 or length % custom.recalculate_target_at == 0:
             retarget = estimate_time() / custom.blocktime
             result = targetTimesFloat(estimate_target(), retarget)
             return bytearray.fromhex(result)

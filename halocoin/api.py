@@ -343,6 +343,8 @@ def block():
     }
     for i in range(start, end+1):
         block = engine.instance.db.get(str(i))
+        if block is None:
+            break
         mint_tx = list(filter(lambda t: t['type'] == 'mint', block['txs']))[0]
         block['miner'] = tools.tx_owner_address(mint_tx)
         result["blocks"].append(block)
