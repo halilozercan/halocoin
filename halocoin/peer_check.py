@@ -56,6 +56,8 @@ class PeerCheckService(Service):
 
             self.account.update_peer(peer)
 
+        time.sleep(1)
+
     @sync
     def peer_check(self, peer):
         peer_ip_port = (peer['ip'], peer['port'])

@@ -1,44 +1,24 @@
 import os
 from cdecimal import Decimal
 
-"""
-Most of these stuff should be moved into config file.
-- Initial peer list must be in some kind of torrent file.
-- Inflection, block reward, etc. are not configurable. 
-They must stay here.
-- 
-
-# Configurable
-DEBUG = False
-db_type = 'redis'
-db_user = 'username'
-db_pass = 'halocoin'
-db_port = 6379
-db_name = 0
-log_file = 'log'
-port = 7900
-api_port = 7899
-download_many = 50  # Max number of blocks to request from a peer at the same time.
-
-
-# Independent
-peers = [['159.89.9.43', 7900]]
-"""
-
-version = "0.0003"
-block_reward = 10 ** 2
+version = "0.0004"
+block_reward = 10 ** 3  # Initial block reward
+halve_at = 525600  # Approximately one year
+recalculate_target_at = 24*60  # It's everyday bro!
 miner_core_count = -1  # -1 evaluates to number of cores
 # Lower limits on what the "time" tag in a block can say.
-mmm = 100
+median_block_time_limit = 100
 # Take the median of this many of the blocks.
 # How far back in history do we look when we use statistics to guess at
 # the current blocktime and difficulty.
-history_length = 400
+history_length = 1440
 # This constant is selected such that the 50 most recent blocks count for 1/2 the
 # total weight.
 inflection = Decimal('0.985')
+# Precalculate
 memoized_weights = [inflection ** i for i in range(1000)]
-blocktime = 120
+# How often to generate a block in seconds
+blocktime = 60
 
 
 def generate_default_config():

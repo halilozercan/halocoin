@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 import argparse
 import datetime
-import json
 import os
 import sys
 
@@ -55,13 +54,13 @@ def make_api_request(method, files=None, **kwargs):
     return response
 
 
-def print_txs(txs):
+def print_txs(txs, length=-1):
     table = []
     for tx in txs:
         tx['from'] = tools.tx_owner_address(tx)
         if tx['type'] == 'mint':
             tx['to'] = 'N/A'
-            tx['amount'] = custom.block_reward
+            tx['amount'] = tools.block_reward(length)
             tx['message'] = ''
         table.append([tx['type'], tx['from'], tx['to'], tx['amount'], tx['message']])
 
@@ -105,7 +104,7 @@ def print_blocks(blocks):
 
     if len(blocks) == 1:
         print(Colors.WARNING + "\nTransactions in the Block:\n" + Colors.ENDC)
-        print_txs(blocks[0]['txs'])
+        print_txs(blocks[0]['txs'], length=blocks[0]['length'])
 
 
 def print_history(history):
@@ -130,7 +129,7 @@ def print_history(history):
             print("In Block {} {} mined amount {}".format(
                 tx['block'],
                 Colors.HEADER + tools.tx_owner_address(tx) + Colors.ENDC,
-                custom.block_reward))
+                tools.block_reward(tx['block'])))
 
 
 def extract_configuration(args):
@@ -212,12 +211,15 @@ def info_wallet(args):
 @action
 def upload_wallet(args):
     files = {
-        "wallet_file": ('wallet_file', open(args.wallet, 'rb'))
+        "wallet_file": ('wallet_file', open(args.wallet_path, 'rb')),
+        "wallet_name": args.wallet_name
     }
     print(make_api_request(args.action, files=files))
 
 
-# TODO: Download wallet
+@action
+def download_wallet(args):
+    print(make_api_request(args.action, wallet_name=args.wallet))
 
 
 @action
@@ -315,6 +317,8 @@ def run(argv):
                         help='Amount of coins that are going to be used')
     parser.add_argument('--number', action="store", type=str, dest='number',
                         help='Block number or range')
+    parser.add_argument('--wallet-path', action="store", type=str, dest='wallet_path',
+                        help='Wallet path for uploading')
     parser.add_argument('--wallet', action="store", type=str, dest='wallet_name',
                         help='Wallet name')
     parser.add_argument('--config', action="store", type=str, dest='config',

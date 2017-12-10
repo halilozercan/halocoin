@@ -1,6 +1,5 @@
 import copy
 
-from halocoin import custom
 from halocoin import tools
 from halocoin.service import Service, sync
 
@@ -113,7 +112,7 @@ class AccountService(Service):
             send_account = get_acc(send_address)
 
             if tx['type'] == 'mint':
-                send_account['amount'] = apply(send_account['amount'], custom.block_reward)
+                send_account['amount'] = apply(send_account['amount'], tools.block_reward(block['length']))
                 send_account['mined_blocks'] = apply(send_account['mined_blocks'], block['length'])
             elif tx['type'] == 'spend':
                 recv_address = tx['to']
@@ -138,7 +137,7 @@ class AccountService(Service):
 
         return flag
 
-    def update_account_with_txs(self, address, account, txs, add_flag=True, only_outgoing=False, block_number=-1):
+    def update_account_with_txs(self, address, account, txs, add_flag=True, only_outgoing=False):
         def apply(a, b):
             if isinstance(a, int):
                 if add_flag:
@@ -154,32 +153,13 @@ class AccountService(Service):
 
         for tx in txs:
             owner = tools.tx_owner_address(tx)
-            if tx['type'] == 'mint' and owner == address:
-                account['amount'] = apply(account['amount'], custom.block_reward)
-                if block_number != -1:
-                    account['mined_blocks'] = apply(account['mined_blocks'], block_number)
-            elif tx['type'] == 'spend':
+            if tx['type'] == 'spend':
                 if owner == address:
                     account['amount'] = apply(account['amount'], -tx['amount'])
                     account['count'] = apply(account['count'], 1)
-                    if block_number != -1:
-                        account['tx_blocks'] = apply(account['tx_blocks'], block_number)
                 elif tx['to'] == address and not only_outgoing:
                     account['amount'] = apply(account['amount'], tx['amount'])
-                    if block_number != -1:
-                        account['tx_blocks'] = apply(account['tx_blocks'], block_number)
         return account
-
-    def invalidate_cache(self, address):
-        account = copy.deepcopy(AccountService.default_account)
-
-        for i in range(int(self.db.get('length')) + 1):
-            block = self.db.get(str(i))
-            account = self.update_account_with_txs(address, account, block['txs'],
-                                                   add_flag=True, block_number=block['length'])
-
-        self.db.put(address, account)
-        return 'Updated ' + str(account)
 
     def known_tx_count(self, address):
         # Returns the number of transactions that pubkey has broadcast.

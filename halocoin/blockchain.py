@@ -181,7 +181,7 @@ class BlockchainService(Service):
             tools.log('wrong target')
             return False
 
-        recent_time_values = self.recent_blockthings('times', custom.mmm, self.db.get('length'))
+        recent_time_values = self.recent_blockthings('times', custom.median_block_time_limit, self.db.get('length'))
         median_block = tools.median(recent_time_values)
         if block['time'] < median_block:
             tools.log('Received block is generated earlier than median.')
@@ -382,10 +382,6 @@ class BlockchainService(Service):
         return response
 
     def target(self, length):
-        """ Returns the target difficulty at a particular blocklength. """
-        if length < 4:
-            return bytearray.fromhex('0' * 4 + 'f' * 60)  # Use same difficulty for first few blocks.
-
         def targetTimesFloat(target, number):
             a = int(str(target), 16)
             b = int(a * number)  # this should be rational multiplication followed by integer estimation
@@ -428,7 +424,14 @@ class BlockchainService(Service):
             tw = sum(w)
             return sum([w[i] * block_times[i] / tw for i in range(len(block_times))])
 
-        retarget = estimate_time() / custom.blocktime
-        result = targetTimesFloat(estimate_target(), retarget)
-        return bytearray.fromhex(result)
+        """ Returns the target difficulty at a particular blocklength. """
+        if length < 4:
+            return bytearray.fromhex('0' * 4 + 'f' * 60)  # Use same difficulty for first few blocks.
+        if length % custom.recalculate_target_at == 0:
+            retarget = estimate_time() / custom.blocktime
+            result = targetTimesFloat(estimate_target(), retarget)
+            return bytearray.fromhex(result)
+        else:
+            last_block = length - (length % custom.recalculate_target_at)
+            return self.db.get(last_block)['target']
 
