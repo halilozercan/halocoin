@@ -1,2 +1,2 @@
-*.css linguist-vendored
-*.js linguist-vendored
+halocoin/static/* linguist-vendored
+ui/public/dashboard/* linguist-vendored
