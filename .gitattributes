@@ -1,2 +1,4 @@
-halocoin/static/* linguist-vendored
-ui/public/dashboard/* linguist-vendored
+*.css linguist-vendored=true
+*.min.css linguist-vendored=true
+halocoin/static/* linguist-vendored=true
+ui/public/dashboard/* linguist-vendored=true
