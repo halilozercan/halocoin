@@ -211,6 +211,17 @@ class BlockchainService(Service):
             tools.log('Received block is generated earlier than median.')
             return 3
 
+        # Check that block includes exactly one mint transaction
+        if 'txs' not in block:
+            tools.log('Received block does not include txs. At least a coinbase tx must be present')
+            return 3
+
+        # Sum of all mint type transactions must be one
+        mint_present = sum([0 if tx['type'] != 'mint' else 1 for tx in block['txs']])
+        if mint_present != 1:
+            tools.log('Received block includes wrong amount of mint txs')
+            return 3
+
         if not self.account.update_accounts_with_block(block, add_flag=True, simulate=True):
             tools.log('Received block failed transactions check.')
             return 3

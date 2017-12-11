@@ -1,7 +1,7 @@
 import os
 import yaml
 
-from ecdsa import NIST192p
+from ecdsa import SECP256k1
 from ecdsa.util import randrange_from_seed__trytryagain
 from ecdsa import SigningKey
 
@@ -16,8 +16,8 @@ class Wallet:
         """
         self.name = name
         if privkey is None:
-            secexp = randrange_from_seed__trytryagain(os.urandom(NIST192p.baselen), NIST192p.order)
-            self.privkey = SigningKey.from_secret_exponent(secexp, curve=NIST192p)
+            secexp = randrange_from_seed__trytryagain(os.urandom(SECP256k1.baselen), SECP256k1.order)
+            self.privkey = SigningKey.from_secret_exponent(secexp, curve=SECP256k1)
         else:
             self.privkey = privkey
         self.pubkey = self.privkey.get_verifying_key()

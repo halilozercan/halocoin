@@ -89,7 +89,7 @@ def print_peers(peers):
 
 def print_blocks(blocks):
     table = []
-    for block in blocks:
+    for block in blocks['blocks']:
         if block['length'] == 0:
             block['prevHash'] = "N/A"
         block['time'] = datetime.datetime.fromtimestamp(
