@@ -1,4 +1,5 @@
 *.css linguist-vendored=true
 *.min.css linguist-vendored=true
+*.js linguist-vendored=true
 halocoin/static/* linguist-vendored=true
 ui/public/dashboard/* linguist-vendored=true
