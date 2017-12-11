@@ -16,7 +16,7 @@ history_length = 1440
 # total weight.
 inflection = Decimal('0.985')
 # Precalculate
-memoized_weights = [inflection ** i for i in range(1000)]
+memoized_weights = [inflection ** i for i in range(recalculate_target_at)]
 # How often to generate a block in seconds
 blocktime = 60
 
