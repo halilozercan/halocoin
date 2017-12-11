@@ -60,6 +60,8 @@ def run():
     listen_thread = threading.Thread(target=thread_target, daemon=True)
     listen_thread.start()
     print("Started API on {}:{}".format(host, engine.instance.config['port']['api']))
+    import webbrowser
+    webbrowser.open('http://' + host + ':' + str(engine.instance.config['port']['api']))
 
 
 @socketio.on('connect')

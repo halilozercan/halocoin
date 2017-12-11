@@ -119,12 +119,13 @@ class PeerCheckService(Service):
         return 0
 
     def ask_for_txs(self, peer_ip_port):
+        txs = ntwrk.command(peer_ip_port, {'action': 'txs'}, self.node_id)
+
         T = self.blockchain.tx_pool()
         pushers = list(filter(lambda t: t not in txs, T))
         for push in pushers:
             ntwrk.command(peer_ip_port, {'action': 'push_tx', 'tx': push}, self.node_id)
 
-        txs = ntwrk.command(peer_ip_port, {'action': 'txs'}, self.node_id)
         if not isinstance(txs, list):
             return -1
         for tx in txs:
