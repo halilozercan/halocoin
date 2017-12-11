@@ -3,9 +3,11 @@ import random
 import string
 
 import redis
+import sys
 import yaml
 from simplekv.memory.redisstore import RedisStore
 
+from halocoin import tools
 from halocoin.service import Service, sync
 
 
@@ -24,8 +26,16 @@ class DatabaseService(Service):
 
     def on_register(self):
         # TODO: Add authentication support for redis
-        self.DB = RedisStore(redis.StrictRedis(host=os.environ.get('REDIS_URL', 'localhost'),
-                                               db=self.engine.config['database']['index']))
+        try:
+            redis_instance = redis.StrictRedis(host=os.environ.get('REDIS_URL', 'localhost'),
+                                               db=self.engine.config['database']['index'])
+            redis_instance.ping()
+            self.DB = RedisStore(redis_instance)
+        except Exception as e:
+            tools.log(e)
+            sys.stderr.write('Redis connection cannot be established!\nFalling to SQLAlchemy')
+            return False
+
         try:
             self.salt = self.DB.get('salt').decode()
             if self.salt is None:
