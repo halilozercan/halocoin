@@ -38,8 +38,10 @@ class BlockchainService(Service):
             return
         self.set_chain_state(BlockchainService.SYNCING)
         try:
-            if isinstance(candidate_block, list):
-                blocks = candidate_block  # This is just aliasing
+            if isinstance(candidate_block, tuple):
+                blocks = candidate_block[0]  # Get the list of blocks that arrived from a peer
+                node_id = candidate_block[1]  # Source of these blocks.
+                total_number_of_blocks_added = 0
 
                 integrity_flag = True
                 for block in blocks:
@@ -57,7 +59,17 @@ class BlockchainService(Service):
                         else:
                             break
                     for block in blocks:
-                        self.add_block(block)
+                        add_block_result = self.add_block(block)
+                        if add_block_result == 2:  # A block that is ahead of us could not be added. No need to proceed.
+                            break
+                        elif add_block_result == 0:
+                            total_number_of_blocks_added += 1
+
+                    if total_number_of_blocks_added == 0:
+                        # All received blocks failed. Punish the peer by lowering rank.
+                        self.peer_reported_false_blocks(node_id)
+                else:
+                    self.peer_reported_false_blocks(node_id)
             else:
                 self.add_block(candidate_block)
             self.set_chain_state(BlockchainService.IDLE)
@@ -100,8 +112,8 @@ class BlockchainService(Service):
         """
         txs = self.db.get('txs')
         txs.append(tx)
-        api.new_tx_in_pool()
         self.db.put('txs', txs)
+        api.new_tx_in_pool()
 
     @sync
     def tx_pool_pop_all(self):
@@ -111,7 +123,15 @@ class BlockchainService(Service):
         """
         txs = self.db.get('txs')
         self.db.put('txs', [])
+        api.new_tx_in_pool()
         return txs
+
+    @sync
+    def peer_reported_false_blocks(self, node_id):
+        peer = self.account.get_peer(node_id)
+        peer['rank'] *= 0.8
+        peer['rank'] += 0.2 * 30
+        self.account.update_peer(peer)
 
     def add_tx(self, tx):
 
@@ -154,9 +174,10 @@ class BlockchainService(Service):
 
         length = self.db.get('length')
 
-        if int(block['length']) != int(length) + 1:
-            # tools.log('Length is not valid')
-            return False
+        if int(block['length']) < int(length) + 1:
+            return 1
+        elif int(block['length']) > int(length) + 1:
+            return 2
 
         if (length >= 0 and block['diffLength'] != tools.hex_sum(self.db.get('diffLength'), tools.hex_invert(block['target']))) \
                 or (length < 0 and block['diffLength'] != tools.hex_invert(block['target'])):
@@ -164,32 +185,32 @@ class BlockchainService(Service):
             tools.log(tools.hex_sum(self.db.get('diffLength'), tools.hex_invert(block['target'])))
             tools.log(block['length'])
             tools.log('difflength is wrong')
-            return False
+            return 3
 
         if length >= 0 and tools.det_hash(self.db.get(length)) != block['prevHash']:
             tools.log('prevhash different')
-            return False
+            return 3
 
         nonce_and_hash = tools.hash_without_nonce(block)
         if tools.det_hash(nonce_and_hash) > block['target']:
             tools.log('hash value does not match the target')
-            return False
+            return 3
 
         if block['target'] != self.target(block['length']):
             tools.log('block: ' + str(block))
             tools.log('target: ' + str(self.target(block['length'])))
             tools.log('wrong target')
-            return False
+            return 3
 
         recent_time_values = self.recent_blockthings('times', custom.median_block_time_limit, self.db.get('length'))
         median_block = tools.median(recent_time_values)
         if block['time'] < median_block:
             tools.log('Received block is generated earlier than median.')
-            return False
+            return 3
 
         if not self.account.update_accounts_with_block(block, add_flag=True, simulate=True):
             tools.log('Received block failed transactions check.')
-            return False
+            return 3
 
         self.db.put(block['length'], block)
         self.db.put('length', block['length'])
@@ -204,7 +225,7 @@ class BlockchainService(Service):
 
         from halocoin import api
         api.new_block()
-        return True
+        return 0
 
     def delete_block(self):
         """ Removes the most recent block from the blockchain. """

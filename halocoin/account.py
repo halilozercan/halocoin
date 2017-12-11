@@ -249,6 +249,7 @@ class AccountService(Service):
                 if peer['node_id'] == _peer['node_id'] or \
                         (peer['ip'] == _peer['ip'] and peer['port'] == _peer['port']):
                     return
+            peer['rank'] = 10
             peers.append(peer)
 
         self.db.put('peer_list', peers)
@@ -297,6 +298,20 @@ class AccountService(Service):
             return False
 
         return True
+
+    @sync
+    def get_peer_history(self, node_id):
+        if self.db.exists('peer_history_' + node_id):
+            return self.db.get('peer_history_' + node_id)
+        else:
+            return {
+                "greetings": 0,
+                "peer_transfer": 0
+            }
+
+    @sync
+    def set_peer_history(self, node_id, peer_history):
+        self.db.put('peer_history_' + node_id, peer_history)
 
     @sync
     def get_wallets(self):

@@ -42,15 +42,21 @@ class PeerCheckService(Service):
 
         peers = self.account.get_peers()
         if len(peers) > 0:
-            i = tools.exponential_random(1.0 / 2.5) % len(peers)
+            i = tools.exponential_random(1.0 / 2) % len(peers)
             peer = peers[i]
             t1 = time.time()
-            r = self.peer_check(peer)
+            peer_result = self.peer_check(peer)
             t2 = time.time()
 
             peer['rank'] *= 0.8
-            if r == 0:
+            if peer_result == 1:  # We give them blocks. They do not contribute much information
+                peer['rank'] += 0.4 * (t2 - t1)
+            elif peer_result == 2:  # We are at the same level. Treat them equal
                 peer['rank'] += 0.2 * (t2 - t1)
+            elif peer_result == 3:
+                # They give us blocks. Increase their rank.
+                # If blocks are faulty, they will get punished severely.
+                peer['rank'] += 0.1 * (t2 - t1)
             else:
                 peer['rank'] += 0.2 * 30
 
@@ -72,9 +78,9 @@ class PeerCheckService(Service):
                                 self.node_id)
 
         if not isinstance(greeted, dict):
-            return
+            return None
         if 'error' in greeted.keys():
-            return
+            return None
 
         peer['diffLength'] = greeted['diffLength']
         peer['length'] = greeted['length']
@@ -92,31 +98,37 @@ class PeerCheckService(Service):
         # This is the most important peer operation part
         # We are deciding what to do with this peer. We can either
         # send them blocks, share txs or download blocks.
+
+        # Only transfer peers at every minute.
+        peer_history = self.account.get_peer_history(peer['node_id'])
+        if time.time() - peer_history['peer_transfer'] > 60:
+            my_peers = self.account.get_peers()
+            their_peers = ntwrk.command(peer_ip_port, {'action': 'peers'}, self.node_id)
+            if type(their_peers) == list:
+                for p in their_peers:
+                    self.account.add_peer(p, 'friend_of_mine')
+                for p in my_peers:
+                    ntwrk.command(peer_ip_port, {'action': 'receive_peer', 'peer': p}, self.node_id)
+
+            peer_history['peer_transfer'] = time.time()
+            self.account.set_peer_history(peer['node_id'], peer_history)
+
         if them < us:
             self.give_block(peer_ip_port, greeted['length'])
+            return 1
         elif us == them:
             self.ask_for_txs(peer_ip_port)
+            return 2
         else:
-            self.download_blocks(peer_ip_port, greeted['length'], length)
+            self.download_blocks(peer_ip_port, greeted['length'], length, peer['node_id'])
+            return 3
 
-        my_peers = self.account.get_peers()
-        their_peers = ntwrk.command(peer_ip_port, {'action': 'peers'}, self.node_id)
-        if type(their_peers) == list:
-            for p in their_peers:
-                self.account.add_peer(p, 'friend_of_mine')
-            for p in my_peers:
-                ntwrk.command(peer_ip_port, {'action': 'receive_peer', 'peer': p}, self.node_id)
-
-        return 0
-
-    def download_blocks(self, peer_ip_port, block_count_peer, length):
+    def download_blocks(self, peer_ip_port, block_count_peer, length, node_id):
         b = [max(0, length - 10), min(block_count_peer + 1,
                                       length + self.engine.config['peers']['download_limit'])]
         blocks = ntwrk.command(peer_ip_port, {'action': 'range_request', 'range': b}, self.node_id)
-        if not isinstance(blocks, list):
-            return []
-        self.blockchain.blocks_queue.put(blocks)
-        return 0
+        if isinstance(blocks, list):
+            self.blockchain.blocks_queue.put((blocks, node_id))
 
     def ask_for_txs(self, peer_ip_port):
         txs = ntwrk.command(peer_ip_port, {'action': 'txs'}, self.node_id)
