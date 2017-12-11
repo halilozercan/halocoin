@@ -68,10 +68,13 @@ class BlockchainService(Service):
                     if total_number_of_blocks_added == 0:
                         # All received blocks failed. Punish the peer by lowering rank.
                         self.peer_reported_false_blocks(node_id)
+                    else:
+                        api.new_block()
                 else:
                     self.peer_reported_false_blocks(node_id)
             else:
                 self.add_block(candidate_block)
+                api.new_block()
             self.set_chain_state(BlockchainService.IDLE)
         except:
             self.set_chain_state(BlockchainService.IDLE)
@@ -223,8 +226,6 @@ class BlockchainService(Service):
         for orphan in sorted(orphans, key=lambda x: x['count']):
             self.add_tx(orphan)
 
-        from halocoin import api
-        api.new_block()
         return 0
 
     def delete_block(self):

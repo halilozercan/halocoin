@@ -1,5 +1,5 @@
-import queue
 import multiprocessing
+import queue
 import random
 import time
 from multiprocessing import Process
@@ -7,7 +7,6 @@ from multiprocessing import Process
 from halocoin import blockchain
 from halocoin import custom
 from halocoin import tools
-from halocoin.ntwrk import Response
 from halocoin.service import Service, threaded
 
 

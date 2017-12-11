@@ -68,7 +68,6 @@ class Engine(Service):
             self.db.put('accounts', {})
             self.db.put('known_length', -1)
         self.db.put('stop', False)
-        self.db.put('peer_list', [])
 
         if not self.account.register():
             sys.stderr.write("Account service has failed. Exiting!\n")

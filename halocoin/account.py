@@ -1,6 +1,6 @@
 import copy
 
-from halocoin import tools
+from halocoin import tools, api
 from halocoin.service import Service, sync
 
 
@@ -252,6 +252,7 @@ class AccountService(Service):
             peer['rank'] = 10
             peers.append(peer)
 
+        api.peer_update()
         self.db.put('peer_list', peers)
 
     @sync
@@ -270,7 +271,6 @@ class AccountService(Service):
                 peers[i] = peer
                 break
 
-        from halocoin import api
         api.peer_update()
         self.db.put('peer_list', peers)
 

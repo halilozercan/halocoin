@@ -173,24 +173,6 @@ def decrypt(key, content, chunksize=24 * 1024):
     return outfile.getvalue()
 
 
-def parse_wallet(wallet_file, pw=None):
-    from getpass import getpass
-    import yaml
-    wallet_encrypted_content = wallet_file.read()
-    if pw is None:
-        while True:
-            try:
-                wallet_pw = getpass('Wallet password: ')
-
-                wallet = yaml.load(decrypt(wallet_pw, wallet_encrypted_content).decode())
-                break
-            except ValueError:
-                print('Wrong password')
-    else:
-        wallet = yaml.load(decrypt(pw, wallet_encrypted_content).decode())
-    return wallet
-
-
 def signature_verify(message, signature, pubkey):
     from ecdsa import VerifyingKey
     if isinstance(pubkey, str):
@@ -202,23 +184,6 @@ def signature_verify(message, signature, pubkey):
         return pubkey.verify(signature, message)
     else:
         return False
-
-
-def wallet_to_str(wallet):
-    import yaml
-    return yaml.dump(wallet)
-
-
-def wallet_from_str(wallet_str):
-    import yaml
-    return yaml.load(wallet_str)
-
-
-def byteslike_to_hexstr(input):
-    if isinstance(input, (bytearray, bytes)):
-        return input.hex()
-    else:
-        return str(input)
 
 
 def validate_uuid4(uuid_string):

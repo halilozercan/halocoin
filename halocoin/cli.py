@@ -187,7 +187,7 @@ def new_wallet(args):
     else:
         wallet_pw = args.pw
 
-    print(make_api_request(args.action, password=wallet_pw))
+    print(make_api_request(args.action, wallet_name=args.wallet, password=wallet_pw))
 
 
 @action
@@ -198,10 +198,11 @@ def info_wallet(args):
     else:
         wallet_pw = args.pw
 
-    information = make_api_request(args.action, index=args.index, password=wallet_pw)
+    information = make_api_request(args.action, wallet_name=args.wallet_name, password=wallet_pw)
 
     if isinstance(information, dict):
         print("Address: {}".format(information['address']))
+        print("Balance: {}".format(information['balance']))
         print("Pubkey: {}".format(information['pubkey']))
         print("Privkey: {}".format(information['privkey']))
     else:
@@ -224,7 +225,7 @@ def download_wallet(args):
 
 @action
 def block(args):
-    blocks = make_api_request(args.action, number=args.number)
+    blocks = make_api_request(args.action, start=args.start, end=args.end)
     print_blocks(blocks)
 
 
@@ -248,9 +249,15 @@ def node_id(args):
 
 @action
 def send(args):
+    from getpass import getpass
+    if args.pw is None:
+        wallet_pw = getpass('Wallet password: ')
+    else:
+        wallet_pw = args.pw
+
     print(make_api_request(args.action, address=args.address,
                            amount=args.amount, message=args.message,
-                           wallet_name=args.wallet_name))
+                           wallet_name=args.wallet_name, password=wallet_pw))
 
 
 @action
@@ -272,12 +279,15 @@ def stop(args):
 
 @action
 def start_miner(args):
-    if args.wallet is None:
+    if args.wallet_name is None:
         sys.stderr.write("Please provide a wallet which will be rewarded for mining\n")
         return
-    wallet_file = open(args.wallet, 'rb')
-    wallet = tools.parse_wallet(wallet_file, args.pw)
-    print(make_api_request(args.action, wallet=tools.wallet_to_str(wallet)))
+    from getpass import getpass
+    if args.pw is None:
+        wallet_pw = getpass('Wallet password: ')
+    else:
+        wallet_pw = args.pw
+    print(make_api_request(args.action, wallet_name=args.wallet_name, password=wallet_pw))
 
 
 @action
@@ -315,8 +325,10 @@ def run(argv):
                         help='Message to send with transaction')
     parser.add_argument('--amount', action="store", type=int, dest='amount',
                         help='Amount of coins that are going to be used')
-    parser.add_argument('--number', action="store", type=str, dest='number',
-                        help='Block number or range')
+    parser.add_argument('--start', action="store", type=str, dest='start',
+                        help='Starting number while requesting range of blocks')
+    parser.add_argument('--end', action="store", type=str, dest='end',
+                        help='Ending number while requesting range of blocks')
     parser.add_argument('--wallet-path', action="store", type=str, dest='wallet_path',
                         help='Wallet path for uploading')
     parser.add_argument('--wallet', action="store", type=str, dest='wallet_name',
