@@ -23,7 +23,8 @@ def init_logging(DEBUG, working_dir, log_file):
 def get_default_dir():
     from os.path import expanduser
     home = expanduser("~")
-    return os.path.join(home, '.halocoin')
+    default_dir = os.path.join(home, '.halocoin')
+    return os.environ.get("HALOCOIN_DATA_DIR", default_dir)
 
 
 def block_reward(length):
