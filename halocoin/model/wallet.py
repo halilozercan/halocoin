@@ -38,5 +38,5 @@ class Wallet:
     @staticmethod
     def from_string(wallet_string):
         wallet_dict = yaml.load(wallet_string)
-        return Wallet(wallet_dict['name'], SigningKey.from_string(wallet_dict['privkey']))
+        return Wallet(wallet_dict['name'], SigningKey.from_string(wallet_dict['privkey'], curve=SECP256k1))
 

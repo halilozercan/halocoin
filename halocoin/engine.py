@@ -67,6 +67,7 @@ class Engine(Service):
             self.db.put('diffLength', '0')
             self.db.put('accounts', {})
             self.db.put('known_length', -1)
+        self.db.put('txs', [])
         self.db.put('stop', False)
 
         if not self.account.register():

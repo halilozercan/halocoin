@@ -125,14 +125,22 @@ class AccountService(Service):
                 recv_account['amount'] = apply(recv_account['amount'], tx['amount'])
                 recv_account['tx_blocks'] = apply(recv_account['tx_blocks'], block['length'])
                 flag &= (recv_account['amount'] >= 0)
+            elif tx['type'] == 'reward':
+                recv_address = tx['to']
+                recv_account = get_acc(recv_address)
+
+                recv_account['amount'] = apply(recv_account['amount'], tx['amount'])
+                recv_account['tx_blocks'] = apply(recv_account['tx_blocks'], block['length'])
+                flag &= (recv_account['amount'] >= 0)
 
             flag &= (send_account['amount'] >= 0)
 
             if not flag:
                 return False
             else:
-                update_acc(send_address, send_account)
-                if tx['type'] == 'spend':
+                if tx['type'] == 'mint' or tx['type'] == 'spend':
+                    update_acc(send_address, send_account)
+                if tx['type'] == 'spend' or tx['type'] == 'reward':
                     update_acc(recv_address, recv_account)
 
         return flag
@@ -384,3 +392,24 @@ class AccountService(Service):
     def delete_default_wallet(self):
         self.db.delete('default_wallet')
         return True
+
+    @sync
+    def put_certificate(self, cert_pem):
+        if tools.check_certificate_chain(cert_pem):
+            common_name = tools.get_commonname_from_certificate(cert_pem)
+            self.db.put('cert_' + common_name, cert_pem)
+
+    @sync
+    def find_certificate_by_name(self, name):
+        return self.db.get('cert_' + name)
+
+    @sync
+    def find_name_by_certificate(self, cert_pem):
+        if tools.check_certificate_chain(cert_pem):
+            common_name = tools.get_commonname_from_certificate(cert_pem)
+            if self.db.exists('cert_' + common_name):
+                return common_name
+            else:
+                return None
+        else:
+            return None

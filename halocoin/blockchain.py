@@ -10,7 +10,7 @@ from halocoin.service import Service, threaded, sync, NoExceptionQueue
 
 
 class BlockchainService(Service):
-    tx_types = ['spend', 'mint']
+    tx_types = ['spend', 'mint', 'reward']
     IDLE = 1
     SYNCING = 2
 
@@ -72,8 +72,9 @@ class BlockchainService(Service):
                         api.new_block()
                 else:
                     self.peer_reported_false_blocks(node_id)
-            else:
-                self.add_block(candidate_block)
+            elif isinstance(candidate_block, list):
+                for block in candidate_block:
+                    self.add_block(block)
                 api.new_block()
             self.set_chain_state(BlockchainService.IDLE)
         except:
@@ -154,15 +155,16 @@ class BlockchainService(Service):
         if tx in txs_in_pool:
             response.setData('no duplicates')
             response.setFlag(False)
-        if not BlockchainService.tx_integrity_check(tx).getFlag():
+        if not self.tx_integrity_check(tx).getFlag():
             response.setData('tx: ' + str(tx))
             response.setFlag(False)
-        if tx['count'] != self.account.known_tx_count(tools.tx_owner_address(tx)):
-            response.setData('count error')
-            response.setFlag(False)
-        if not self.account.is_tx_affordable(address, tx):
-            response.setData('fee check error')
-            response.setFlag(False)
+        if tx['type'] != 'reward':
+            if tx['count'] != self.account.known_tx_count(tools.tx_owner_address(tx)):
+                response.setData('count error')
+                response.setFlag(False)
+            if not self.account.is_tx_affordable(address, tx):
+                response.setData('fee check error')
+                response.setFlag(False)
 
         if response.getFlag():
             self.tx_pool_add(tx)
@@ -224,6 +226,15 @@ class BlockchainService(Service):
 
         if not self.account.update_accounts_with_block(block, add_flag=True, simulate=True):
             tools.log('Received block failed transactions check.')
+            return 3
+
+        # TODO: Add tx integrity check for all tx types
+        reward_txs = [tx for tx in block['txs'] if tx['type'] == 'reward']
+        flag = True
+        for tx in reward_txs:
+            flag &= self.tx_integrity_check(tx).getFlag()
+        if not flag:
+            tools.log('Received block failed rewards check.')
             return 3
 
         self.db.put(block['length'], block)
@@ -386,8 +397,7 @@ class BlockchainService(Service):
         b = (recent_hash not in their_hashes) and newblocks[0]['length'] - 1 < length < newblocks[-1]['length']
         return b
 
-    @staticmethod
-    def tx_integrity_check(tx):
+    def tx_integrity_check(self, tx):
         """
         This functions test whether a transaction has basic things right.
         Does it have amount, recipient, right signatures and correct address types.
@@ -396,7 +406,7 @@ class BlockchainService(Service):
         :return:
         """
         response = Response(True, None)
-        if tx['type'] == 'spend':
+        if tx['type'] == 'spend' or tx['type'] == 'reward':
             if 'to' not in tx or not isinstance(tx['to'], str):
                 response.setData('no to')
                 response.setFlag(False)
@@ -409,9 +419,27 @@ class BlockchainService(Service):
             if 'amount' not in tx or not isinstance(tx['amount'], (int)):
                 response.setData('no amount')
                 response.setFlag(False)
-        else:
-            response.setFlag(False)
-            response.setData('only spend transactions can be cheched')
+
+        if tx['type'] == 'reward':
+            if 'auth' in tx:
+                cert = self.account.find_certificate_by_name(tx['auth'])
+                if cert is None:
+                    response.setData('given auth name does not have a certificate')
+                    response.setFlag(False)
+                elif tx['pubkeys'] != [tools.get_pubkey_from_certificate(cert).to_string()]:
+                    response.setData('pubkeys does not match with known pubkeys of auth')
+                    response.setFlag(False)
+            elif 'certificate' in tx:
+                if not tools.check_certificate_chain(tx['certificate']):
+                    response.setData('given certificate is not signed by root')
+                    response.setFlag(False)
+                elif tx['pubkeys'] != [tools.get_pubkey_from_certificate(tx['certificate']).to_string()]:
+                    response.setData('pubkeys does not match with certificate')
+                    response.setFlag(False)
+                else:
+                    # Reward transaction includes certificate and passed every check.
+                    # Add it to known certificates
+                    self.account.put_certificate(tx['certificate'])
         return response
 
     def target(self, length):

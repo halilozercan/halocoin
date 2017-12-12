@@ -309,6 +309,60 @@ def send():
     return generate_json_response(response)
 
 
+@app.route('/reward', methods=['GET', 'POST'])
+#@blockchain_synced
+def reward():
+    from ecdsa import SigningKey
+    amount = int(request.values.get('amount', 0))
+    address = request.values.get('address', None)
+    message = request.values.get('message', '')
+    cert_pem = request.values.get('cert_pem', None)
+    priv_key_pem = request.values.get('privkey_pem', None)
+    common_name = request.values.get('common_name', None)
+
+    response = {"success": False}
+    if amount <= 0:
+        response['error'] = "Amount cannot be lower than or equal to 0"
+        return generate_json_response(response)
+    elif address is None:
+        response['error'] = "You need to specify a receiving address for the reward"
+        return generate_json_response(response)
+    elif priv_key_pem is None:
+        response['error'] = "Reward transactions need to be signed by private key belonging to certificate"
+        return generate_json_response(response)
+    elif cert_pem is None and common_name is None:
+        response['error'] = "To reward, you must specify a common name or certificate that is granted by root"
+        return generate_json_response(response)
+
+    tx = {'type': 'reward', 'amount': int(amount),
+          'to': address, 'message': message}
+
+    privkey = SigningKey.from_pem(priv_key_pem)
+
+    if common_name is not None:
+        cert = engine.instance.account.find_certificate_by_name(common_name)
+        if cert is None:
+            response['error'] = 'Given common name does not exist in blockchain'
+        else:
+            tx['auth'] = common_name
+    elif cert_pem is not None:
+        common_name = engine.instance.account.find_name_by_certificate(cert_pem)
+        if common_name is None and not tools.check_certificate_chain(cert_pem):
+            response['error'] = "Given certificate is not granted by root"
+        elif common_name is None:
+            # Add this certificate to transaction
+            tx['certificate'] = cert_pem
+        else:
+            tx['auth'] = common_name
+
+    tx['pubkeys'] = [privkey.get_verifying_key().to_string()]  # We use pubkey as string
+    tx['signatures'] = [tools.sign(tools.det_hash(tx), privkey)]
+    engine.instance.blockchain.tx_queue.put(tx)
+    response["success"] = True
+    response["message"] = 'Reward amount:{} to:{} sent to the pool'.format(tx['amount'], tx['to'])
+    return generate_json_response(response)
+
+
 @app.route('/blockcount', methods=['GET', 'POST'])
 def blockcount():
     result = dict(length=engine.instance.db.get('length'),

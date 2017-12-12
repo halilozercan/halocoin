@@ -261,6 +261,14 @@ def send(args):
 
 
 @action
+def reward(args):
+    cert_pem = open(args.certificate, 'rb').read()
+    privkey_pem = open(args.privkey, 'rb').read()
+    print(make_api_request(args.action, amount=args.amount, address=args.address,
+                           cert_pem=cert_pem, privkey_pem=privkey_pem))
+
+
+@action
 def peers(args):
     peers = make_api_request(args.action)
     print_peers(peers)
@@ -333,6 +341,10 @@ def run(argv):
                         help='Wallet path for uploading')
     parser.add_argument('--wallet', action="store", type=str, dest='wallet_name',
                         help='Wallet name')
+    parser.add_argument('--certificate', action="store", type=str, dest='certificate',
+                        help='Rewarding sub-auth certificate file in pem format')
+    parser.add_argument('--privkey', action="store", type=str, dest='privkey',
+                        help='Rewarding sub-auth private key file in pem format')
     parser.add_argument('--config', action="store", type=str, dest='config',
                         help='Config file address. Use with start command.')
     parser.add_argument('--pw', action="store", type=str, dest='pw',

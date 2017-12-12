@@ -174,11 +174,11 @@ def decrypt(key, content, chunksize=24 * 1024):
 
 
 def signature_verify(message, signature, pubkey):
-    from ecdsa import VerifyingKey
+    from ecdsa import VerifyingKey, SECP256k1
     if isinstance(pubkey, str):
-        pubkey = VerifyingKey.from_string(pubkey)
+        pubkey = VerifyingKey.from_string(pubkey, curve=SECP256k1)
     elif isinstance(pubkey, bytes):
-        pubkey = VerifyingKey.from_string(pubkey)
+        pubkey = VerifyingKey.from_string(pubkey, curve=SECP256k1)
 
     if isinstance(pubkey, VerifyingKey):
         return pubkey.verify(signature, message)
@@ -212,3 +212,32 @@ def validate_uuid4(uuid_string):
     # valid uuid4. This is bad for validation purposes.
 
     return val.hex == uuid_string.replace('-', '')
+
+
+def check_certificate_chain(intermediate_cert_pem):
+    from OpenSSL.crypto import load_certificate, FILETYPE_PEM, X509Store, X509StoreContext
+    root_cert = load_certificate(FILETYPE_PEM, custom.root_cert_pem)
+    intermediate_cert = load_certificate(FILETYPE_PEM, intermediate_cert_pem)
+    try:
+        store = X509Store()
+        store.add_cert(root_cert)
+        store_ctx = X509StoreContext(store, intermediate_cert)
+        store_ctx.verify_certificate()
+        return True
+    except:
+        return False
+
+
+def get_pubkey_from_certificate(intermediate_cert_pem):
+    from OpenSSL.crypto import load_certificate, FILETYPE_PEM, dump_publickey
+    from ecdsa import VerifyingKey
+    intermediate_cert = load_certificate(FILETYPE_PEM, intermediate_cert_pem)
+    pubkey_pem = dump_publickey(FILETYPE_PEM, intermediate_cert.get_pubkey())
+    return VerifyingKey.from_pem(pubkey_pem)
+
+
+def get_commonname_from_certificate(intermediate_cert_pem):
+    from OpenSSL.crypto import load_certificate, FILETYPE_PEM
+    from slugify import slugify
+    intermediate_cert = load_certificate(FILETYPE_PEM, intermediate_cert_pem)
+    return slugify(intermediate_cert.get_subject().commonName)

@@ -1,13 +1,11 @@
 import os
-import random
-import string
+import sys
 
 import redis
-import sys
 import yaml
 from simplekv.memory.redisstore import RedisStore
 
-from halocoin import tools
+from halocoin import tools, custom
 from halocoin.service import Service, sync
 
 
@@ -36,13 +34,7 @@ class DatabaseService(Service):
             sys.stderr.write('Redis connection cannot be established!\nFalling to SQLAlchemy')
             return False
 
-        try:
-            self.salt = self.DB.get('salt').decode()
-            if self.salt is None:
-                raise Exception
-        except Exception as e:
-            self.salt = ''.join(random.choice(string.ascii_uppercase + string.digits) for _ in range(5))
-            self.DB.put('salt', self.salt.encode())
+        self.salt = custom.version
         return True
 
     @sync
