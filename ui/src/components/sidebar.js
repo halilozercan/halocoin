@@ -6,7 +6,7 @@ class MSidebar extends Component {
       <div className="sidebar" data-color="purple" data-image="{{ url_for('.static', filename='img/sidebar-1.jpg') }}">
         <div className="logo">
           <a href="http://alkanlab.org" className="simple-text">
-            Halocoin
+            Coinami
           </a>
         </div>
         <div className="sidebar-wrapper">

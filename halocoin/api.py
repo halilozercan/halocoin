@@ -375,7 +375,10 @@ def blockcount():
 def txs():
     pool = engine.instance.blockchain.tx_pool()
     for i, tx in enumerate(pool):
-        pool[i]['from'] = tools.tx_owner_address(tx)
+        if tx['type'] == 'spend':
+            pool[i]['from'] = tools.tx_owner_address(tx)
+        elif tx['type'] == 'reward':
+            pool[i]['from'] = tools.reward_owner_name(tx)
     return generate_json_response(pool)
 
 

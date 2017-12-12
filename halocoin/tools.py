@@ -44,6 +44,13 @@ def tx_owner_address(tx):
     return make_address(tx['pubkeys'], len(tx['signatures']))
 
 
+def reward_owner_name(tx):
+    if 'auth' in tx:
+        return tx['auth']
+    else:
+        return get_commonname_from_certificate(tx['certificate'])
+
+
 def sign(msg, privkey):
     from ecdsa import SigningKey
     if isinstance(privkey, bytes):
