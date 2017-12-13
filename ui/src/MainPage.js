@@ -2,8 +2,6 @@ import React, { Component } from 'react';
 import {MCardStats, MCardTable} from './components/card.js';
 import $ from "jquery";
 import Blockcount from './widgets/blockcount.js';
-import Balance from './widgets/balance.js';
-import Address from './widgets/address.js';
 import {timestampToDatetime} from './tools.js';
 import axios from 'axios';
 
@@ -85,7 +83,7 @@ class MainPage extends Component {
   updatePeers() {
     axios.get("/peers").then((response) => {
       let data = response.data;
-      const columns = {'ip': 'IP Addres', 'port': 'Port', 'rank': 'Rank', 'length': 'Blockcount'};
+      const columns = {'ip': 'IP Address', 'port': 'Port', 'rank': 'Rank', 'length': 'Blockcount'};
       const rows = [];
       data.map((row, i) => {
         if(row.rank < 30 && rows.length < 10) {
@@ -136,14 +134,7 @@ class MainPage extends Component {
   }
 
   render() {
-    let balance = null;
-    let address = null;
     let txs = null;
-    if(this.state.default_wallet !== null ) {
-      balance = <Balance balance={this.state.default_wallet.balance} name={this.state.default_wallet.name} 
-                         notify={this.props.notify} refresh={() => {this.getDefaultWallet(); this.initBlockchainStats();}} />;
-      address = <Address address={this.state.default_wallet.address} name={this.state.default_wallet.name} notify={this.props.notify} />;
-    }
     if(this.state.txs.rows !== null && this.state.txs.rows.length > 0) {
       txs = <div className="col-lg-6 col-md-12">
               <MCardTable color="green" title="Waiting Transactions" description="List of waiting transactions in the pool"
@@ -154,8 +145,6 @@ class MainPage extends Component {
       <div className="container-fluid">
         <div className="row">
           <Blockcount ref={(input)=>{this.blockcount = input;}}/>
-          {address}
-          {balance}
         </div>
         <div className="row">
           {txs}

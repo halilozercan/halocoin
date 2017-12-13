@@ -20,6 +20,9 @@ memoized_weights = [inflection ** i for i in range(recalculate_target_at)]
 # How often to generate a block in seconds
 blocktime = 60
 
+# drop jobs after this many blocks
+drop_job_block_count = 60
+
 
 # Coinami root certificate.
 # Everyone will accept any certificate that is
@@ -78,6 +81,11 @@ def generate_default_config():
 
     config["miner"] = {
         "cores": -1
+    }
+
+    config["coinami"] = {
+        "rabix_path": "/home/halil/Tools/rabix/rabix-cli-1.0.3/rabix",
+        "workflow_path": "/home/halil/coinami-workflow/coinami.cwl"
     }
     return config
 

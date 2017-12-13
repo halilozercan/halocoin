@@ -10,7 +10,8 @@ class AccountService(Service):
         'count': 0,
         'cache-length': -1,
         'tx_blocks': [],
-        'mined_blocks': []
+        'mined_blocks': [],
+        'assigned_job': ''
     }
 
     default_peer = {
@@ -43,7 +44,7 @@ class AccountService(Service):
 
         if apply_tx_pool:
             txs = self.blockchain.tx_pool()
-            account = self.update_account_with_txs(address, account, txs, add_flag=True)
+            account = self.update_account_with_txs(address, account, txs)
 
         if 'tx_blocks' not in account:
             account['tx_blocks'] = []
@@ -65,7 +66,7 @@ class AccountService(Service):
         return True
 
     @sync
-    def update_accounts_with_block(self, block, add_flag=True, simulate=False):
+    def update_database_with_block(self, block, simulate=False):
         """
 
         :param block:
@@ -73,19 +74,6 @@ class AccountService(Service):
         :param simulate: Do not actually update the accounts, return any irregularity
         :return:
         """
-
-        def apply(a, b):
-            if isinstance(a, int):
-                if add_flag:
-                    a += b
-                else:
-                    a -= b
-            elif isinstance(a, list):
-                if add_flag:
-                    a.append(b)
-                else:
-                    a.remove(b)
-            return a
 
         def get_acc(address):
             if not simulate:
@@ -112,28 +100,44 @@ class AccountService(Service):
             send_account = get_acc(send_address)
 
             if tx['type'] == 'mint':
-                send_account['amount'] = apply(send_account['amount'], tools.block_reward(block['length']))
-                send_account['mined_blocks'] = apply(send_account['mined_blocks'], block['length'])
+                send_account['amount'] += tools.block_reward(block['length'])
+                send_account['mined_blocks'].append(block['length'])
+                flag &= (send_account['amount'] >= 0)
             elif tx['type'] == 'spend':
                 recv_address = tx['to']
                 recv_account = get_acc(recv_address)
 
-                send_account['amount'] = apply(send_account['amount'], -tx['amount'])
-                send_account['count'] = apply(send_account['count'], 1)
-                send_account['tx_blocks'] = apply(send_account['tx_blocks'], block['length'])
+                send_account['amount'] -= tx['amount']
+                send_account['count'] += 1
+                send_account['tx_blocks'].append(block['length'])
 
-                recv_account['amount'] = apply(recv_account['amount'], tx['amount'])
-                recv_account['tx_blocks'] = apply(recv_account['tx_blocks'], block['length'])
+                recv_account['amount'] += tx['amount']
+                recv_account['tx_blocks'].append(block['length'])
                 flag &= (recv_account['amount'] >= 0)
+                flag &= (send_account['amount'] >= 0)
             elif tx['type'] == 'reward':
-                recv_address = tx['to']
+                job = self.db.get('job_' + tx['job_id'])
+                flag &= (job['status_list'][-1]['action'] == 'assign')
                 recv_account = get_acc(recv_address)
 
-                recv_account['amount'] = apply(recv_account['amount'], tx['amount'])
-                recv_account['tx_blocks'] = apply(recv_account['tx_blocks'], block['length'])
+                recv_account['amount'] += tx['amount']
+                recv_account['tx_blocks'].append(block['length'])
                 flag &= (recv_account['amount'] >= 0)
-
-            flag &= (send_account['amount'] >= 0)
+                flag &= self.reward_job(tx['job_id'])
+            elif tx['type'] == 'auth_reg':
+                flag &= self.put_certificate(tx['certificate'])
+            elif tx['type'] == 'job_dump':
+                flag &= self.add_new_job(tx['job'])
+            elif tx['type'] == 'job_request':
+                """
+                Rules are simple: 
+                - job should be newly added or unassigned.
+                - requester must not have any other assigned job
+                """
+                job = self.db.get('job_' + tx['job']['id'])
+                flag &= (job['status_list'][-1]['action'] == 'add' or job['status_list'][-1]['action'] == 'unassign')
+                account = self.db.get(send_address)
+                flag &= (account['assigned_job'] == '')
 
             if not flag:
                 return False
@@ -145,29 +149,66 @@ class AccountService(Service):
 
         return flag
 
-    def update_account_with_txs(self, address, account, txs, add_flag=True, only_outgoing=False):
-        def apply(a, b):
-            if isinstance(a, int):
-                if add_flag:
-                    a += b
-                else:
-                    a -= b
-            elif isinstance(a, list):
-                if add_flag:
-                    a.append(b)
-                else:
-                    a.remove(b)
-            return a
-
+    def update_account_with_txs(self, address, account, txs, only_outgoing=False):
+        """
+        Not many use cases. Dont care
+        """
         for tx in txs:
             owner = tools.tx_owner_address(tx)
             if tx['type'] == 'spend':
                 if owner == address:
-                    account['amount'] = apply(account['amount'], -tx['amount'])
-                    account['count'] = apply(account['count'], 1)
+                    account['amount'] -= -tx['amount']
+                    account['count'] += 1
                 elif tx['to'] == address and not only_outgoing:
-                    account['amount'] = apply(account['amount'], tx['amount'])
+                    account['amount'] += tx['amount']
         return account
+
+    @sync
+    def rollback_block(self, block):
+        """
+        A block rollback means removing the block from chain.
+        A block is defined by its transactions. Here we rollback every object in database to the version
+        that existed before this block. Blocks must be removed one by one.
+
+        Also, there is no need to simulate here.
+        :param block: Block to be removed
+        :return: Success of removal
+        """
+        current_length = self.db.get('length')
+        if block['length'] != current_length:
+            # Block is not at the top the chain
+            return False
+
+        for tx in block['txs']:
+            tx_owner_address = tools.tx_owner_address(tx)
+            owner_account = self.get_account(tx_owner_address)
+            if tx['type'] == 'mint':
+                owner_account['amount'] -= tools.block_reward(block['length'])
+                owner_account['mined_blocks'].remove(block['length'])
+                self.db.put(tx_owner_address, owner_account)
+            elif tx['type'] == 'spend':
+                owner_account['amount'] += tx['amount']
+                owner_account['count'] -= 1
+                owner_account['tx_blocks'].remove(block['length'])
+
+                receiver_account = self.db.get(tx['to'])
+                receiver_account['amount'] -= tx['amount']
+                owner_account['tx_blocks'].remove(block['length'])
+
+                self.db.put(tx_owner_address, owner_account)
+                self.db.put(tx['to'], receiver_account)
+            elif tx['type'] == 'auth_reg':
+                self.delete_certificate(tx['certificate'])
+            elif tx['type'] == 'job_dump':
+                self.delete_job(tx['job']['id'])
+            elif tx['type'] == 'job_request' or tx['type'] == 'reward':
+                job = self.get_job(tx['request']['job_id'])
+                for status in reversed(job['status_list']):
+                    if status['block'] == block['length']:
+                        job['status_list'].remove(status)
+                    else:
+                        break
+                self.db.update_job(job)
 
     def known_tx_count(self, address):
         # Returns the number of transactions that pubkey has broadcast.
@@ -181,8 +222,7 @@ class AccountService(Service):
     def is_tx_affordable(self, address, tx):
         account = self.update_account_with_txs(address,
                                                self.get_account(address),
-                                               [tx] + self.blockchain.tx_pool(),
-                                               add_flag=True)
+                                               [tx] + self.blockchain.tx_pool())
 
         return account['amount'] >= 0
 
@@ -400,6 +440,11 @@ class AccountService(Service):
             self.db.put('cert_' + common_name, cert_pem)
 
     @sync
+    def delete_certificate(self, cert_pem):
+        common_name = tools.get_commonname_from_certificate(cert_pem)
+        self.db.delete('cert_' + common_name, cert_pem)
+
+    @sync
     def find_certificate_by_name(self, name):
         return self.db.get('cert_' + name)
 
@@ -413,3 +458,101 @@ class AccountService(Service):
                 return None
         else:
             return None
+
+    @sync
+    def get_available_jobs(self):
+        job_list = self.db.get('job_list')
+        result = {}
+        for job_id in job_list:
+            job = self.get_job(job_id)
+            # Here we check last transaction made on the job.
+            if job['status_list'][-1]['action'] == 'add' or job['status_list'][-1]['action'] == 'unassign':
+                result[job_id] = self.db.get('job_'+job_id)
+        return result
+
+    @sync
+    def add_new_job(self, job, block_number):
+        job['status_list'] = [{
+            'action': 'add',
+            'block': block_number
+        }]
+        job_list = self.db.get('job_list')
+        if job['id'] in job_list:
+            return False
+        job_list.append(job['id'])
+        self.db.put('job_list', job_list)
+        self.db.put('job_' + job['id'], job)
+        return True
+
+    @sync
+    def assign_job(self, job_id, address, block_number):
+        job = self.db.get('job_' + job_id)
+        if job['status_list'][-1]['action'] != 'add' and job['status_list'][-1]['action'] != 'unassign':
+            return False
+        account = self.db.get(address)
+        if account['assigned_job'] != '':
+            return False
+
+        job['status_list'].append({
+            'action': 'assign',
+            'block': block_number,
+            'address': address
+        })
+        account['assigned_job'] = job_id
+        self.db.put('job_' + job_id, job)
+        self.db.put(address, account)
+        return True
+
+    @sync
+    def reward_job(self, job_id, address, block_number):
+        job = self.db.get('job_' + job_id)
+        if job['status_list'][-1]['action'] != 'assign':
+            return False
+        account = self.db.get(address)
+        if account['assigned_job'] != job_id:
+            return False
+
+        job['status_list'].append({
+            'action': 'reward',
+            'block': block_number,
+            'address': address
+        })
+        account['assigned_job'] = ''
+        self.db.put('job_' + job_id, job)
+        self.db.put(address, account)
+        return True
+
+    @sync
+    def unassign_job(self, job_id, block_number):
+        job = self.db.get('job_' + job_id)
+        if job['status_list'][-1]['action'] != 'assign':
+            return False
+
+        last_assigned_address = job['status_list'][-1]['address']
+        last_assigned_account = self.db.get(last_assigned_address)
+
+        job = self.db.get('job_' + job_id)
+        job['status_list'].append({
+            'action': 'unassign',
+            'block': block_number
+        })
+        last_assigned_account['assigned_job'] = ''
+        self.db.put('job_' + job_id)
+        self.db.put(last_assigned_address, last_assigned_account)
+        return True
+
+    @sync
+    def get_job(self, job_id):
+        return self.db.get('job_' + job_id)
+
+    @sync
+    def update_job(self, job):
+        return self.db.put('job_' + job['id'], job)
+
+    @sync
+    def delete_job(self, job_id):
+        job_list = self.db.get('job_list')
+        job_list.remove(job_id)
+        self.db.put('job_list', job_list)
+        self.db.delete('job_' + job_id)
+        return True

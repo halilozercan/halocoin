@@ -47,7 +47,7 @@ class Balance extends Component {
 
   render() {
     return (
-      <div className="col-lg-6 col-md-12 col-sm-12">
+      <div className="col-lg-12 col-md-12 col-sm-12">
         <div className="card card-stats">
         <div className="card-header" data-background-color="Green">
           <i className="material-icons">info_outline</i>

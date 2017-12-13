@@ -100,6 +100,7 @@ class WalletList extends Component {
               {content}
             </tbody>
           </table>
+          {this.props.children}
         </div>
       </div>
     );

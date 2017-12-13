@@ -313,53 +313,69 @@ def send():
 #@blockchain_synced
 def reward():
     from ecdsa import SigningKey
-    amount = int(request.values.get('amount', 0))
-    address = request.values.get('address', None)
-    message = request.values.get('message', '')
+    job_id = request.values.get('job_id', None)
     cert_pem = request.values.get('cert_pem', None)
     priv_key_pem = request.values.get('privkey_pem', None)
-    common_name = request.values.get('common_name', None)
 
     response = {"success": False}
-    if amount <= 0:
-        response['error'] = "Amount cannot be lower than or equal to 0"
-        return generate_json_response(response)
-    elif address is None:
+    if job_id is None:
         response['error'] = "You need to specify a receiving address for the reward"
         return generate_json_response(response)
     elif priv_key_pem is None:
         response['error'] = "Reward transactions need to be signed by private key belonging to certificate"
         return generate_json_response(response)
-    elif cert_pem is None and common_name is None:
+    elif cert_pem is None:
         response['error'] = "To reward, you must specify a common name or certificate that is granted by root"
         return generate_json_response(response)
 
-    tx = {'type': 'reward', 'amount': int(amount),
-          'to': address, 'message': message}
+    tx = {'type': 'reward', 'job_id': job_id}
 
     privkey = SigningKey.from_pem(priv_key_pem)
-
-    if common_name is not None:
-        cert = engine.instance.account.find_certificate_by_name(common_name)
-        if cert is None:
-            response['error'] = 'Given common name does not exist in blockchain'
-        else:
-            tx['auth'] = common_name
-    elif cert_pem is not None:
-        common_name = engine.instance.account.find_name_by_certificate(cert_pem)
-        if common_name is None and not tools.check_certificate_chain(cert_pem):
-            response['error'] = "Given certificate is not granted by root"
-        elif common_name is None:
-            # Add this certificate to transaction
-            tx['certificate'] = cert_pem
-        else:
-            tx['auth'] = common_name
+    common_name = tools.get_commonname_from_certificate(cert_pem)
 
     tx['pubkeys'] = [privkey.get_verifying_key().to_string()]  # We use pubkey as string
     tx['signatures'] = [tools.sign(tools.det_hash(tx), privkey)]
     engine.instance.blockchain.tx_queue.put(tx)
     response["success"] = True
     response["message"] = 'Reward amount:{} to:{} sent to the pool'.format(tx['amount'], tx['to'])
+    return generate_json_response(response)
+
+
+@app.route('/auth_reg', methods=['GET', 'POST'])
+#@blockchain_synced
+def auth_reg():
+    from ecdsa import SigningKey
+    cert_pem = request.values.get('cert_pem', None)
+    priv_key_pem = request.values.get('privkey_pem', None)
+
+    response = {"success": False}
+    if priv_key_pem is None:
+        response['error'] = "Auth registration transactions need to be signed by private key belonging to certificate"
+        return generate_json_response(response)
+    elif cert_pem is None:
+        response['error'] = "Certificate is required for registration"
+        return generate_json_response(response)
+
+    tx = {'type': 'auth_reg'}
+
+    privkey = SigningKey.from_pem(priv_key_pem)
+
+    common_name = engine.instance.account.find_name_by_certificate(cert_pem)
+    if common_name is None and not tools.check_certificate_chain(cert_pem):
+        response['error'] = "Given certificate is not granted by root"
+        return generate_json_response(response)
+    elif common_name is None:
+        # Add this certificate to transaction
+        tx['certificate'] = cert_pem
+    else:
+        response['error'] = "This auth is already registered"
+        return generate_json_response(response)
+
+    tx['pubkeys'] = [privkey.get_verifying_key().to_string()]  # We use pubkey as string
+    tx['signatures'] = [tools.sign(tools.det_hash(tx), privkey)]
+    engine.instance.blockchain.tx_queue.put(tx)
+    response["success"] = True
+    response["message"] = 'Auth registration is added to the pool'
     return generate_json_response(response)
 
 
@@ -495,12 +511,6 @@ def status_miner():
 def generate_json_response(obj):
     result_text = json.dumps(obj, cls=ComplexEncoder)
     return Response(response=result_text, headers={"Content-Type": "application/json"})
-
-
-@app.route('/notify')
-def notify():
-    new_block()
-    return "ok"
 
 
 def new_block():

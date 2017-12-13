@@ -10,7 +10,16 @@ from halocoin.service import Service, threaded, sync, NoExceptionQueue
 
 
 class BlockchainService(Service):
-    tx_types = ['spend', 'mint', 'reward']
+    """
+    tx_types are allowed transactions in coinami platform.
+    spend: Send coins from one address to another
+    mint: Traditional mining coinbase
+    reward: Reward coins sent from an authority to an address
+    auth_reg: Authority register. Includes a certificate that proves this authority is approved by root.
+    job_dump: Announcing jobs that are prepared and ready to be downloaded
+    job_request: Entering a pool for a job request.
+    """
+    tx_types = ['spend', 'mint', 'reward', 'auth_reg', 'job_dump', 'job_request']
     IDLE = 1
     SYNCING = 2
 
@@ -224,17 +233,17 @@ class BlockchainService(Service):
             tools.log('Received block includes wrong amount of mint txs')
             return 3
 
-        if not self.account.update_accounts_with_block(block, add_flag=True, simulate=True):
-            tools.log('Received block failed transactions check.')
-            return 3
-
         # TODO: Add tx integrity check for all tx types
-        reward_txs = [tx for tx in block['txs'] if tx['type'] == 'reward']
+        coinami_txs = [tx for tx in block['txs'] if tx['type'] != 'spend' and tx['type'] != 'mint']
         flag = True
-        for tx in reward_txs:
+        for tx in coinami_txs:
             flag &= self.tx_integrity_check(tx).getFlag()
         if not flag:
-            tools.log('Received block failed rewards check.')
+            tools.log('Received block failed special txs check.')
+            return 3
+
+        if not self.account.update_database_with_block(block, simulate=True):
+            tools.log('Received block failed simulation.')
             return 3
 
         self.db.put(block['length'], block)
@@ -243,7 +252,7 @@ class BlockchainService(Service):
 
         orphans = self.tx_pool_pop_all()
 
-        self.account.update_accounts_with_block(block, add_flag=True)
+        self.account.update_database_with_block(block, add_flag=True)
 
         for orphan in sorted(orphans, key=lambda x: x['count']):
             self.add_tx(orphan)
@@ -267,7 +276,7 @@ class BlockchainService(Service):
         self.db.put('times', times)
 
         block = self.db.get(length)
-        self.account.update_accounts_with_block(block, add_flag=False)
+        self.account.rollback_block(block)
 
         orphans = self.tx_pool_pop_all()
 
@@ -405,42 +414,63 @@ class BlockchainService(Service):
         :param txs: These txs can come from both pool and block.
         :return:
         """
-        response = Response(True, None)
+
         if tx['type'] == 'spend' or tx['type'] == 'reward':
             if 'to' not in tx or not isinstance(tx['to'], str):
-                response.setData('no to')
-                response.setFlag(False)
+                return Response(False, 'no to')
             if not BlockchainService.tx_signature_check(tx):
-                response.setData('signature check')
-                response.setFlag(False)
+                return Response(False, 'signature check')
             if len(tx['to']) <= 30:
-                response.setData('that address is too short ' + 'tx: ' + str(tx))
-                response.setFlag(False)
+                return Response(False, 'that address is too short ' + 'tx: ' + str(tx))
             if 'amount' not in tx or not isinstance(tx['amount'], (int)):
-                response.setData('no amount')
-                response.setFlag(False)
+                return Response(False, 'no amount')
+
+        if tx['type'] == 'job_request':
+            if 'job_id' not in tx:
+                return Response(False, 'job id missing from the request')
+            elif 'amount' not in tx:
+                return Response(False, 'amount missing from the request')
+            else:
+                job = self.account.get_job(tx['job_id'])
+                if job is None:
+                    return Response(False, 'given job does not exist')
+                elif job['status'] != 'available':
+                    return Response(False, 'given job is not available for taking')
 
         if tx['type'] == 'reward':
-            if 'auth' in tx:
-                cert = self.account.find_certificate_by_name(tx['auth'])
-                if cert is None:
-                    response.setData('given auth name does not have a certificate')
-                    response.setFlag(False)
-                elif tx['pubkeys'] != [tools.get_pubkey_from_certificate(cert).to_string()]:
-                    response.setData('pubkeys does not match with known pubkeys of auth')
-                    response.setFlag(False)
-            elif 'certificate' in tx:
-                if not tools.check_certificate_chain(tx['certificate']):
-                    response.setData('given certificate is not signed by root')
-                    response.setFlag(False)
-                elif tx['pubkeys'] != [tools.get_pubkey_from_certificate(tx['certificate']).to_string()]:
-                    response.setData('pubkeys does not match with certificate')
-                    response.setFlag(False)
-                else:
-                    # Reward transaction includes certificate and passed every check.
-                    # Add it to known certificates
-                    self.account.put_certificate(tx['certificate'])
-        return response
+            if 'auth' not in tx:
+                return Response(False, 'Reward transactions must include auth name')
+            cert = self.account.find_certificate_by_name(tx['auth'])
+            if cert is None:
+                return Response(False, 'given auth name does not have a known certificate')
+            elif tx['pubkeys'] != [tools.get_pubkey_from_certificate(cert).to_string()]:
+                return Response(False, 'pubkeys do not match with known pubkeys of auth')
+            else:
+                job = self.account.get_job(tx['job_id'])
+                if job is None:
+                    return Response(False, 'given job does not exist')
+                elif job['status'] != 'assigned':
+                    return Response(False, 'given job is not assigned')
+
+        if tx['type'] == 'job_dump':
+            if 'auth' not in tx:
+                return Response(False, 'Job dump transactions must include auth name')
+            cert = self.account.find_certificate_by_name(tx['auth'])
+            if cert is None:
+                return Response(False, 'given auth name does not have a known certificate')
+            elif tx['pubkeys'] != [tools.get_pubkey_from_certificate(cert).to_string()]:
+                return Response(False, 'pubkeys do not match with known pubkeys of auth')
+            if 'job' not in 'tx':
+                return Response(False, 'Job dump transactions must include a job in it. Makes sense right?')
+
+        if tx['type'] == 'auth_reg':
+            if 'certificate' not in tx:
+                return Response(False, 'Auth must register with a valid certificate')
+            if not tools.check_certificate_chain(tx['certificate']):
+                return Response(False, 'given certificate is not signed by root')
+            elif tx['pubkeys'] != [tools.get_pubkey_from_certificate(tx['certificate']).to_string()]:
+                return Response(False, 'pubkeys do not match with certificate')
+        return Response(True, 'Everything seems fine')
 
     def target(self, length):
         def targetTimesFloat(target, number):
