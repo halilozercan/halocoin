@@ -261,10 +261,32 @@ def send(args):
 
 
 @action
+def job_request(args):
+    from getpass import getpass
+    if args.pw is None:
+        wallet_pw = getpass('Wallet password: ')
+    else:
+        wallet_pw = args.pw
+
+    print(make_api_request(args.action,
+                           job_id=args.job_id, amount=args.amount,
+                           wallet_name=args.wallet_name, password=wallet_pw))
+
+
+@action
 def reward(args):
     cert_pem = open(args.certificate, 'rb').read()
     privkey_pem = open(args.privkey, 'rb').read()
     print(make_api_request(args.action, amount=args.amount, address=args.address,
+                           cert_pem=cert_pem, privkey_pem=privkey_pem))
+
+
+@action
+def job_dump(args):
+    import time
+    cert_pem = open(args.certificate, 'rb').read()
+    privkey_pem = open(args.privkey, 'rb').read()
+    print(make_api_request(args.action, job_id=args.job_id, job_timestamp=time.time(),
                            cert_pem=cert_pem, privkey_pem=privkey_pem))
 
 
@@ -350,6 +372,8 @@ def run(argv):
                         help='Wallet name')
     parser.add_argument('--certificate', action="store", type=str, dest='certificate',
                         help='Rewarding sub-auth certificate file in pem format')
+    parser.add_argument('--job-id', action="store", type=str, dest='job_id',
+                        help='While dumping, requesting, or rewarding, necessary job id.')
     parser.add_argument('--privkey', action="store", type=str, dest='privkey',
                         help='Rewarding sub-auth private key file in pem format')
     parser.add_argument('--config', action="store", type=str, dest='config',

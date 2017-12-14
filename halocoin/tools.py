@@ -18,6 +18,8 @@ def init_logging(DEBUG, working_dir, log_file):
                             level=logging.DEBUG,
                             format='%(levelname)s on %(asctime)s\n%(message)s',
                             datefmt='%m/%d/%Y %I:%M:%S %p')
+    log = logging.getLogger('werkzeug')
+    log.setLevel(logging.ERROR)
 
 
 def get_default_dir():

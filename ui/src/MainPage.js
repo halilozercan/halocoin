@@ -19,6 +19,18 @@ class MainPage extends Component {
         'columns': {},
         'rows': null
       },
+      'job_txs': {
+        'columns': {},
+        'rows': null
+      },
+      'available_jobs': {
+        'columns': {},
+        'rows': null
+      },
+      'assigned_jobs': {
+        'columns': {},
+        'rows': null
+      },
       'blocks': {
         'columns': {},
         'rows': null
@@ -53,6 +65,8 @@ class MainPage extends Component {
     this.updateTxs();
     this.updatePeers();
     this.updateBlocks();
+    this.updateJobTxs();
+    this.updateJobs();
   }
 
   updateTxs() {
@@ -61,7 +75,7 @@ class MainPage extends Component {
       const columns = {'from': 'Sender', 'to': 'Receiver', 'amount': 'Value'};
       const rows = [];
       data.map((row, i) => {
-        if(rows.length < 20) {
+        if(rows.length < 20 && row.type == 'spend') {
           let new_row = [];
           Object.keys(columns).map((col, j) => {
             new_row.push(row[col]);
@@ -72,6 +86,78 @@ class MainPage extends Component {
 
       this.setState((state) => {
         state['txs'] = {
+          'rows': rows,
+          'columns': columns
+        }
+        return state;
+      });
+    });
+  }
+
+  updateJobTxs() {
+    axios.get("/txs").then((response) => {
+      let data = response.data;
+      const columns = {'type': 'Type', 'from': 'Announcer', 'to': 'Target', 'amount': 'Supply'};
+      const rows = [];
+      data.map((row, i) => {
+        if(rows.length < 20 && row.type != 'spend') {
+          let new_row = [];
+          Object.keys(columns).map((col, j) => {
+            new_row.push(row[col]);
+          });
+          rows.push(new_row);
+        }
+      });
+
+      this.setState((state) => {
+        state['job_txs'] = {
+          'rows': rows,
+          'columns': columns
+        }
+        return state;
+      });
+    });
+  }
+
+  updateJobs() {
+    axios.get("/jobs").then((response) => {
+      let data = response.data.available;
+
+      console.log(data);
+      let columns = {'job_id': 'Job ID', 'added_at': 'Added At'};
+      let rows = [];
+      Object.values(data).map((row, i) => {
+        if(rows.length < 20) {
+          let new_row = [];
+          new_row.push(row.id);
+          new_row.push(row.status_list[0].block);
+          rows.push(new_row);
+        }
+      });
+
+      this.setState((state) => {
+        state['available_jobs'] = {
+          'rows': rows,
+          'columns': columns
+        }
+        return state;
+      });
+
+      data = response.data.assigned;
+      columns = {'job_id': 'Job ID', 'assigned_at': 'Assignment Block', 'assigned_to': 'Assignee'};
+      rows = [];
+      Object.values(data).map((row, i) => {
+        if(rows.length < 20) {
+          let new_row = [];
+          new_row.push(row.id);
+          new_row.push(row.status_list[row.status_list.length-1].block);
+          new_row.push(row.status_list[row.status_list.length-1].address);
+          rows.push(new_row);
+        }
+      });
+
+      this.setState((state) => {
+        state['assigned_jobs'] = {
           'rows': rows,
           'columns': columns
         }
@@ -155,6 +241,20 @@ class MainPage extends Component {
           <div className="col-lg-6 col-md-12">
             <MCardTable color="purple" title="Peers" description="List of top ranked peers in your network"
              columns={this.state.peers.columns} rows={this.state.peers.rows}/>
+          </div>
+          <div className="col-lg-6 col-md-12">
+            <MCardTable color="yellow" title="Job Transactions" description="Transactions that are special to Coinami network"
+             columns={this.state.job_txs.columns} rows={this.state.job_txs.rows}/>
+          </div>
+        </div>
+        <div className="row">
+          <div className="col-lg-6 col-md-12">
+            <MCardTable color="green" title="Available Jobs" description="Jobs that are currently available for bidding"
+             columns={this.state.available_jobs.columns} rows={this.state.available_jobs.rows}/>
+          </div>
+          <div className="col-lg-6 col-md-12">
+            <MCardTable color="red" title="Assigned Jobs" description="Jobs that are assigned until some time"
+             columns={this.state.assigned_jobs.columns} rows={this.state.assigned_jobs.rows}/>
           </div>
         </div>
       </div>

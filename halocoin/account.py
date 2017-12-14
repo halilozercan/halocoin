@@ -66,46 +66,81 @@ class AccountService(Service):
         return True
 
     @sync
-    def update_database_with_block(self, block, simulate=False):
+    def check_tx_validity_to_blockchain(self, tx):
+        current_length = self.db.get('length')
+        send_address = tools.tx_owner_address(tx)
+        send_account = self.db.get(send_address)
+
+        if tx['type'] == 'mint':
+            send_account['amount'] += tools.block_reward(current_length)
+            return send_account['amount'] >= 0
+        elif tx['type'] == 'spend':
+            if tx['count'] != self.known_tx_count(send_address):
+                return False
+
+            recv_address = tx['to']
+            recv_account = self.db.get(recv_address)
+
+            send_account['amount'] -= tx['amount']
+            send_account['count'] += 1
+
+            recv_account['amount'] += tx['amount']
+            return (recv_account['amount'] >= 0) and (send_account['amount'] >= 0)
+        elif tx['type'] == 'reward':
+            job = self.db.get('job_' + tx['job_id'])
+            last_change = job['status_list'][-1]
+            # This job is not assigned to anyone right now.
+            if last_change['action'] != 'assign':
+                return False
+
+            # Reward is addressed to wrong address.
+            if last_change['address'] != tx['to']:
+                return False
+
+            recv_account = self.db.get(last_change['address'])
+            # Receiving account does not have the same assignment
+            if recv_account['assigned_job'] != tx['job_id']:
+                return False
+
+            recv_account['amount'] += tx['amount']
+            return recv_account['amount'] >= 0
+        elif tx['type'] == 'auth_reg':
+            return tools.check_certificate_chain(tx['certificate'])
+        elif tx['type'] == 'job_dump':
+            return not self.db.exists('job_' + tx['job']['id'])
+        elif tx['type'] == 'job_request':
+            """
+            Rules are simple: 
+            - job should be newly added or unassigned.
+            - requester must not have any other assigned job
+            """
+            job = self.db.get('job_' + tx['job_id'])
+            first_condition = (job['status_list'][-1]['action'] == 'add' or job['status_list'][-1]['action'] == 'unassign')
+            account = self.get_account(send_address)
+            second_condition = (account['assigned_job'] == '')
+            return first_condition and second_condition
+
+    @sync
+    def update_database_with_block(self, block):
         """
+        This method should only be called after block passes every check.
 
         :param block:
-        :param add_flag: Is block being added or removed
-        :param simulate: Do not actually update the accounts, return any irregularity
         :return:
         """
 
-        def get_acc(address):
-            if not simulate:
-                account = self.get_account(address)
-            else:
-                if address not in account_sandbox:
-                    account = self.get_account(address)
-                    account_sandbox[address] = account
-                account = account_sandbox[address]
-            return account
-
-        def update_acc(address, account):
-            if not simulate:
-                self.update_account(address, account)
-            else:
-                account_sandbox[address] = account
-            return True
-
-        flag = True
-        account_sandbox = {}
-
+        from collections import defaultdict
+        requested_jobs = defaultdict(list)
         for tx in block['txs']:
             send_address = tools.tx_owner_address(tx)
-            send_account = get_acc(send_address)
+            send_account = self.get_account(send_address)
 
             if tx['type'] == 'mint':
                 send_account['amount'] += tools.block_reward(block['length'])
                 send_account['mined_blocks'].append(block['length'])
-                flag &= (send_account['amount'] >= 0)
             elif tx['type'] == 'spend':
                 recv_address = tx['to']
-                recv_account = get_acc(recv_address)
+                recv_account = self.get_account(recv_address)
 
                 send_account['amount'] -= tx['amount']
                 send_account['count'] += 1
@@ -113,55 +148,35 @@ class AccountService(Service):
 
                 recv_account['amount'] += tx['amount']
                 recv_account['tx_blocks'].append(block['length'])
-                flag &= (recv_account['amount'] >= 0)
-                flag &= (send_account['amount'] >= 0)
             elif tx['type'] == 'reward':
-                job = self.db.get('job_' + tx['job_id'])
-                flag &= (job['status_list'][-1]['action'] == 'assign')
-                recv_account = get_acc(recv_address)
+                recv_account = self.get_account(recv_address)
 
                 recv_account['amount'] += tx['amount']
                 recv_account['tx_blocks'].append(block['length'])
-                flag &= (recv_account['amount'] >= 0)
-                flag &= self.reward_job(tx['job_id'])
             elif tx['type'] == 'auth_reg':
-                flag &= self.put_certificate(tx['certificate'])
+                self.put_certificate(tx['certificate'])
             elif tx['type'] == 'job_dump':
-                flag &= self.add_new_job(tx['job'])
+                self.add_new_job(tx['job'], block['length'])
             elif tx['type'] == 'job_request':
-                """
-                Rules are simple: 
-                - job should be newly added or unassigned.
-                - requester must not have any other assigned job
-                """
-                job = self.db.get('job_' + tx['job']['id'])
-                flag &= (job['status_list'][-1]['action'] == 'add' or job['status_list'][-1]['action'] == 'unassign')
-                account = self.db.get(send_address)
-                flag &= (account['assigned_job'] == '')
+                requested_jobs[tx['job_id']].append((send_address, tx['amount']))
 
-            if not flag:
-                return False
-            else:
-                if tx['type'] == 'mint' or tx['type'] == 'spend':
-                    update_acc(send_address, send_account)
-                if tx['type'] == 'spend' or tx['type'] == 'reward':
-                    update_acc(recv_address, recv_account)
+            if tx['type'] == 'mint' or tx['type'] == 'spend':
+                self.update_account(send_address, send_account)
+            if tx['type'] == 'spend' or tx['type'] == 'reward':
+                self.update_account(recv_address, recv_account)
 
-        return flag
+        for requested_job_id in requested_jobs.keys():
+            sorted_requests = sorted(requested_jobs[requested_job_id], key=lambda x: x[1])
+            lowest_bidder = sorted_requests[0][0]
+            self.assign_job(requested_job_id, lowest_bidder, block['length'])
 
-    def update_account_with_txs(self, address, account, txs, only_outgoing=False):
-        """
-        Not many use cases. Dont care
-        """
-        for tx in txs:
-            owner = tools.tx_owner_address(tx)
-            if tx['type'] == 'spend':
-                if owner == address:
-                    account['amount'] -= -tx['amount']
-                    account['count'] += 1
-                elif tx['to'] == address and not only_outgoing:
-                    account['amount'] += tx['amount']
-        return account
+        # Now we take a look at back, we unassign jobs that are still not rewarded
+        from halocoin import custom
+        assigned_jobs = self.get_assigned_jobs()
+        for job in assigned_jobs.values():
+            if job['status_list'][-1]['block'] <= (block['length'] - custom.drop_job_block_count):
+                self.unassign_job(job['id'], block['length'])
+
 
     @sync
     def rollback_block(self, block):
@@ -209,6 +224,20 @@ class AccountService(Service):
                     else:
                         break
                 self.db.update_job(job)
+
+    def update_account_with_txs(self, address, account, txs, only_outgoing=False):
+        """
+        Not many use cases. Dont care
+        """
+        for tx in txs:
+            owner = tools.tx_owner_address(tx)
+            if tx['type'] == 'spend':
+                if owner == address:
+                    account['amount'] -= -tx['amount']
+                    account['count'] += 1
+                elif tx['to'] == address and not only_outgoing:
+                    account['amount'] += tx['amount']
+        return account
 
     def known_tx_count(self, address):
         # Returns the number of transactions that pubkey has broadcast.
@@ -471,14 +500,23 @@ class AccountService(Service):
         return result
 
     @sync
+    def get_assigned_jobs(self):
+        job_list = self.db.get('job_list')
+        result = {}
+        for job_id in job_list:
+            job = self.get_job(job_id)
+            # Here we check last transaction made on the job.
+            if job['status_list'][-1]['action'] == 'assign':
+                result[job_id] = self.db.get('job_' + job_id)
+        return result
+
+    @sync
     def add_new_job(self, job, block_number):
         job['status_list'] = [{
             'action': 'add',
             'block': block_number
         }]
         job_list = self.db.get('job_list')
-        if job['id'] in job_list:
-            return False
         job_list.append(job['id'])
         self.db.put('job_list', job_list)
         self.db.put('job_' + job['id'], job)
@@ -489,7 +527,7 @@ class AccountService(Service):
         job = self.db.get('job_' + job_id)
         if job['status_list'][-1]['action'] != 'add' and job['status_list'][-1]['action'] != 'unassign':
             return False
-        account = self.db.get(address)
+        account = self.get_account(address)
         if account['assigned_job'] != '':
             return False
 
@@ -508,7 +546,7 @@ class AccountService(Service):
         job = self.db.get('job_' + job_id)
         if job['status_list'][-1]['action'] != 'assign':
             return False
-        account = self.db.get(address)
+        account = self.get_account(address)
         if account['assigned_job'] != job_id:
             return False
 
@@ -519,7 +557,7 @@ class AccountService(Service):
         })
         account['assigned_job'] = ''
         self.db.put('job_' + job_id, job)
-        self.db.put(address, account)
+        self.update_account(address, account)
         return True
 
     @sync
@@ -529,7 +567,7 @@ class AccountService(Service):
             return False
 
         last_assigned_address = job['status_list'][-1]['address']
-        last_assigned_account = self.db.get(last_assigned_address)
+        last_assigned_account = self.get_account(last_assigned_address)
 
         job = self.db.get('job_' + job_id)
         job['status_list'].append({
@@ -537,8 +575,8 @@ class AccountService(Service):
             'block': block_number
         })
         last_assigned_account['assigned_job'] = ''
-        self.db.put('job_' + job_id)
-        self.db.put(last_assigned_address, last_assigned_account)
+        self.db.put('job_' + job_id, job)
+        self.update_account(last_assigned_address, last_assigned_account)
         return True
 
     @sync
