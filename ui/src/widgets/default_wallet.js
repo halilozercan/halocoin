@@ -28,10 +28,11 @@ class DefaultWallet extends Component {
     return (
       <div className="col-lg-6 col-md-12 col-sm-12">
         <div className="card">
-          <MAlert type={color} icon="explore" text="Default wallets are stored as decrypted. Any action requiring a wallet will be performed with default wallet if another is not given." />
-          <div className="card-content">
-            Default Wallet: <b>{content}</b>
+          <MAlert type={color} icon="explore" text="Default wallets are stored as decrypted. Any action requiring a wallet will be performed with default wallet if another is not given.">
             {removeDefaultButton}
+          </MAlert>
+          <div className="card-content">
+            {this.props.children}
           </div>
         </div>
       </div>

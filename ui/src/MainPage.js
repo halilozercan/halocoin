@@ -2,8 +2,6 @@ import React, { Component } from 'react';
 import {MCardStats, MCardTable} from './components/card.js';
 import $ from "jquery";
 import Blockcount from './widgets/blockcount.js';
-import Balance from './widgets/balance.js';
-import Address from './widgets/address.js';
 import {timestampToDatetime} from './tools.js';
 import axios from 'axios';
 
@@ -18,6 +16,18 @@ class MainPage extends Component {
         'rows': null
       },
       'txs': {
+        'columns': {},
+        'rows': null
+      },
+      'job_txs': {
+        'columns': {},
+        'rows': null
+      },
+      'available_jobs': {
+        'columns': {},
+        'rows': null
+      },
+      'assigned_jobs': {
         'columns': {},
         'rows': null
       },
@@ -55,6 +65,8 @@ class MainPage extends Component {
     this.updateTxs();
     this.updatePeers();
     this.updateBlocks();
+    this.updateJobTxs();
+    this.updateJobs();
   }
 
   updateTxs() {
@@ -63,7 +75,7 @@ class MainPage extends Component {
       const columns = {'from': 'Sender', 'to': 'Receiver', 'amount': 'Value'};
       const rows = [];
       data.map((row, i) => {
-        if(rows.length < 20) {
+        if(rows.length < 20 && row.type == 'spend') {
           let new_row = [];
           Object.keys(columns).map((col, j) => {
             new_row.push(row[col]);
@@ -82,10 +94,82 @@ class MainPage extends Component {
     });
   }
 
+  updateJobTxs() {
+    axios.get("/txs").then((response) => {
+      let data = response.data;
+      const columns = {'type': 'Type', 'from': 'Announcer', 'to': 'Target', 'amount': 'Supply'};
+      const rows = [];
+      data.map((row, i) => {
+        if(rows.length < 20 && row.type != 'spend') {
+          let new_row = [];
+          Object.keys(columns).map((col, j) => {
+            new_row.push(row[col]);
+          });
+          rows.push(new_row);
+        }
+      });
+
+      this.setState((state) => {
+        state['job_txs'] = {
+          'rows': rows,
+          'columns': columns
+        }
+        return state;
+      });
+    });
+  }
+
+  updateJobs() {
+    axios.get("/jobs").then((response) => {
+      let data = response.data.available;
+
+      console.log(data);
+      let columns = {'job_id': 'Job ID', 'added_at': 'Added At'};
+      let rows = [];
+      Object.values(data).map((row, i) => {
+        if(rows.length < 20) {
+          let new_row = [];
+          new_row.push(row.id);
+          new_row.push(row.status_list[0].block);
+          rows.push(new_row);
+        }
+      });
+
+      this.setState((state) => {
+        state['available_jobs'] = {
+          'rows': rows,
+          'columns': columns
+        }
+        return state;
+      });
+
+      data = response.data.assigned;
+      columns = {'job_id': 'Job ID', 'assigned_at': 'Assignment Block', 'assigned_to': 'Assignee'};
+      rows = [];
+      Object.values(data).map((row, i) => {
+        if(rows.length < 20) {
+          let new_row = [];
+          new_row.push(row.id);
+          new_row.push(row.status_list[row.status_list.length-1].block);
+          new_row.push(row.status_list[row.status_list.length-1].address);
+          rows.push(new_row);
+        }
+      });
+
+      this.setState((state) => {
+        state['assigned_jobs'] = {
+          'rows': rows,
+          'columns': columns
+        }
+        return state;
+      });
+    });
+  }
+
   updatePeers() {
     axios.get("/peers").then((response) => {
       let data = response.data;
-      const columns = {'ip': 'IP Addres', 'port': 'Port', 'rank': 'Rank', 'length': 'Blockcount'};
+      const columns = {'ip': 'IP Address', 'port': 'Port', 'rank': 'Rank', 'length': 'Blockcount'};
       const rows = [];
       data.map((row, i) => {
         if(row.rank < 30 && rows.length < 10) {
@@ -136,14 +220,7 @@ class MainPage extends Component {
   }
 
   render() {
-    let balance = null;
-    let address = null;
     let txs = null;
-    if(this.state.default_wallet !== null ) {
-      balance = <Balance balance={this.state.default_wallet.balance} name={this.state.default_wallet.name} 
-                         notify={this.props.notify} refresh={() => {this.getDefaultWallet(); this.initBlockchainStats();}} />;
-      address = <Address address={this.state.default_wallet.address} name={this.state.default_wallet.name} notify={this.props.notify} />;
-    }
     if(this.state.txs.rows !== null && this.state.txs.rows.length > 0) {
       txs = <div className="col-lg-6 col-md-12">
               <MCardTable color="green" title="Waiting Transactions" description="List of waiting transactions in the pool"
@@ -154,8 +231,6 @@ class MainPage extends Component {
       <div className="container-fluid">
         <div className="row">
           <Blockcount ref={(input)=>{this.blockcount = input;}}/>
-          {address}
-          {balance}
         </div>
         <div className="row">
           {txs}
@@ -166,6 +241,20 @@ class MainPage extends Component {
           <div className="col-lg-6 col-md-12">
             <MCardTable color="purple" title="Peers" description="List of top ranked peers in your network"
              columns={this.state.peers.columns} rows={this.state.peers.rows}/>
+          </div>
+          <div className="col-lg-6 col-md-12">
+            <MCardTable color="yellow" title="Job Transactions" description="Transactions that are special to Coinami network"
+             columns={this.state.job_txs.columns} rows={this.state.job_txs.rows}/>
+          </div>
+        </div>
+        <div className="row">
+          <div className="col-lg-6 col-md-12">
+            <MCardTable color="green" title="Available Jobs" description="Jobs that are currently available for bidding"
+             columns={this.state.available_jobs.columns} rows={this.state.available_jobs.rows}/>
+          </div>
+          <div className="col-lg-6 col-md-12">
+            <MCardTable color="red" title="Assigned Jobs" description="Jobs that are assigned until some time"
+             columns={this.state.assigned_jobs.columns} rows={this.state.assigned_jobs.rows}/>
           </div>
         </div>
       </div>

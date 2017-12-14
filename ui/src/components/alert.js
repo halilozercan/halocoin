@@ -9,6 +9,7 @@ class MAlert extends Component {
         	 <i className="material-icons">{this.props.icon}</i>
           </div>
           {this.props.text}
+          {this.props.children}
         </div>
       </div>
     );

@@ -10,7 +10,16 @@ from halocoin.service import Service, threaded, sync, NoExceptionQueue
 
 
 class BlockchainService(Service):
-    tx_types = ['spend', 'mint']
+    """
+    tx_types are allowed transactions in coinami platform.
+    spend: Send coins from one address to another
+    mint: Traditional mining coinbase
+    reward: Reward coins sent from an authority to an address
+    auth_reg: Authority register. Includes a certificate that proves this authority is approved by root.
+    job_dump: Announcing jobs that are prepared and ready to be downloaded
+    job_request: Entering a pool for a job request.
+    """
+    tx_types = ['spend', 'mint', 'reward', 'auth_reg', 'job_dump', 'job_request']
     IDLE = 1
     SYNCING = 2
 
@@ -72,8 +81,9 @@ class BlockchainService(Service):
                         api.new_block()
                 else:
                     self.peer_reported_false_blocks(node_id)
-            else:
-                self.add_block(candidate_block)
+            elif isinstance(candidate_block, list):
+                for block in candidate_block:
+                    self.add_block(block)
                 api.new_block()
             self.set_chain_state(BlockchainService.IDLE)
         except:
@@ -139,36 +149,23 @@ class BlockchainService(Service):
     def add_tx(self, tx):
 
         if not isinstance(tx, dict):
-            return False
-
-        address = tools.tx_owner_address(tx)
+            return Response(False, 'Transactions must be dict typed')
 
         # tools.log('attempt to add tx: ' +str(tx))
         txs_in_pool = self.tx_pool()
 
-        response = Response(True, None)
-        if 'type' not in tx or not isinstance(tx['type'], str) \
-                or tx['type'] not in BlockchainService.tx_types:
-            response.setData('type error')
-            response.setFlag(False)
         if tx in txs_in_pool:
-            response.setData('no duplicates')
-            response.setFlag(False)
-        if not BlockchainService.tx_integrity_check(tx).getFlag():
-            response.setData('tx: ' + str(tx))
-            response.setFlag(False)
-        if tx['count'] != self.account.known_tx_count(tools.tx_owner_address(tx)):
-            response.setData('count error')
-            response.setFlag(False)
-        if not self.account.is_tx_affordable(address, tx):
-            response.setData('fee check error')
-            response.setFlag(False)
+            return Response(False, 'no duplicates')
+        if 'type' not in tx or tx['type'] not in BlockchainService.tx_types:
+            return Response(False, 'Invalid type')
+        integrity_check = self.tx_integrity_check(tx)
+        if not integrity_check.getFlag():
+            return Response(False, 'Transaction failed integrity check: ' + integrity_check.getData())
+        if not self.account.check_tx_validity_to_blockchain(tx):
+            return Response(False, 'Transaction failed current state check')
 
-        if response.getFlag():
-            self.tx_pool_add(tx)
-            return 'added tx into the pool: ' + str(tx)
-        else:
-            return 'failed to add tx because: ' + response.getData()
+        self.tx_pool_add(tx)
+        return Response(True, 'Added tx into the pool: ' + str(tx))
 
     def add_block(self, block):
         """Attempts adding a new block to the blockchain.
@@ -211,8 +208,25 @@ class BlockchainService(Service):
             tools.log('Received block is generated earlier than median.')
             return 3
 
-        if not self.account.update_accounts_with_block(block, add_flag=True, simulate=True):
-            tools.log('Received block failed transactions check.')
+        # Check that block includes exactly one mint transaction
+        if 'txs' not in block:
+            tools.log('Received block does not include txs. At least a coinbase tx must be present')
+            return 3
+
+        # Sum of all mint type transactions must be one
+        mint_present = sum([0 if tx['type'] != 'mint' else 1 for tx in block['txs']])
+        if mint_present != 1:
+            tools.log('Received block includes wrong amount of mint txs')
+            return 3
+
+        # TODO: Add tx integrity check for all tx types
+        coinami_txs = [tx for tx in block['txs'] if tx['type'] != 'spend' and tx['type'] != 'mint']
+        flag = True
+        for tx in coinami_txs:
+            flag &= self.tx_integrity_check(tx).getFlag()
+            flag &= self.account.check_tx_validity_to_blockchain(tx)
+        if not flag:
+            tools.log('Received block failed special txs check.')
             return 3
 
         self.db.put(block['length'], block)
@@ -221,7 +235,7 @@ class BlockchainService(Service):
 
         orphans = self.tx_pool_pop_all()
 
-        self.account.update_accounts_with_block(block, add_flag=True)
+        self.account.update_database_with_block(block)
 
         for orphan in sorted(orphans, key=lambda x: x['count']):
             self.add_tx(orphan)
@@ -245,7 +259,7 @@ class BlockchainService(Service):
         self.db.put('times', times)
 
         block = self.db.get(length)
-        self.account.update_accounts_with_block(block, add_flag=False)
+        self.account.rollback_block(block)
 
         orphans = self.tx_pool_pop_all()
 
@@ -273,10 +287,6 @@ class BlockchainService(Service):
             tools.log('Block is not a dict')
             return False
 
-        if 'error' in block:
-            tools.log('Errors in block')
-            return False
-
         if not ('length' in block and isinstance(block['length'], int)):
             return False
 
@@ -292,12 +302,15 @@ class BlockchainService(Service):
             return False
 
         if block['time'] > time.time() + 60 * 6:
-            tools.log('Received block is coming from future. Call the feds')
+            tools.log('Received block is coming from the future. Call the feds')
             return False
 
         return True
 
     def recent_blockthings(self, key, size, length=0):
+        """
+        Legacy of zack-bitcoin. This is the true art of naming of functions.
+        """
         if length == 0:
             length = self.db.get('length')
 
@@ -375,33 +388,59 @@ class BlockchainService(Service):
         b = (recent_hash not in their_hashes) and newblocks[0]['length'] - 1 < length < newblocks[-1]['length']
         return b
 
-    @staticmethod
-    def tx_integrity_check(tx):
+    def tx_integrity_check(self, tx):
         """
         This functions test whether a transaction has basic things right.
-        Does it have amount, recipient, right signatures and correct address types.
+        Does it have amount, recipient, RIGHT SIGNATURES and correct address types.
         :param tx:
-        :param txs: These txs can come from both pool and block.
         :return:
         """
-        response = Response(True, None)
-        if tx['type'] == 'spend':
+
+        if tx['type'] == 'spend' or tx['type'] == 'reward':
             if 'to' not in tx or not isinstance(tx['to'], str):
-                response.setData('no to')
-                response.setFlag(False)
+                return Response(False, 'Reward or spend transactions must be addressed')
             if not BlockchainService.tx_signature_check(tx):
-                response.setData('signature check')
-                response.setFlag(False)
+                return Response(False, 'Transaction is not properly signed')
             if len(tx['to']) <= 30:
-                response.setData('that address is too short ' + 'tx: ' + str(tx))
-                response.setFlag(False)
-            if 'amount' not in tx or not isinstance(tx['amount'], (int)):
-                response.setData('no amount')
-                response.setFlag(False)
-        else:
-            response.setFlag(False)
-            response.setData('only spend transactions can be cheched')
-        return response
+                return Response(False, 'Address is not valid')
+            if 'amount' not in tx or not isinstance(tx['amount'], int):
+                return Response(False, 'Transaction amount is not given or not a proper integer')
+
+        if tx['type'] == 'job_request':
+            if 'job_id' not in tx:
+                return Response(False, 'Job id missing from the request')
+            elif 'amount' not in tx:
+                return Response(False, 'Bidding amount is missing from the request')
+
+        if tx['type'] == 'reward':
+            if 'auth' not in tx:
+                return Response(False, 'Reward transactions must include auth name')
+            cert = self.account.get_certificate_by_name(tx['auth'])
+            if cert is None:
+                return Response(False, 'given auth name does not have a known certificate')
+            if tx['pubkeys'] != [tools.get_pubkey_from_certificate(cert).to_string()]:
+                return Response(False, 'pubkeys do not match with known pubkeys of auth')
+            if 'job_id' not in tx:
+                return Response(False, 'Reward must be addressed to a job id')
+
+        if tx['type'] == 'job_dump':
+            if 'auth' not in tx:
+                return Response(False, 'Job dump transactions must include auth name')
+            cert = self.account.find_certificate_by_name(tx['auth'])
+            if cert is None:
+                return Response(False, 'given auth name does not have a known certificate')
+            elif tx['pubkeys'] != [tools.get_pubkey_from_certificate(cert).to_string()]:
+                return Response(False, 'pubkeys do not match with known pubkeys of auth')
+            if 'job' not in tx or not isinstance(tx['job'], dict) or \
+                            'id' not in tx['job'] or 'timestamp' not in tx['job']:
+                return Response(False, 'Job dump transactions must include a job in it. Makes sense right?')
+
+        if tx['type'] == 'auth_reg':
+            if 'certificate' not in tx:
+                return Response(False, 'Auth must register with a valid certificate')
+            elif tx['pubkeys'] != [tools.get_pubkey_from_certificate(tx['certificate']).to_string()]:
+                return Response(False, 'pubkeys do not match with certificate')
+        return Response(True, 'Everything seems fine')
 
     def target(self, length):
         def targetTimesFloat(target, number):

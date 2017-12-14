@@ -13,3 +13,5 @@ simplekv==0.11.4
 tabulate==0.8.1
 urllib3==1.22
 Werkzeug==0.12.2
+flask
+flask-socketio

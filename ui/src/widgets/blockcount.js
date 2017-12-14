@@ -19,7 +19,10 @@ class Blockcount extends Component {
     $.get("/blockcount", (data) => {
       this.setState((state) => {
         state['length'] = data.length;
-        state['known_length'] = data.known_length;
+        if(data.known_length != -1)
+          state['known_length'] = data.known_length;
+        else
+          state['known_length'] = 'Unk';
         return state;
       });
     });

@@ -20,7 +20,7 @@ class Address extends Component {
 
   render() {
     return (
-      <div className="col-lg-3 col-md-6 col-sm-6" onClick={this.copyToClipboard}>
+      <div className="col-lg-6 col-md-12 col-sm-12" onClick={this.copyToClipboard}>
         <MCardStats color="red" header_icon="info_outline" title="Address"
          content={this.props.address.substring(0,8) + '...'}
          footer_icon="local_offer" alt_text={"Belongs to: " + this.props.name}/>

@@ -38,6 +38,12 @@ class CardRow extends Component {
 class MCardTable extends Component {
   render() {
     if(this.props.rows !== null) {
+      let data = <a style={{"textAlign":"center"}}>We could not find any data to fill this table :(</a>;
+      if(this.props.rows.length > 0) {
+        data = this.props.rows.map((_row, i) => {
+                return <CardRow key={i} row={_row} index={i}/>;
+              });
+      }
       return (
         <div className="card">
           <div className="card-header" data-background-color={this.props.color}>
@@ -54,10 +60,7 @@ class MCardTable extends Component {
                 </tr>
               </thead>
               <tbody>
-                {this.props.rows.map((_row, i) => {
-                  return <CardRow key={i} row={_row} index={i}/>;
-                }
-                )}
+                {data}
               </tbody>
             </table>
           </div>

@@ -89,7 +89,7 @@ def print_peers(peers):
 
 def print_blocks(blocks):
     table = []
-    for block in blocks:
+    for block in blocks['blocks']:
         if block['length'] == 0:
             block['prevHash'] = "N/A"
         block['time'] = datetime.datetime.fromtimestamp(
@@ -261,6 +261,43 @@ def send(args):
 
 
 @action
+def job_request(args):
+    from getpass import getpass
+    if args.pw is None:
+        wallet_pw = getpass('Wallet password: ')
+    else:
+        wallet_pw = args.pw
+
+    print(make_api_request(args.action,
+                           job_id=args.job_id, amount=args.amount,
+                           wallet_name=args.wallet_name, password=wallet_pw))
+
+
+@action
+def reward(args):
+    cert_pem = open(args.certificate, 'rb').read()
+    privkey_pem = open(args.privkey, 'rb').read()
+    print(make_api_request(args.action, amount=args.amount, address=args.address,
+                           cert_pem=cert_pem, privkey_pem=privkey_pem))
+
+
+@action
+def job_dump(args):
+    import time
+    cert_pem = open(args.certificate, 'rb').read()
+    privkey_pem = open(args.privkey, 'rb').read()
+    print(make_api_request(args.action, job_id=args.job_id, job_timestamp=time.time(),
+                           cert_pem=cert_pem, privkey_pem=privkey_pem))
+
+
+@action
+def auth_reg(args):
+    cert_pem = open(args.certificate, 'rb').read()
+    privkey_pem = open(args.privkey, 'rb').read()
+    print(make_api_request(args.action, cert_pem=cert_pem, privkey_pem=privkey_pem))
+
+
+@action
 def peers(args):
     peers = make_api_request(args.action)
     print_peers(peers)
@@ -333,6 +370,12 @@ def run(argv):
                         help='Wallet path for uploading')
     parser.add_argument('--wallet', action="store", type=str, dest='wallet_name',
                         help='Wallet name')
+    parser.add_argument('--certificate', action="store", type=str, dest='certificate',
+                        help='Rewarding sub-auth certificate file in pem format')
+    parser.add_argument('--job-id', action="store", type=str, dest='job_id',
+                        help='While dumping, requesting, or rewarding, necessary job id.')
+    parser.add_argument('--privkey', action="store", type=str, dest='privkey',
+                        help='Rewarding sub-auth private key file in pem format')
     parser.add_argument('--config', action="store", type=str, dest='config',
                         help='Config file address. Use with start command.')
     parser.add_argument('--pw', action="store", type=str, dest='pw',
