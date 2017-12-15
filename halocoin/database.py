@@ -1,9 +1,16 @@
-import os
+import sys
+from sqlalchemy.exc import OperationalError
+
+import yaml
+
+from halocoin import tools, custom
+from halocoin.service import Service, sync
+from simplekv.db.sql import SQLAlchemyStore
 import sys
 
-import redis
 import yaml
-from simplekv.memory.redisstore import RedisStore
+from simplekv.db.sql import SQLAlchemyStore
+from sqlalchemy.exc import OperationalError
 
 from halocoin import tools, custom
 from halocoin.service import Service, sync
@@ -25,10 +32,19 @@ class DatabaseService(Service):
     def on_register(self):
         # TODO: Add authentication support for redis
         try:
+            """
             redis_instance = redis.StrictRedis(host=os.environ.get('REDIS_URL', 'localhost'),
                                                db=self.engine.config['database']['index'])
             redis_instance.ping()
             self.DB = RedisStore(redis_instance)
+            """
+            from sqlalchemy import create_engine, MetaData
+            engine = create_engine('sqlite:///' + self.engine.config['database']['location'])
+            metadata = MetaData(bind=engine)
+            self.DB = SQLAlchemyStore(engine, metadata, 'kvstore')
+            self.DB.table.create()
+        except OperationalError as e:
+            pass
         except Exception as e:
             tools.log(e)
             sys.stderr.write('Redis connection cannot be established!\nFalling to SQLAlchemy')

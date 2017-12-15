@@ -64,6 +64,8 @@ class PeerListenService(Service):
                         kwargs = copy.deepcopy(request)
                         if request['action'] == 'greetings':
                             kwargs['__remote_ip__'] = client_sock.getpeername()
+                        elif request['action'] == 'push_block':
+                            kwargs['node_id'] = message.get_header("node_id")
                         del kwargs['action']
                         del kwargs['version']
                         result = getattr(self, request['action'])(**kwargs)
@@ -153,6 +155,6 @@ class PeerListenService(Service):
         return 'success'
 
     @sync
-    def push_block(self, blocks):
-        self.blockchain.blocks_queue.put(blocks)
+    def push_block(self, blocks, node_id):
+        self.blockchain.blocks_queue.put((blocks, node_id))
         return 'success'

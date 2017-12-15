@@ -33,7 +33,7 @@ class Engine(Service):
         self.config = config
         self.working_dir = working_dir
 
-        if self.config['database']['type'] == 'redis':
+        if self.config['database']['type'] == 'sql':
             self.db = DatabaseService(self)
 
         self.blockchain = BlockchainService(self)

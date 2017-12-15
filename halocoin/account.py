@@ -185,7 +185,6 @@ class AccountService(Service):
         A block is defined by its transactions. Here we rollback every object in database to the version
         that existed before this block. Blocks must be removed one by one.
 
-        Also, there is no need to simulate here.
         :param block: Block to be removed
         :return: Success of removal
         """
