@@ -18,6 +18,6 @@ setup(
     include_package_data=True,
     install_requires=['requests', 'wheel', 'pyyaml', 'flask', 'flask-socketio',
                       'pycrypto', 'm3-cdecimal', 'simplekv',
-                      'werkzeug', 'json-rpc', 'tabulate', 'redis', 'ecdsa'],
-    packages=find_packages(exclude=("tests", "tests.*", "tracker")),
+                      'werkzeug', 'json-rpc', 'tabulate', 'SQLAlchemy', 'ecdsa'],
+    packages=find_packages(exclude=("tests", "tests.*")),
 )

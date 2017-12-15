@@ -4,25 +4,28 @@ import random
 import time
 from multiprocessing import Process
 
+import os
+
 from halocoin import blockchain
 from halocoin import custom
 from halocoin import tools
-from halocoin.service import Service, threaded
+from halocoin.service import Service, threaded, sync
 
 
 class PowerService(Service):
     """
     This is the power service, designed and developed for Coinami.
     Power service is similar to a miner. It solves problems and earns you currency.
-    Power contacts with sub-authorities in the network to request problems.
+    Power contacts with sub-authorities in the network to dowload problems that you are assigned.
     These problems are related to Bioinformatics, DNA mapping.
     After solving these problems, authority verifies the results and rewards you.
     """
     def __init__(self, engine):
-        Service.__init__(self, "miner")
+        Service.__init__(self, "power")
         self.engine = engine
         self.db = None
         self.blockchain = None
+        self.account = None
         self.wallet = None
 
     def set_wallet(self, wallet):
@@ -31,6 +34,7 @@ class PowerService(Service):
     def on_register(self):
         self.db = self.engine.db
         self.blockchain = self.engine.blockchain
+        self.account = self.engine.account
 
         if self.wallet is not None and hasattr(self.wallet, 'privkey'):
             return True
@@ -41,116 +45,125 @@ class PowerService(Service):
         self.wallet = None
         print('Power is turned off')
 
+    @sync
+    def get_job_status(self, job_id):
+        if self.db.exists('local_job_repo_' + job_id):
+            job_directory = os.path.join(self.engine.working_dir, 'jobs', job_id)
+            result_file = os.path.join(job_directory, 'result.zip')
+            job_file = os.path.join(job_directory, 'job.zip')
+            result_exists = os.path.exists(result_file)
+            job_exists = os.path.exists(job_file)
+            entry = self.db.get('local_job_repo_' + job_id)
+            if entry['status'] == 'executed' or entry['status'] == 'downloaded':
+                if result_exists:
+                    return "executed"
+                elif job_exists:
+                    return "downloaded"
+                else:
+                    return "assigned"
+            else:
+                return entry['status']
+        else:
+            return "null"
+
+    @sync
+    def initiate_job(self, job_id):
+        self.db.put('local_job_repo_' + job_id, {
+            "status": "assigned",
+        })
+
+    @sync
+    def download_job(self, job_id):
+        # TODO: Authorities must have a job endpoint template.
+        # TODO: Add signature verification while requesting jobs to download.
+        # TODO: implementation
+        """
+        from pget.down import Downloader
+        job = self.account.get_job(job_id)
+        endpoint = "http://0.0.0.0:5000/jobs/{}".format(job_id)
+        job_directory = os.path.join(self.engine.working_dir, 'jobs', job_id)
+        job_file = os.path.join(job_directory, 'job.zip')
+        pget = Downloader(endpoint, job_file, 1)  # URL, file name, chunk count
+        pget.start_sync()
+        if os.path.exists(job_file):
+            import zipfile
+            zip_ref = zipfile.ZipFile(job_file, 'r')
+            zip_ref.extractall(job_directory)
+            zip_ref.close()
+            entry = self.db.get('local_job_repo_' + job_id)
+            entry['status'] = 'downloaded'
+            self.db.put('local_job_repo_' + job_id, entry)
+            return True
+        else:
+            return False
+        """
+        entry = self.db.get('local_job_repo_' + job_id)
+        entry['status'] = 'downloaded'
+        self.db.put('local_job_repo_' + job_id, entry)
+
+    @sync
+    def execute_job(self, job_id):
+        import subprocess
+        job_directory = os.path.join(self.engine.working_dir, 'jobs', job_id)
+        job_file = os.path.join(job_directory, job_id + '.job.json')
+        result_file = os.path.join(job_directory, 'result.zip')
+        result = subprocess.run([self.engine.config['coinami']['rabix_path'],
+                                 self.engine.config['coinami']['workflow_path'],
+                                 job_file])
+        if result.check_returncode() == 0 and os.path.exists(result_file):
+            entry = self.db.get('local_job_repo_' + job_id)
+            entry['status'] = 'executed'
+            self.db.put('local_job_repo_' + job_id, entry)
+            return True
+        else:
+            return False
+
+    @sync
+    def upload_job(self, job_id):
+        # TODO: Implementation
+        entry = self.db.get('local_job_repo_' + job_id)
+        entry['status'] = 'uploaded'
+        self.db.put('local_job_repo_' + job_id, entry)
+
+    @sync
+    def done_job(self, job_id):
+        # TODO: Implementation
+        entry = self.db.get('local_job_repo_' + job_id)
+        entry['status'] = 'done'
+        self.db.put('local_job_repo_' + job_id, entry)
+
     @threaded
     def worker(self):
+        """
+        - Find our assigned task.
+        - Query Job repository for the task.
+        - If job is not downloaded:
+            - Download the job.
+        - Start rabix process.
+        - Upload the result.
+        - Mark the job as done.
+        - Return to beginning.
+        """
         if self.blockchain.get_chain_state() == blockchain.BlockchainService.SYNCING:
             time.sleep(0.1)
             return
 
-        candidate_block = self.get_candidate_block()
-        tx_pool = self.blockchain.tx_pool()
-        self.start_workers(candidate_block)
+        own_address = self.wallet.address
+        own_account = self.account.get_account(own_address)
+        assigned_job = own_account['assigned_job']
+        if assigned_job == '':
+            time.sleep(5)
+            return
 
-        possible_blocks = []
-        while not MinerService.is_everyone_dead(self.pool) and self.threaded_running():
-            if self.db.get('length')+1 != candidate_block['length'] or self.blockchain.tx_pool() != tx_pool:
-                candidate_block = self.get_candidate_block()
-                tx_pool = self.blockchain.tx_pool()
-                self.start_workers(candidate_block)
-            try:
-                while not self.queue.empty():
-                    possible_blocks.append(self.queue.get(timeout=0.01))
-            except queue.Empty:
-                pass
-            if len(possible_blocks) > 0:
-                break
-
-        # This may seem weird. It is needed when workers finish so fast, while loop ends prematurely.
-        try:
-            while not self.queue.empty():
-                possible_blocks.append(self.queue.get(timeout=0.01))
-        except queue.Empty:
-            pass
-
-        if len(possible_blocks) > 0:
-            tools.log('Mined block')
-            tools.log(possible_blocks)
-            self.blockchain.blocks_queue.put(possible_blocks)
-
-    def start_workers(self, candidate_block):
-        self.close_workers()
-        for i in range(self.core_count):
-            p = Process(target=MinerService.target, args=[candidate_block, self.queue])
-            p.start()
-            self.pool.append(p)
-
-    def close_workers(self):
-        for p in self.pool:
-            p.terminate()
-            p.join()
-        self.pool = []
-
-    def make_block(self, prev_block, txs, pubkey):
-        leng = int(prev_block['length']) + 1
-        target_ = self.blockchain.target(leng)
-        diffLength = tools.hex_sum(prev_block['diffLength'], tools.hex_invert(target_))
-        out = {'version': custom.version,
-               'txs': txs + [self.make_mint(pubkey)],
-               'length': leng,
-               'time': time.time(),
-               'diffLength': diffLength,
-               'target': target_,
-               'prevHash': tools.det_hash(prev_block)}
-        return out
-
-    def make_mint(self, pubkey):
-        return {'type': 'mint',
-                'pubkeys': [pubkey],
-                'signatures': ['first_sig'],
-                'count': 0}
-
-    def genesis(self, pubkey):
-        target_ = self.blockchain.target(0)
-        out = {'version': custom.version,
-               'length': 0,
-               'time': time.time(),
-               'target': target_,
-               'diffLength': tools.hex_invert(target_),
-               'txs': [self.make_mint(pubkey)]}
-        return out
-
-    def get_candidate_block(self):
-        length = self.db.get('length')
-        print('Miner working for block', (length + 1))
-        if length == -1:
-            candidate_block = self.genesis(self.wallet.get_pubkey_str())
-        else:
-            prev_block = self.db.get(length)
-            candidate_block = self.make_block(prev_block, self.blockchain.tx_pool(), self.wallet.get_pubkey_str())
-        return candidate_block
-
-    @staticmethod
-    def target(candidate_block, queue):
-        # Miner registered but no work is sent yet.
-        try:
-            if candidate_block is None:
-                return
-            if 'nonce' in candidate_block:
-                candidate_block.pop('nonce')
-            halfHash = tools.det_hash(candidate_block)
-            candidate_block['nonce'] = random.randint(0, 10000000000000000000000000000000000000000)
-            current_hash = tools.det_hash({'nonce': candidate_block['nonce'], 'halfHash': halfHash})
-            while current_hash > candidate_block['target']:
-                candidate_block['nonce'] += 1
-                current_hash = tools.det_hash({'nonce': candidate_block['nonce'], 'halfHash': halfHash})
-            if current_hash <= candidate_block['target']:
-                queue.put(candidate_block)
-        except Exception as e:
-            pass
-
-    @staticmethod
-    def is_everyone_dead(processes):
-        for p in processes:
-            if p.is_alive():
-                return False
-        return True
+        job_status = self.get_job_status(assigned_job)
+        if job_status == 'null':
+            self.initiate_job(assigned_job)
+        elif job_status == 'assigned':
+            self.download_job(assigned_job)
+        elif job_status == 'downloaded':
+            self.execute_job(assigned_job)
+        elif job_status == 'executed':
+            self.upload_job(assigned_job)
+        elif job_status == 'uploaded':
+            self.done_job(assigned_job)
+        time.sleep(1)

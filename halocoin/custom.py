@@ -3,8 +3,6 @@ from cdecimal import Decimal
 
 version = "0.0004c"
 block_reward = 10 ** 3  # Initial block reward
-halve_at = 525600  # Approximately one year
-recalculate_target_at = 1440  # It's everyday bro!
 miner_core_count = -1  # -1 evaluates to number of cores
 # Lower limits on what the "time" tag in a block can say.
 median_block_time_limit = 100
@@ -15,17 +13,19 @@ history_length = 1440
 # This constant is selected such that the 50 most recent blocks count for 1/2 the
 # total weight.
 inflection = Decimal('0.985')
+# How often to generate a block in seconds
+blocktime = 60 * 5
+halve_at = (365 * 24 * 60 * 60 / blocktime)  # Approximately one year
+recalculate_target_at = (24*60*60 // blocktime)  # It's everyday bro!
+
 # Precalculate
 memoized_weights = [inflection ** i for i in range(recalculate_target_at)]
-# How often to generate a block in seconds
-blocktime = 60
 
 # drop jobs after this many blocks
 drop_job_block_count = 60
 
-
 # Coinami root certificate.
-# Everyone will accept any certificate that is
+# Everyone will accept any certificate that is signed by the root
 root_cert_pem = b"""-----BEGIN CERTIFICATE-----
 MIICXjCCAgWgAwIBAgIJAMVH45qrPCKOMAoGCCqGSM49BAMCMIGDMQswCQYDVQQG
 EwJUUjEPMA0GA1UECAwGVHVya2V5MQ8wDQYDVQQHDAZBbmthcmExEDAOBgNVBAoM
@@ -48,12 +48,8 @@ def generate_default_config():
     config = dict()
     config['DEBUG'] = False
     config['database'] = {
-        "type": "redis",
-        "index": 0,
-        "auth": False,
-        "user": "",
-        "pw": "",
-        "port": 6379
+        "type": "sql",
+        "location": "coinami.db"
     }
 
     config['logging'] = {

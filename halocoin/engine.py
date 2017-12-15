@@ -10,6 +10,7 @@ from halocoin.database import DatabaseService
 from halocoin.miner import MinerService
 from halocoin.peer_check import PeerCheckService
 from halocoin.peer_listen import PeerListenService
+from halocoin.power import PowerService
 from halocoin.service import Service, async
 
 
@@ -33,14 +34,13 @@ class Engine(Service):
         self.config = config
         self.working_dir = working_dir
 
-        if self.config['database']['type'] == 'sql':
-            self.db = DatabaseService(self)
-
+        self.db = DatabaseService(self)
         self.blockchain = BlockchainService(self)
         self.peers_check = PeerCheckService(self, self.config['peers']['list'])
         self.peer_receive = PeerListenService(self)
         self.account = AccountService(self)
         self.miner = MinerService(self)
+        self.power = PowerService(self)
 
     def on_register(self):
         print('Starting halocoin')

@@ -277,7 +277,7 @@ def job_request(args):
 def reward(args):
     cert_pem = open(args.certificate, 'rb').read()
     privkey_pem = open(args.privkey, 'rb').read()
-    print(make_api_request(args.action, amount=args.amount, address=args.address,
+    print(make_api_request(args.action, amount=args.amount, address=args.address, job_id=args.job_id,
                            cert_pem=cert_pem, privkey_pem=privkey_pem))
 
 

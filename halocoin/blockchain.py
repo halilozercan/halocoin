@@ -415,7 +415,7 @@ class BlockchainService(Service):
         if tx['type'] == 'reward':
             if 'auth' not in tx:
                 return Response(False, 'Reward transactions must include auth name')
-            cert = self.account.get_certificate_by_name(tx['auth'])
+            cert = self.account.find_certificate_by_name(tx['auth'])
             if cert is None:
                 return Response(False, 'given auth name does not have a known certificate')
             if tx['pubkeys'] != [tools.get_pubkey_from_certificate(cert).to_string()]:

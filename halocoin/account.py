@@ -87,6 +87,9 @@ class AccountService(Service):
             recv_account['amount'] += tx['amount']
             return (recv_account['amount'] >= 0) and (send_account['amount'] >= 0)
         elif tx['type'] == 'reward':
+            # TODO: Same auth
+            # Check whether rewarding transaction has
+            # (job_dump.auth=reward.auth), (reward = auction bidding), (receiver = auction winner)
             job = self.db.get('job_' + tx['job_id'])
             last_change = job['status_list'][-1]
             # This job is not assigned to anyone right now.
@@ -149,14 +152,16 @@ class AccountService(Service):
                 recv_account['amount'] += tx['amount']
                 recv_account['tx_blocks'].append(block['length'])
             elif tx['type'] == 'reward':
+                recv_address = tx['to']
                 recv_account = self.get_account(recv_address)
 
                 recv_account['amount'] += tx['amount']
                 recv_account['tx_blocks'].append(block['length'])
+                self.reward_job(tx['job_id'], recv_address, block['length'])
             elif tx['type'] == 'auth_reg':
                 self.put_certificate(tx['certificate'])
             elif tx['type'] == 'job_dump':
-                self.add_new_job(tx['job'], block['length'])
+                self.add_new_job(tx['job'], tx['auth'], block['length'])
             elif tx['type'] == 'job_request':
                 requested_jobs[tx['job_id']].append((send_address, tx['amount']))
 
@@ -510,7 +515,8 @@ class AccountService(Service):
         return result
 
     @sync
-    def add_new_job(self, job, block_number):
+    def add_new_job(self, job, auth, block_number):
+        job['auth'] = auth
         job['status_list'] = [{
             'action': 'add',
             'block': block_number

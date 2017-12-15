@@ -627,6 +627,53 @@ def status_miner():
     })
 
 
+@app.route('/start_power', methods=['GET', 'POST'])
+def start_power():
+    from halocoin.model.wallet import Wallet
+    wallet_name = request.values.get('wallet_name', None)
+    password = request.values.get('password', None)
+
+    if wallet_name is None:
+        default_wallet = engine.instance.account.get_default_wallet()
+        if default_wallet is not None:
+            wallet_name = default_wallet['wallet_name']
+            password = default_wallet['password']
+
+    encrypted_wallet_content = engine.instance.account.get_wallet(wallet_name)
+    if encrypted_wallet_content is not None:
+        try:
+            wallet = Wallet.from_string(tools.decrypt(password, encrypted_wallet_content))
+        except:
+            return generate_json_response("Wallet password incorrect")
+    else:
+        return generate_json_response("Error occurred")
+
+    if engine.instance.power.get_state() == Service.RUNNING:
+        return generate_json_response('Power is already running.')
+    elif wallet is None:
+        return generate_json_response('Given wallet is not valid.')
+    else:
+        engine.instance.power.set_wallet(wallet)
+        engine.instance.power.register()
+        return generate_json_response('Running power')
+
+
+@app.route('/stop_power', methods=['GET', 'POST'])
+def stop_power():
+    if engine.instance.power.get_state() == Service.RUNNING:
+        engine.instance.power.unregister()
+        return 'Closed power'
+    else:
+        return 'Power is not running.'
+
+
+@app.route('/status_power', methods=['GET', 'POST'])
+def status_power():
+    return generate_json_response({
+        'running': engine.instance.power.get_state() == Service.RUNNING
+    })
+
+
 def generate_json_response(obj):
     result_text = json.dumps(obj, cls=ComplexEncoder)
     return Response(response=result_text, headers={"Content-Type": "application/json"})
