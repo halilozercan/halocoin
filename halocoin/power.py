@@ -50,7 +50,7 @@ class PowerService(Service):
         if self.db.exists('local_job_repo_' + job_id):
             job_directory = os.path.join(self.engine.working_dir, 'jobs', job_id)
             result_file = os.path.join(job_directory, 'result.zip')
-            job_file = os.path.join(job_directory, 'job.zip')
+            job_file = os.path.join(job_directory, job_id + '.1.fastq')
             result_exists = os.path.exists(result_file)
             job_exists = os.path.exists(job_file)
             entry = self.db.get('local_job_repo_' + job_id)
@@ -105,11 +105,17 @@ class PowerService(Service):
     def execute_job(self, job_id):
         import subprocess
         job_directory = os.path.join(self.engine.working_dir, 'jobs', job_id)
-        job_file = os.path.join(job_directory, job_id + '.job.json')
         result_file = os.path.join(job_directory, 'result.zip')
         result = subprocess.run([self.engine.config['coinami']['rabix_path'],
+                                 '--quiet', '--basedir',
+                                 os.path.dirname(self.engine.config['coinami']['workflow_path']),
                                  self.engine.config['coinami']['workflow_path'],
-                                 job_file])
+                                 '--',
+                                 '--reads_1', os.path.join(job_directory, job_id + '.1.fastq'),
+                                 '--reads_2', os.path.join(job_directory, job_id + '.2.fastq'),
+                                 '--reference', self.engine.config['coinami']['reference_path'],
+                                 '--threads', '4',
+                                 '--output_loc', 'result.zip'])
         if result.check_returncode() == 0 and os.path.exists(result_file):
             entry = self.db.get('local_job_repo_' + job_id)
             entry['status'] = 'executed'
