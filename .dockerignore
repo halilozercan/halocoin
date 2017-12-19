@@ -1,0 +1,5 @@
+data_folder
+build
+dist
+*egg-info*
+coinami
