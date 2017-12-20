@@ -465,6 +465,7 @@ class AccountService(Service):
     @sync
     def delete_default_wallet(self):
         self.db.delete('default_wallet')
+        api.changed_default_wallet()
         return True
 
     @sync

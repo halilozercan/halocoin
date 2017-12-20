@@ -29,9 +29,8 @@ class App extends Component {
         this.mainPage.updateBlocks();
     });
 
-    this.socket.on('peer_update', (socket) => {
-      if(this.state.page == "Dashboard")
-        this.mainPage.updatePeers();
+    this.socket.on('changed_default_wallet', (socket) => {
+      this.checkDefault();
     });
 
     this.socket.on('new_tx_in_pool', (socket) => {
@@ -106,10 +105,10 @@ class App extends Component {
       page = <div>Could not connect to Coinami Engine :(</div>;
     }
     else if(this.state.status === "yes_dw") {
-      page = <MainPage />;
+      page = <MainPage notify={this.notify}/>;
     }
     else if(this.state.status === "no_dw") {
-      page = <ChooseWallet />;
+      page = <ChooseWallet notify={this.notify}/>;
     }
 
     return (
