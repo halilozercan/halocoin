@@ -2,6 +2,9 @@ import React, { Component } from 'react';
 import {MCardStats} from '../components/card.js';
 import MAlert from '../components/alert.js';
 import axios from 'axios';
+import {Card, CardActions, CardHeader, CardText} from 'material-ui/Card';
+import RaisedButton from 'material-ui/RaisedButton';
+import TextField from 'material-ui/TextField';
 
 class NewWalletForm extends Component {
 
@@ -19,6 +22,7 @@ class NewWalletForm extends Component {
     // super easy to update the state
     const state = this.state
     state[e.target.name] = e.target.value;
+    console.log(state);
     this.setState(state);
   }
 
@@ -35,6 +39,7 @@ class NewWalletForm extends Component {
     let data = new FormData();
     data.append('wallet_name', this.state.name);
     data.append('password', this.state.password);
+    data.append('set_default', true);
 
     axios.post('/new_wallet', data)
       .then((response) => {
@@ -45,44 +50,39 @@ class NewWalletForm extends Component {
 
   render() {
     return (
-      <div className="card">
-        <div className="card-header" data-background-color="purple">
-          <h4 className="title">New</h4>
-          <p className="category">Open a new wallet</p>
-        </div>
-        <div className="card-content">
+      <Card style={{"margin":16}}>
+        <CardHeader
+          title="New Wallet"
+          subtitle="Create a new wallet to start Coinami"
+        />
+        <CardText>
           <form onSubmit={this.onSubmit}>
-            <div className="row">
-              <div className="col-md-12">
-                  <div className="form-group label-floating is-empty">
-                      <label className="control-label">Name</label>
-                      <input name="name" className="form-control" type="text" onChange={this.onChange} />
-                  <span className="material-input"></span></div>
-              </div>
-            </div>
-            <div className="row">
-              <div className="col-md-12">
-                <div className="form-group label-floating is-empty">
-                  <label className="control-label">Password</label>
-                  <input name="password" className="form-control" type="password" onChange={this.onChange} />
-                <span className="material-input"></span></div>
-              </div>
-            </div>
-            <div className="row">
-              <div className="col-md-12">
-                <div className="form-group label-floating is-empty">
-                  <label className="control-label">Password (Repeat)</label>
-                  <input name="password2" className="form-control" type="password" onChange={this.onChange} />
-                <span className="material-input"></span></div>
-              </div>
-            </div>
-            <button type="submit" onClick={this.submitNewWalletForm} className="btn btn-primary pull-right">Submit
-              <div className="ripple-container"></div>
-            </button>
-            <div className="clearfix"></div>
+            <TextField
+              fullWidth={true}
+              floatingLabelText="Name"
+              name="name"
+              onChange={this.onChange}
+            />
+            <TextField
+              fullWidth={true}
+              floatingLabelText="Password"
+              name="password"
+              type="password"
+              onChange={this.onChange}
+            />
+            <TextField
+              fullWidth={true}
+              floatingLabelText="Password(Again)"
+              name="password2"
+              type="password"
+              onChange={this.onChange}
+            />
           </form>
-        </div>
-      </div>
+        </CardText>
+        <CardActions align='right'>
+          <RaisedButton label="Start" primary={true} onClick={this.onSubmit} />
+        </CardActions>
+      </Card>
     );
   }
 }

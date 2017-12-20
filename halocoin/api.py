@@ -60,8 +60,11 @@ def run():
     listen_thread = threading.Thread(target=thread_target, daemon=True)
     listen_thread.start()
     print("Started API on {}:{}".format(host, engine.instance.config['port']['api']))
+    """
+    Deprecated in favor of electron app
     import webbrowser
     webbrowser.open('http://' + host + ':' + str(engine.instance.config['port']['api']))
+    """
 
 
 @socketio.on('connect')
@@ -174,8 +177,12 @@ def new_wallet():
     from halocoin.model.wallet import Wallet
     wallet_name = request.values.get('wallet_name', None)
     pw = request.values.get('password', None)
+    set_default = request.values.get('set_default', None)
     wallet = Wallet(wallet_name)
     success = engine.instance.account.new_wallet(pw, wallet)
+    if set_default:
+        engine.instance.account.set_default_wallet(wallet_name, pw)
+
     return generate_json_response({
         "name": wallet_name,
         "success": success
@@ -677,6 +684,10 @@ def status_power():
 def generate_json_response(obj):
     result_text = json.dumps(obj, cls=ComplexEncoder)
     return Response(response=result_text, headers={"Content-Type": "application/json"})
+
+
+def changed_default_wallet():
+    socketio.emit('changed_default_wallet')
 
 
 def new_block():

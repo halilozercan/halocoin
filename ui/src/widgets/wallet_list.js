@@ -1,7 +1,10 @@
 import React, { Component } from 'react';
 import MButton from '../components/button.js';
 import axios from 'axios';
-
+import {List, ListItem} from 'material-ui/List';
+import Divider from 'material-ui/Divider';
+import {Card, CardActions, CardHeader, CardText} from 'material-ui/Card';
+import RaisedButton from 'material-ui/RaisedButton';
 
 class WalletList extends Component {
 
@@ -61,16 +64,10 @@ class WalletList extends Component {
 
   render() {
     let content = <div>Loading</div>;
-    let default_wallet_name = (this.props.default_wallet === null) ? null:this.props.default_wallet.name;
     if(this.props.wallets !== null) {
       content = this.props.wallets.map((_row, i) => {
-                  let isDefault = (_row === default_wallet_name);
-                  let defaultButton = '';
-                  if(!isDefault){
-                    defaultButton = <li><a href="#" onClick={()=>{this.makeDefault(_row);}}>Make Default</a></li>;
-                  }
-
-                  return <tr key={i}>
+                    return <ListItem primaryText={_row} />;
+                  /*return <tr key={i}>
                           <td><h4><b>{_row}</b></h4></td>
                           <td>
                              <div className="dropdown" style={{"float":"right"}}>
@@ -80,29 +77,26 @@ class WalletList extends Component {
                               <ul className="dropdown-menu">
                                 <li><a href="#" onClick={()=>{this.downloadWallet(_row);}}>Backup</a></li>
                                 <li><a href="#" onClick={()=>{this.removeWallet(_row);}}>Delete</a></li>
-                                {defaultButton}
+                                <li><a href="#" onClick={()=>{this.makeDefault(_row);}}>Start</a></li>
                               </ul>
                             </div>
                           </td>
-                         </tr>;
+                         </tr>;*/
                 });
     }
 
     return (
-      <div className="card">
-        <div className="card-header" data-background-color="yellow">
-            <h4 className="title">Wallets</h4>
-            <p className="category">List of wallets that are managed by halocoin</p>
-        </div>
-        <div className="card-content table-responsive">
-          <table className="table table-hover">
-            <tbody>
-              {content}
-            </tbody>
-          </table>
-          {this.props.children}
-        </div>
-      </div>
+      <Card style={{"margin":16}}>
+        <CardHeader
+          title="Choose a Wallet"
+          subtitle="Select one of the wallets created earlier"
+        />
+        <CardText>
+          <List>
+            {content}
+          </List>
+        </CardText>
+      </Card>
     );
   }
 }

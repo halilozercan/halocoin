@@ -4,9 +4,11 @@ RUN git clone -b coinami --single-branch https://github.com/halilozercan/halocoi
 WORKDIR /halocoin
 
 RUN pip3 install -r requirements.txt
-RUN python3 setup.py install
+RUN pip3 install .
 
 VOLUME /data
+EXPOSE 7001
+EXPOSE 7002
 
-# ENTRYPOINT ["/usr/local/bin/halocoin"]
-# CMD ["start", "--dir", "/data"]
+ENTRYPOINT ["/usr/local/bin/halocoin"]
+CMD ["start", "--dir", "/data"]

@@ -454,6 +454,7 @@ class AccountService(Service):
                     "wallet_name": wallet_name,
                     "password": password
                 })
+                api.changed_default_wallet()
                 return True
             else:
                 return False
