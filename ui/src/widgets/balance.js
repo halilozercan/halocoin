@@ -1,9 +1,5 @@
 import React, { Component } from 'react';
 import {MCardStats} from '../components/card.js';
-import axios from 'axios';
-import Paper from 'material-ui/Paper';
-import FontIcon from 'material-ui/FontIcon';
-import {blue500, red500, greenA200} from 'material-ui/styles/colors';
 
 class Balance extends Component {
 

@@ -3,8 +3,9 @@ import os
 import tempfile
 import threading
 
-import jinja2
-from flask import Flask, request, Response, render_template, send_file
+import psutil as psutil
+from engineio import async_threading
+from flask import Flask, request, Response, send_file
 from flask_socketio import SocketIO
 
 from halocoin import tools, engine
@@ -34,13 +35,8 @@ def blockchain_synced(func):
     return wrapper
 
 
-app = Flask(__name__, template_folder="templates", static_folder="static")
-app.config['TEMPLATES_AUTO_RELOAD'] = True
-app.jinja_loader = jinja2.ChoiceLoader([
-    app.jinja_loader,
-    jinja2.PackageLoader(__name__)
-])
-socketio = SocketIO(app)
+app = Flask(__name__)
+socketio = SocketIO(app, async_mode='threading')
 listen_thread = None
 
 
@@ -74,8 +70,8 @@ def connect():
 
 
 @app.route('/')
-def dashboard():
-    return render_template('index.html')
+def hello():
+    return "~Healthy and alive~"
 
 
 @app.route("/upload_wallet", methods=['GET', 'POST'])
@@ -629,9 +625,12 @@ def stop_miner():
 
 @app.route('/status_miner', methods=['GET', 'POST'])
 def status_miner():
-    return generate_json_response({
+    status = {
         'running': engine.instance.miner.get_state() == Service.RUNNING
-    })
+    }
+    if status['running']:
+        status['cpu'] = psutil.cpu_percent()
+    return generate_json_response(status)
 
 
 @app.route('/start_power', methods=['GET', 'POST'])
@@ -676,9 +675,19 @@ def stop_power():
 
 @app.route('/status_power', methods=['GET', 'POST'])
 def status_power():
-    return generate_json_response({
-        'running': engine.instance.power.get_state() == Service.RUNNING
-    })
+    from halocoin.model.wallet import Wallet
+    status = {
+        'running': engine.instance.power.get_state() == Service.RUNNING,
+        'assigned': ''
+    }
+    default_wallet_props = engine.instance.account.get_default_wallet()
+    default_wallet = engine.instance.account.get_wallet(default_wallet_props['wallet_name'])
+    default_wallet = Wallet.from_string(tools.decrypt(default_wallet_props['password'], default_wallet))
+    own_address = default_wallet.address
+    own_account = engine.instance.account.get_account(own_address)
+    assigned_job = own_account['assigned_job']
+    status['assigned'] = assigned_job
+    return generate_json_response(status)
 
 
 def generate_json_response(obj):

@@ -1,9 +1,7 @@
 import React, { Component } from 'react';
-import MButton from '../components/button.js';
-import axios from 'axios';
+import {axiosInstance} from '../tools.js';
 import {List, ListItem} from 'material-ui/List';
-import Divider from 'material-ui/Divider';
-import {Card, CardActions, CardHeader, CardText} from 'material-ui/Card';
+import {Card, CardHeader, CardText} from 'material-ui/Card';
 import RaisedButton from 'material-ui/RaisedButton';
 import Dialog from 'material-ui/Dialog';
 import TextField from 'material-ui/TextField';
@@ -23,7 +21,7 @@ class WalletList extends Component {
     data.append('wallet_name', wallet_name);
     data.append('password', password);
 
-    axios.post('/remove_wallet', data).then((response) => {
+    axiosInstance.post('/remove_wallet', data).then((response) => {
       data = response.data;
       if(data.success) {
         this.props.notify(data.message, 'success');
@@ -62,7 +60,7 @@ class WalletList extends Component {
     data.append('wallet_name', this.state.name);
     data.append('password', password);
 
-    axios.post('/set_default_wallet', data).then((response) => {
+    axiosInstance.post('/set_default_wallet', data).then((response) => {
       let success = response.data.success;
       if(success) {
         this.props.notify('Successfully updated your default wallet', 'success');

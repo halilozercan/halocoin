@@ -1,6 +1,15 @@
 import React, { Component } from 'react';
-import {MCardStats} from '../components/card.js';
-import $ from "jquery";
+import axios from "axios";
+import Paper from 'material-ui/Paper';
+
+const bottomBarStyle = {
+  position: 'fixed', 
+  left: 0, 
+  bottom: 0,
+  zIndex: 150,
+  width: '100%',
+  padding: 16
+};
 
 class Blockcount extends Component {
   constructor(props) {
@@ -16,10 +25,11 @@ class Blockcount extends Component {
   }
 
   update() {
-    $.get("/blockcount", (data) => {
+    axios.get("/blockcount").then((response) => {
+      let data = response.data;
       this.setState((state) => {
         state['length'] = data.length;
-        if(data.known_length != -1)
+        if(data.known_length !== -1)
           state['known_length'] = data.known_length;
         else
           state['known_length'] = 'Unk';
@@ -29,16 +39,10 @@ class Blockcount extends Component {
   }
 
   render() {
-    let content = 'Loading';
-    if(this.state.length !== '-') {
-      content = this.state.length + '/' + this.state.known_length;
-    }
     return (
-      <div className="col-lg-3 col-md-6 col-sm-6">
-        <MCardStats color="orange" header_icon="content_copy" title="Block Count"
-         content={content} 
-         footer_icon="update" alt_text="Just Updated"/>
-      </div>
+      <Paper style={bottomBarStyle}  zDepth={1}>
+        Blockcount: {this.state.length}/{this.state.known_length}
+      </Paper>
     );
   }
 }

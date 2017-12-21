@@ -1,21 +1,9 @@
 import React, { Component } from 'react';
-import $ from 'jquery';
-import DefaultWallet from './widgets/default_wallet.js';
 import WalletList from './widgets/wallet_list.js';
 import NewWalletForm from './widgets/new_wallet_form.js';
-import Miner from './widgets/miner.js';
-import Balance from './widgets/balance.js';
-import Address from './widgets/address.js';
-import axios from 'axios';
+import Blockcount from './widgets/blockcount.js';
+import {axiosInstance} from './tools.js';
 import {Tabs, Tab} from 'material-ui/Tabs';
-import Paper from 'material-ui/Paper';
-
-const bottomBarStyle = {
-  position: 'absolute', 
-  bottom: 0, 
-  width: '100%',
-  padding: 16
-};
 
 const styles = {
   headline: {
@@ -41,7 +29,7 @@ class ChooseWallet extends Component {
   }
 
   getWallets() {
-    axios.get("/wallets").then((response) => {
+    axiosInstance.get("/wallets").then((response) => {
       let data = response.data;
       console.log(data);
       if(data.hasOwnProperty('wallets')) {
@@ -72,9 +60,7 @@ class ChooseWallet extends Component {
             </div>
           </Tab>
         </Tabs>
-        <Paper style={bottomBarStyle}  zDepth={1}>
-          Blockcount: 225-3569
-        </Paper>
+        <Blockcount />
       </div>
     );
   }

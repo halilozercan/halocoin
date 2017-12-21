@@ -1,9 +1,6 @@
 import React, { Component } from 'react';
 import MuiThemeProvider from 'material-ui/styles/MuiThemeProvider';
-import MSidebar from './components/sidebar.js';
-import MNavbar from './components/navbar.js';
 import MainPage from './MainPage.js';
-import WalletManagement from './WalletManagement.js';
 import ChooseWallet from './ChooseWallet.js';
 import NotificationSystem from 'react-notification-system';
 import io from 'socket.io-client';
@@ -19,14 +16,9 @@ class App extends Component {
     this.pageChanged = this.pageChanged.bind(this);
     this.checkDefault = this.checkDefault.bind(this);
     this.notify = this.notify.bind(this);
-    this.pagesIcons = {
-      "Dashboard": "dashboard",
-      "Wallet Manager": "explore"
-    }
-    this.socket = io();
+    this.socket = io('0.0.0.0:7001');
     this.socket.on('new_block', (socket) => {
-      if(this.state.page == "Dashboard")
-        this.mainPage.updateBlocks();
+      
     });
 
     this.socket.on('changed_default_wallet', (socket) => {
@@ -34,8 +26,7 @@ class App extends Component {
     });
 
     this.socket.on('new_tx_in_pool', (socket) => {
-      if(this.state.page == "Dashboard")
-        this.mainPage.updateTxs();
+
     });
   }
 

@@ -382,6 +382,8 @@ def run(argv):
                         help='NOT RECOMMENDED! If you want to pass wallet password as argument.')
     parser.add_argument('--dir', action="store", type=str, dest='dir',
                         help='Directory for halocoin to use.')
+    parser.add_argument('--port', action="store", type=int, dest='port',
+                        help='Override API port defined in config file.')
 
     args = parser.parse_args(argv[1:])
 

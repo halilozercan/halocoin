@@ -2,9 +2,9 @@
   "name": "ui",
   "version": "0.1.0",
   "private": true,
-  "proxy": "http://0.0.0.0:7001",
   "dependencies": {
     "axios": "^0.17.1",
+    "electron-packager": "^10.1.0",
     "jquery": "2.x",
     "material-ui": "^0.20.0",
     "npm": "^5.6.0",
@@ -27,6 +27,7 @@
   },
   "devDependencies": {
     "electron": "^1.7.10",
+    "electron-installer-debian": "^0.7.1",
     "foreman": "^2.0.0"
   }
 }

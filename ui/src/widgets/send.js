@@ -4,14 +4,14 @@ import {Card, CardActions, CardHeader, CardText} from 'material-ui/Card';
 import RaisedButton from 'material-ui/RaisedButton';
 import TextField from 'material-ui/TextField';
 
-class NewWalletForm extends Component {
+class Send extends Component {
 
   constructor(props) {
     super(props);
     this.state = {
-      "name": '',
-      "password": '',
-      "password2": ''
+      "address": '',
+      "amount": '',
+      "password": ''
     }
   }
 
@@ -26,39 +26,50 @@ class NewWalletForm extends Component {
 
   onSubmit = (e) => {
     e.preventDefault();
-    if(this.state.password === '' || this.state.name === '') {
-      this.props.notify('Wallet name or password cannot be empty', 'error');
-      return;
-    }
-    else if(this.state.password !== this.state.password2) {
-      this.props.notify('Passwords must match', 'error');
+    if(this.state.password === '' || this.state.address === '' || this.state.amount === '') {
+      this.props.notify('All fields must be filled', 'error');
       return;
     }
     let data = new FormData();
-    data.append('wallet_name', this.state.name);
+    data.append('address', this.state.address);
     data.append('password', this.state.password);
-    data.append('set_default', true);
+    data.append('amount', this.state.amount);
 
-    axiosInstance.post('/new_wallet', data)
+    axiosInstance.post('/send', data)
       .then((response) => {
-        this.props.notify('Succesfully created the wallet ' + response.data.name, 'success');
-        this.props.refresh();
+        this.props.notify('Your transaction is successfully added to the pool', 'success');
+      })
+      .catch((error) => {
+        this.props.notify('Something is wrong. Transaction failed!', 'error');
       });
+    this.setState({
+      'address': '',
+      'amount': '',
+      'password': ''
+    })
   }
 
   render() {
     return (
       <Card style={{"margin":16}}>
         <CardHeader
-          title="New Wallet"
-          subtitle="Create a new wallet to start Coinami"
+          title="Send coins"
+          subtitle="Make a transaction"
         />
         <CardText>
           <form onSubmit={this.onSubmit}>
             <TextField
               fullWidth={true}
-              floatingLabelText="Name"
-              name="name"
+              floatingLabelText="Address"
+              name="address"
+              value={this.state.address}
+              onChange={this.onChange}
+            />
+            <TextField
+              fullWidth={true}
+              floatingLabelText="Amount"
+              name="amount"
+              value={this.state.amount}
               onChange={this.onChange}
             />
             <TextField
@@ -66,23 +77,17 @@ class NewWalletForm extends Component {
               floatingLabelText="Password"
               name="password"
               type="password"
-              onChange={this.onChange}
-            />
-            <TextField
-              fullWidth={true}
-              floatingLabelText="Password(Again)"
-              name="password2"
-              type="password"
+              value={this.state.password}
               onChange={this.onChange}
             />
           </form>
         </CardText>
         <CardActions align='right'>
-          <RaisedButton label="Start" primary={true} onClick={this.onSubmit} />
+          <RaisedButton label="Send" primary={true} onClick={this.onSubmit} />
         </CardActions>
       </Card>
     );
   }
 }
 
-export default NewWalletForm;
+export default Send;

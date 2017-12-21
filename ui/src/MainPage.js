@@ -1,24 +1,14 @@
 import React, { Component } from 'react';
-import {MCardStats, MCardTable} from './components/card.js';
-import Blockcount from './widgets/blockcount.js';
-import {timestampToDatetime} from './tools.js';
 import axios from 'axios';
-import Address from './widgets/address.js';
+import WalletManagement from './WalletManagement.js';
+import Mining from './Mining.js';
 import AppBar from 'material-ui/AppBar';
 import Drawer from 'material-ui/Drawer';
 import MenuItem from 'material-ui/MenuItem';
-import Balance from './widgets/balance.js';
 import Home from 'material-ui/svg-icons/action/home';
 import Settings from 'material-ui/svg-icons/action/settings';
 import Lock from 'material-ui/svg-icons/action/lock';
-import Paper from 'material-ui/Paper';
-
-const bottomBarStyle = {
-  position: 'absolute', 
-  bottom: 0, 
-  width: '100%',
-  padding: 16
-};
+import Blockcount from './widgets/blockcount.js';
 
 class MainPage extends Component {
 
@@ -26,7 +16,8 @@ class MainPage extends Component {
     super(props);
     this.state = {
       'default_wallet': null,
-      'drawer_open': false
+      'drawer_open': false,
+      'page': 'main'
     }
   }
 
@@ -38,6 +29,13 @@ class MainPage extends Component {
     state.drawer_open = !state.drawer_open;
     return state;
   });
+
+  changePage = (newPage) => {
+    this.setState({
+      page: newPage,
+      drawer_open: false
+    })
+  }
 
   getDefaultWallet = () => {
     axios.get("/info_wallet").then((response) => {
@@ -63,6 +61,13 @@ class MainPage extends Component {
   }
 
   render() {
+    let currentPage = <div />
+    if(this.state.page === 'main') {
+      currentPage = <WalletManagement notify={this.props.notify} default_wallet={this.state.default_wallet} />;
+    }
+    else if(this.state.page === 'mining') {
+      currentPage = <Mining notify={this.props.notify} default_wallet={this.state.default_wallet} />
+    }
     return (
       <div>
         <AppBar
@@ -71,24 +76,12 @@ class MainPage extends Component {
           onLeftIconButtonClick={this.drawerToggle}
         />
         <Drawer open={this.state.drawer_open} docked={false} onRequestChange={(drawer_open) => this.setState({drawer_open})}>
-          <MenuItem leftIcon={<Home />}>Home</MenuItem>
-          <MenuItem leftIcon={<Settings />}>Mining</MenuItem>
+          <MenuItem leftIcon={<Home />} onClick={() => {this.changePage('main')}} >Home</MenuItem>
+          <MenuItem leftIcon={<Settings />} onClick={() => {this.changePage('mining')}}>Mining</MenuItem>
           <MenuItem leftIcon={<Lock />} onClick={this.onLogout}>Logout</MenuItem>
         </Drawer>
-        <div className="container-fluid" style={{marginTop:16}}>
-          <div className="row">
-            <Balance wallet={this.state.default_wallet} notify={this.props.notify} />
-          </div>
-          <div className="row">
-            <Address wallet={this.state.default_wallet} notify={this.props.notify} />
-          </div>
-          <div className="row">
-            
-          </div>
-        </div>
-        <Paper style={bottomBarStyle}  zDepth={1}>
-          Blockcount: 225-3569
-        </Paper>
+        {currentPage}
+        <Blockcount />
       </div>
     );
   }
