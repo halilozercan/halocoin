@@ -16,10 +16,7 @@ class App extends Component {
     this.pageChanged = this.pageChanged.bind(this);
     this.checkDefault = this.checkDefault.bind(this);
     this.notify = this.notify.bind(this);
-    this.socket = io('0.0.0.0:7001');
-    this.socket.on('new_block', (socket) => {
-      
-    });
+    this.socket = io('http://0.0.0.0:7001');
 
     this.socket.on('changed_default_wallet', (socket) => {
       this.checkDefault();
@@ -96,10 +93,10 @@ class App extends Component {
       page = <div>Could not connect to Coinami Engine :(</div>;
     }
     else if(this.state.status === "yes_dw") {
-      page = <MainPage notify={this.notify}/>;
+      page = <MainPage socket={this.socket} notify={this.notify}/>;
     }
     else if(this.state.status === "no_dw") {
-      page = <ChooseWallet notify={this.notify}/>;
+      page = <ChooseWallet socket={this.socket} notify={this.notify}/>;
     }
 
     return (

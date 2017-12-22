@@ -23,6 +23,11 @@ class MainPage extends Component {
 
   componentDidMount() {
     this.getDefaultWallet();
+    const electron = window.require('electron');
+    var win = electron.remote.getCurrentWindow();
+    win.setSize(800,600);
+        // now i have everything from BrowserWindow api...
+    console.log(win);
   }
 
   drawerToggle = () => this.setState((state) => {
@@ -81,7 +86,7 @@ class MainPage extends Component {
           <MenuItem leftIcon={<Lock />} onClick={this.onLogout}>Logout</MenuItem>
         </Drawer>
         {currentPage}
-        <Blockcount />
+        <Blockcount socket={this.props.socket}/>
       </div>
     );
   }

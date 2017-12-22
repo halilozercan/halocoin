@@ -1,18 +1,14 @@
 {
-  "name": "ui",
+  "name": "Coinami",
+  "description": "Coinami Wallet and more",
   "version": "0.1.0",
   "private": true,
   "dependencies": {
     "axios": "^0.17.1",
-    "electron-packager": "^10.1.0",
-    "jquery": "2.x",
     "material-ui": "^0.20.0",
-    "npm": "^5.6.0",
     "react": "^16.2.0",
-    "react-bs-notifier": "^4.4.5",
     "react-dom": "^16.2.0",
     "react-notification-system": "^0.2.16",
-    "react-scripts": "1.0.17",
     "socket.io-client": "^2.0.4"
   },
   "main": "src/electron-starter.js",
@@ -26,8 +22,11 @@
     "dev": "nf start"
   },
   "devDependencies": {
+    "npm": "^5.6.0",
     "electron": "^1.7.10",
+    "react-scripts": "1.0.17",
     "electron-installer-debian": "^0.7.1",
+    "electron-packager": "^10.1.0",
     "foreman": "^2.0.0"
   }
 }

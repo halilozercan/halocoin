@@ -10,8 +10,6 @@ class WalletManagement extends Component {
       <div className="container-fluid" style={{marginTop:16, marginBottom:64}}>
         <div className="row">
           <Balance wallet={this.props.default_wallet} notify={this.props.notify} />
-        </div>
-        <div className="row">
           <Address wallet={this.props.default_wallet} notify={this.props.notify} />
         </div>
         <div className="row">

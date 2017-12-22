@@ -22,6 +22,9 @@ class Blockcount extends Component {
 
   componentWillMount() {
     this.update();
+    this.props.socket.on('new_block', (socket) => {
+      this.update();
+    })
   }
 
   update() {

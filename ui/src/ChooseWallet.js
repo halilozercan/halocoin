@@ -60,7 +60,7 @@ class ChooseWallet extends Component {
             </div>
           </Tab>
         </Tabs>
-        <Blockcount />
+        <Blockcount socket={this.props.socket}/>
       </div>
     );
   }
