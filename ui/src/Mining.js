@@ -13,12 +13,10 @@ class Mining extends Component {
       <div className="container-fluid" style={{marginTop:16, marginBottom:64}}>
         <div className="row">
           <Miner />
-        </div>
-        <div className="row">
           <Power />
         </div>
         <div className="row">
-          <JobListing />
+          <JobListing notify={this.props.notify}/>
         </div>
       </div>
     );

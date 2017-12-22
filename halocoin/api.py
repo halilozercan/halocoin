@@ -52,7 +52,7 @@ def run():
         socketio.run(app, host=host, port=engine.instance.config['port']['api'])
 
     global listen_thread
-    host = os.environ.get('HALOCOIN_API_HOST', "0.0.0.0")
+    host = os.environ.get('COINAMI_API_HOST', "localhost")
     listen_thread = threading.Thread(target=thread_target, daemon=True)
     listen_thread.start()
     print("Started API on {}:{}".format(host, engine.instance.config['port']['api']))
@@ -226,10 +226,17 @@ def set_default_wallet():
 @app.route('/history', methods=['GET', 'POST'])
 # @blockchain_synced
 def history():
+    from halocoin.model.wallet import Wallet
     address = request.values.get('address', None)
     if address is None:
-        address = engine.instance.db.get('address')
-    account = engine.instance.account.get_account(address)
+        default_wallet = engine.instance.account.get_default_wallet()
+        if default_wallet is not None:
+            wallet_name = default_wallet['wallet_name']
+            password = default_wallet['password']
+            encrypted_wallet_content = engine.instance.account.get_wallet(wallet_name)
+            wallet = Wallet.from_string(tools.decrypt(password, encrypted_wallet_content))
+            address = wallet.address
+    account = engine.instance.account.get_account(wallet.address)
     txs = {
         "send": [],
         "recv": [],
@@ -263,6 +270,24 @@ def jobs():
 
     if type == 'assigned' or type == 'all':
         result['assigned'] = engine.instance.account.get_assigned_jobs()
+
+    return generate_json_response(result)
+
+
+@app.route('/jobs2')
+def jobs2():
+    """
+    Jobs from blockchain history
+    :return:
+    """
+    result = []
+    length = engine.instance.db.get('length')
+    for i in range(length):
+        block = engine.instance.db.get(str(i))
+        for tx in block['txs']:
+            if tx['type'] != 'mint':
+                tx['block'] = i
+                result.append(tx)
 
     return generate_json_response(result)
 

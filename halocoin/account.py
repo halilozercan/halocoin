@@ -69,7 +69,7 @@ class AccountService(Service):
     def check_tx_validity_to_blockchain(self, tx):
         current_length = self.db.get('length')
         send_address = tools.tx_owner_address(tx)
-        send_account = self.db.get(send_address)
+        send_account = self.get_account(send_address)
 
         if tx['type'] == 'mint':
             send_account['amount'] += tools.block_reward(current_length)
@@ -141,6 +141,7 @@ class AccountService(Service):
             if tx['type'] == 'mint':
                 send_account['amount'] += tools.block_reward(block['length'])
                 send_account['mined_blocks'].append(block['length'])
+                self.update_account(send_address, send_account)
             elif tx['type'] == 'spend':
                 recv_address = tx['to']
                 recv_account = self.get_account(recv_address)
@@ -151,24 +152,22 @@ class AccountService(Service):
 
                 recv_account['amount'] += tx['amount']
                 recv_account['tx_blocks'].append(block['length'])
+                self.update_account(send_address, send_account)
+                self.update_account(recv_address, recv_account)
             elif tx['type'] == 'reward':
                 recv_address = tx['to']
-                recv_account = self.get_account(recv_address)
+                self.reward_job(tx['job_id'], recv_address, block['length'])
 
+                recv_account = self.get_account(recv_address)
                 recv_account['amount'] += tx['amount']
                 recv_account['tx_blocks'].append(block['length'])
-                self.reward_job(tx['job_id'], recv_address, block['length'])
+                self.update_account(recv_address, recv_account)
             elif tx['type'] == 'auth_reg':
                 self.put_certificate(tx['certificate'])
             elif tx['type'] == 'job_dump':
                 self.add_new_job(tx['job'], tx['auth'], block['length'])
             elif tx['type'] == 'job_request':
                 requested_jobs[tx['job_id']].append((send_address, tx['amount']))
-
-            if tx['type'] == 'mint' or tx['type'] == 'spend':
-                self.update_account(send_address, send_account)
-            if tx['type'] == 'spend' or tx['type'] == 'reward':
-                self.update_account(recv_address, recv_account)
 
         for requested_job_id in requested_jobs.keys():
             sorted_requests = sorted(requested_jobs[requested_job_id], key=lambda x: x[1])
@@ -229,7 +228,7 @@ class AccountService(Service):
                         break
                 self.db.update_job(job)
 
-    def update_account_with_txs(self, address, account, txs, only_outgoing=False):
+    def update_account_with_txs(self, address, account, txs):
         """
         Not many use cases. Dont care
         """
@@ -239,7 +238,7 @@ class AccountService(Service):
                 if owner == address:
                     account['amount'] -= -tx['amount']
                     account['count'] += 1
-                elif tx['to'] == address and not only_outgoing:
+                if tx['to'] == address:
                     account['amount'] += tx['amount']
         return account
 

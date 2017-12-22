@@ -136,7 +136,9 @@ def encrypt(key, content, chunksize=64 * 1024):
     import io
     import Crypto.Random
     from Crypto.Cipher import AES
-    infile = io.BytesIO(content.encode())
+    infile = io.BytesIO()
+    infile.write(content.encode())
+    infile.seek(0)
     outfile = io.BytesIO()
     if isinstance(key, str):
         key = key.encode()
@@ -154,8 +156,7 @@ def encrypt(key, content, chunksize=64 * 1024):
             break
         elif len(chunk) % 16 != 0:
             chunk += '\0'.encode() * (16 - len(chunk) % 16)
-
-            outfile.write(encryptor.encrypt(chunk))
+        outfile.write(encryptor.encrypt(chunk))
     return outfile.getvalue()
 
 

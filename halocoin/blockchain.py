@@ -156,7 +156,7 @@ class BlockchainService(Service):
 
         if tx in txs_in_pool:
             return Response(False, 'no duplicates')
-        if 'type' not in tx or tx['type'] not in BlockchainService.tx_types:
+        if 'type' not in tx or tx['type'] not in BlockchainService.tx_types or tx['type'] == 'mint':
             return Response(False, 'Invalid type')
         integrity_check = self.tx_integrity_check(tx)
         if not integrity_check.getFlag():
@@ -220,9 +220,8 @@ class BlockchainService(Service):
             return 3
 
         # TODO: Add tx integrity check for all tx types
-        coinami_txs = [tx for tx in block['txs'] if tx['type'] != 'spend' and tx['type'] != 'mint']
         flag = True
-        for tx in coinami_txs:
+        for tx in block['txs']:
             flag &= self.tx_integrity_check(tx).getFlag()
             flag &= self.account.check_tx_validity_to_blockchain(tx)
         if not flag:

@@ -1,5 +1,5 @@
 import React, { Component } from 'react';
-import axios from 'axios';
+import {axiosInstance} from './tools.js';
 import WalletManagement from './WalletManagement.js';
 import Mining from './Mining.js';
 import AppBar from 'material-ui/AppBar';
@@ -23,11 +23,12 @@ class MainPage extends Component {
 
   componentDidMount() {
     this.getDefaultWallet();
-    const electron = window.require('electron');
-    var win = electron.remote.getCurrentWindow();
-    win.setSize(800,600);
-        // now i have everything from BrowserWindow api...
-    console.log(win);
+    this.props.socket.on('new_block', (socket) => {
+      this.getDefaultWallet();
+    });
+    this.props.socket.on('new_tx_in_pool', (socket) => {
+      this.getDefaultWallet();
+    });
   }
 
   drawerToggle = () => this.setState((state) => {
@@ -43,7 +44,7 @@ class MainPage extends Component {
   }
 
   getDefaultWallet = () => {
-    axios.get("/info_wallet").then((response) => {
+    axiosInstance.get("/info_wallet").then((response) => {
       let data = response.data;
       if(data.hasOwnProperty('address')) {
         this.setState({default_wallet:data});
@@ -58,7 +59,7 @@ class MainPage extends Component {
     let data = new FormData()
     data.append('delete', true);
 
-    axios.post('/set_default_wallet', data).then((response) => {
+    axiosInstance.post('/set_default_wallet', data).then((response) => {
       
     }).catch((error) => {
       this.props.notify('Failed to logout', 'error');
