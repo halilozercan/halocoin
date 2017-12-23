@@ -169,10 +169,16 @@ class AccountService(Service):
             elif tx['type'] == 'job_request':
                 requested_jobs[tx['job_id']].append((send_address, tx['amount']))
 
-        for requested_job_id in requested_jobs.keys():
-            sorted_requests = sorted(requested_jobs[requested_job_id], key=lambda x: x[1])
-            lowest_bidder = sorted_requests[0][0]
-            self.assign_job(requested_job_id, lowest_bidder, block['length'])
+        """
+         We go over the list of requested jobs in a deterministic way. Thus,
+         every client will agree on how to evaluate multiple job bidding at the same block.
+        """
+        for requested_job_id in sorted(requested_jobs.keys()):
+            for bid in sorted(requested_jobs[requested_job_id], key=lambda x: x[1]):
+                bidder = bid[0]
+                bid_amount = bid[1]
+                if self.assign_job(requested_job_id, bidder, bid_amount, block['length']):
+                    break
 
         # Now we take a look at back, we unassign jobs that are still not rewarded
         from halocoin import custom
@@ -181,9 +187,9 @@ class AccountService(Service):
             if job['status_list'][-1]['block'] <= (block['length'] - custom.drop_job_block_count):
                 self.unassign_job(job['id'], block['length'])
 
-
     @sync
     def rollback_block(self, block):
+        # TODO: Also rollback assignment and unassignment.
         """
         A block rollback means removing the block from chain.
         A block is defined by its transactions. Here we rollback every object in database to the version
@@ -529,9 +535,11 @@ class AccountService(Service):
         return True
 
     @sync
-    def assign_job(self, job_id, address, block_number):
+    def assign_job(self, job_id, address, amount, block_number):
         job = self.db.get('job_' + job_id)
         if job['status_list'][-1]['action'] != 'add' and job['status_list'][-1]['action'] != 'unassign':
+            return False
+        if amount > job['max_amount'] or amount < job['min_amount']:
             return False
         account = self.get_account(address)
         if account['assigned_job'] != '':
@@ -540,7 +548,8 @@ class AccountService(Service):
         job['status_list'].append({
             'action': 'assign',
             'block': block_number,
-            'address': address
+            'address': address,
+            'amount': amount
         })
         account['assigned_job'] = job_id
         self.db.put('job_' + job_id, job)

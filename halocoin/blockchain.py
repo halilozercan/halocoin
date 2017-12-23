@@ -151,7 +151,6 @@ class BlockchainService(Service):
         if not isinstance(tx, dict):
             return Response(False, 'Transactions must be dict typed')
 
-        # tools.log('attempt to add tx: ' +str(tx))
         txs_in_pool = self.tx_pool()
 
         if tx in txs_in_pool:
@@ -433,6 +432,8 @@ class BlockchainService(Service):
             if 'job' not in tx or not isinstance(tx['job'], dict) or \
                             'id' not in tx['job'] or 'timestamp' not in tx['job']:
                 return Response(False, 'Job dump transactions must include a job in it. Makes sense right?')
+            if 'max_amount' not in tx['job'] or 'min_amount' not in tx['job']:
+                return Response(False, 'Job dump transactions must specify maximum and minimum allowed rewards')
 
         if tx['type'] == 'auth_reg':
             if 'certificate' not in tx:
