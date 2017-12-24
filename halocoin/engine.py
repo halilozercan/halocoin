@@ -30,9 +30,9 @@ def test_database(db):
         if test_response == 'TEST_SIM':
             db.commit(sid)
             if db.get('test') == 'TEST_SIM':
-                return True
+                results[1] = True
 
-    return False
+    return results[0] and results[1]
 
 
 instance = None
@@ -44,7 +44,7 @@ class Engine(Service):
         self.config = config
         self.working_dir = working_dir
 
-        self.db = DatabaseService(self)
+        self.db = DatabaseService(self, self.config['database']['location'])
         self.blockchain = BlockchainService(self)
         self.peers_check = PeerCheckService(self, self.config['peers']['list'])
         self.peer_receive = PeerListenService(self)

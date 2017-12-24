@@ -1,6 +1,6 @@
 import copy
 
-from halocoin import tools, api
+from halocoin import tools
 from halocoin.service import Service, sync
 
 
@@ -20,15 +20,6 @@ class AccountService(Service):
         'tx_blocks': [],
         'mined_blocks': [],
         'assigned_job': ''
-    }
-
-    default_peer = {
-        'node_id': 'Anon',
-        'ip': '',
-        'port': 0,
-        'rank': 1,
-        'diffLength': '',
-        'length': -1
     }
 
     def __init__(self, engine):

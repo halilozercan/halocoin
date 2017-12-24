@@ -1,8 +1,12 @@
-import sys
-
 import os
+import sys
+from io import BytesIO
+
 import yaml
+from simplekv import KeyValueStore, CopyMixin
+from simplekv._compat import imap, text_type
 from simplekv.db.sql import SQLAlchemyStore
+from sqlalchemy import Table, Column, String, LargeBinary, select, exists
 from sqlalchemy.exc import OperationalError
 
 from halocoin import tools, custom
@@ -10,13 +14,10 @@ from halocoin.service import Service, sync
 
 
 class DatabaseService(Service):
-    """
-    Database bindings for leveldb
-    """
-
-    def __init__(self, engine):
+    def __init__(self, engine, dbname):
         Service.__init__(self, name='database')
         self.engine = engine
+        self.dbname = dbname
         self.DB = None
         self.salt = None
         self.req_count = 0
@@ -26,7 +27,7 @@ class DatabaseService(Service):
     def on_register(self):
         try:
             from sqlalchemy import create_engine, MetaData
-            db_location = os.path.join(self.engine.working_dir, self.engine.config['database']['location'])
+            db_location = os.path.join(self.engine.working_dir, self.dbname)
             self.dbengine = create_engine('sqlite:///' + db_location)
             self.metadata = MetaData(bind=self.dbengine)
             self.DB = SQLAlchemyStore(self.dbengine, self.metadata, 'kvstore')
@@ -119,17 +120,6 @@ class DatabaseService(Service):
     def rollback(self, sid):
         self.simulations[sid].rollback()
         del self.simulations[sid]
-
-
-#!/usr/bin/env python
-# coding=utf8
-
-from io import BytesIO
-
-from simplekv._compat import imap, text_type
-from simplekv import KeyValueStore, CopyMixin
-
-from sqlalchemy import Table, Column, String, LargeBinary, select, exists
 
 
 class SQLSimulationStore(KeyValueStore, CopyMixin):

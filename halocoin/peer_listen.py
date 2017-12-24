@@ -31,7 +31,6 @@ class PeerListenService(Service):
         try:
             self.s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             self.s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-            self.s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             self.s.settimeout(2)
             self.s.bind(('0.0.0.0', self.engine.config['port']['peers']))
             self.s.listen(10)
@@ -94,15 +93,15 @@ class PeerListenService(Service):
         :param __remote_ip__: IP address of remote as seen from this network.
         :return: Our own greetings message
         """
-        from halocoin.clientdb import AccountService
-        peer = copy.deepcopy(AccountService.default_peer)
+        from halocoin.client_db import ClientDBService
+        peer = copy.deepcopy(ClientDBService.default_peer)
         peer.update(
             node_id=node_id,
             ip=__remote_ip__[0],
             port=port,
             length=length,
             diffLength=diffLength,
-            rank=1
+            rank=0.75
         )
         self.clientdb.add_peer(peer, 'greetings')
         return {

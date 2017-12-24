@@ -1,10 +1,21 @@
-import copy
+import os
+import sys
+
+import yaml
+from simplekv.db.sql import SQLAlchemyStore
+from sqlalchemy.exc import OperationalError
 
 from halocoin import tools, api
 from halocoin.service import Service, sync
 
 
 class ClientDBService(Service):
+    """
+    This is a separate database from blockchain related data.
+    Anything that needs to be stored on client side that doesn't depend on blockchain
+    should be managed by here.
+    """
+
     default_peer = {
         'node_id': 'Anon',
         'ip': '',
@@ -17,18 +28,53 @@ class ClientDBService(Service):
     def __init__(self, engine):
         Service.__init__(self, name='client_db')
         self.engine = engine
-        self.db = None
+        self.DB = None
         self.blockchain = None
 
     def on_register(self):
-        self.db = self.engine.db
         self.blockchain = self.engine.blockchain
         print("Started ClientDB")
+        try:
+            from sqlalchemy import create_engine, MetaData
+            db_location = os.path.join(self.engine.working_dir, 'clientdb')
+            self.dbengine = create_engine('sqlite:///' + db_location)
+            self.metadata = MetaData(bind=self.dbengine)
+            self.DB = SQLAlchemyStore(self.dbengine, self.metadata, 'kvstore')
+            self.DB.table.create()
+        except OperationalError as e:
+            pass
+        except Exception as e:
+            tools.log(e)
+            sys.stderr.write('Redis connection cannot be established!\nFalling to SQLAlchemy')
+            return False
         return True
 
     @sync
+    def get(self, key):
+        try:
+            return yaml.load(self.DB.get(str(key)).decode())
+        except Exception as e:
+            return None
+
+    @sync
+    def put(self, key, value):
+        try:
+            self.DB.put(str(key), yaml.dump(value).encode())
+            return True
+        except Exception as e:
+            return False
+
+    @sync
+    def delete(self, key):
+        try:
+            self.DB.delete(str(key))
+            return True
+        except:
+            return False
+
+    @sync
     def get_peers(self):
-        peers = self.db.get('peer_list')
+        peers = self.get('peer_list')
         if peers is None:
             peers = list()
         peers = sorted(peers, key=lambda x: x['rank'])
@@ -72,7 +118,7 @@ class ClientDBService(Service):
             for i, _peer in enumerate(peers):
                 if _peer['node_id'] == peer['node_id'] and _peer['ip'] == peer['ip'] and \
                                 _peer['port'] == peer['port']:
-                    peer['rank'] = _peer['rank']
+                    peer['rank'] *= _peer['rank']
                     peers[i] = peer
                     add_flag = False
                     break
@@ -101,7 +147,7 @@ class ClientDBService(Service):
             peers.append(peer)
 
         api.peer_update()
-        self.db.put('peer_list', peers)
+        self.put('peer_list', peers)
 
     @sync
     def update_peer(self, peer):
@@ -113,15 +159,16 @@ class ClientDBService(Service):
         if not self.is_peer(peer):
             return
 
-        peers = self.db.get('peer_list')
+        peers = self.get('peer_list')
         for i, _peer in enumerate(peers):
             if peer['node_id'] == _peer['node_id']:
                 peers[i] = peer
                 break
 
         api.peer_update()
-        self.db.put('peer_list', peers)
+        self.put('peer_list', peers)
 
+    @sync
     def is_peer(self, peer):
         """
         Integrity check of a peer object.
@@ -136,21 +183,21 @@ class ClientDBService(Service):
             return False
 
         # Its key set must match default keys
-        if set(peer.keys()) != set(AccountService.default_peer.keys()):
+        if set(peer.keys()) != set(ClientDBService.default_peer.keys()):
             return False
 
         if not tools.validate_uuid4(peer['node_id']):
             return False
 
-        if peer['node_id'] == self.db.get('node_id'):
+        if peer['node_id'] == self.get('node_id'):
             return False
 
         return True
 
     @sync
     def get_peer_history(self, node_id):
-        if self.db.exists('peer_history_' + node_id):
-            return self.db.get('peer_history_' + node_id)
+        if self.exists('peer_history_' + node_id):
+            return self.get('peer_history_' + node_id)
         else:
             return {
                 "greetings": 0,
@@ -159,12 +206,12 @@ class ClientDBService(Service):
 
     @sync
     def set_peer_history(self, node_id, peer_history):
-        self.db.put('peer_history_' + node_id, peer_history)
+        self.put('peer_history_' + node_id, peer_history)
 
     @sync
     def get_wallets(self):
-        if self.db.exists("wallets"):
-            return self.db.get("wallets")
+        if self.get("wallets") is not None:
+            return self.get("wallets")
         return {}
 
     @sync
@@ -181,7 +228,7 @@ class ClientDBService(Service):
         if wallet_obj.name in wallets:
             return False
         wallets[wallet_obj.name] = tools.encrypt(enc_key, wallet_obj.to_string())
-        self.db.put("wallets", wallets)
+        self.put("wallets", wallets)
         return True
 
     @sync
@@ -190,7 +237,7 @@ class ClientDBService(Service):
         if wallet_name in wallets:
             return False
         wallets[wallet_name] = wallet_str
-        self.db.put("wallets", wallets)
+        self.put("wallets", wallets)
         return True
 
     @sync
@@ -198,15 +245,15 @@ class ClientDBService(Service):
         try:
             wallets = self.get_wallets()
             del wallets[name]
-            self.db.put("wallets", wallets)
+            self.put("wallets", wallets)
             return True
         except Exception as e:
             return False
 
     @sync
     def get_default_wallet(self):
-        if self.db.exists('default_wallet'):
-            return self.db.get('default_wallet')
+        if self.exists('default_wallet'):
+            return self.get('default_wallet')
         else:
             return None
 
@@ -217,7 +264,7 @@ class ClientDBService(Service):
             encrypted_wallet_content = self.get_wallet(wallet_name)
             wallet = Wallet.from_string(tools.decrypt(password, encrypted_wallet_content))
             if wallet.name == wallet_name:
-                self.db.put('default_wallet', {
+                self.put('default_wallet', {
                     "wallet_name": wallet_name,
                     "password": password
                 })
@@ -231,6 +278,6 @@ class ClientDBService(Service):
 
     @sync
     def delete_default_wallet(self):
-        self.db.delete('default_wallet')
+        self.delete('default_wallet')
         api.changed_default_wallet()
         return True
