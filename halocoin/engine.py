@@ -6,6 +6,7 @@ from halocoin import api
 from halocoin import tools
 from halocoin.account import AccountService
 from halocoin.blockchain import BlockchainService
+from halocoin.client_db import ClientDBService
 from halocoin.database import DatabaseService
 from halocoin.miner import MinerService
 from halocoin.peer_check import PeerCheckService
@@ -15,12 +16,21 @@ from halocoin.service import Service, async
 
 
 def test_database(db):
+    results = [False, False]
     response = db.put('test', 'TEST')
     if response:
         test_response = db.get('test')
         if test_response == 'TEST':
-            delete_response = db.delete('test')
-            return delete_response
+            results[0] = True
+
+    sid = db.simulate()
+    response = db.put('test', 'TEST_SIM', sid)
+    if response:
+        test_response = db.get('test', sid)
+        if test_response == 'TEST_SIM':
+            db.commit(sid)
+            if db.get('test') == 'TEST_SIM':
+                return True
 
     return False
 
@@ -38,6 +48,7 @@ class Engine(Service):
         self.blockchain = BlockchainService(self)
         self.peers_check = PeerCheckService(self, self.config['peers']['list'])
         self.peer_receive = PeerListenService(self)
+        self.clientdb = ClientDBService(self)
         self.account = AccountService(self)
         self.miner = MinerService(self)
         self.power = PowerService(self)
@@ -69,6 +80,11 @@ class Engine(Service):
             self.db.put('known_length', -1)
             self.db.put('job_list', [])
         self.db.put('stop', False)
+
+        if not self.clientdb.register():
+            sys.stderr.write("ClientDB service has failed. Exiting!\n")
+            self.unregister_sub_services()
+            return False
 
         if not self.account.register():
             sys.stderr.write("Account service has failed. Exiting!\n")
@@ -110,6 +126,9 @@ class Engine(Service):
             running_services.add(self.blockchain)
         if self.account.get_state() == Service.RUNNING:
             self.account.unregister()
+            running_services.add(self.account)
+        if self.clientdb.get_state() == Service.RUNNING:
+            self.clientdb.unregister()
             running_services.add(self.account)
         if self.db.get_state() == Service.RUNNING:
             self.db.unregister()

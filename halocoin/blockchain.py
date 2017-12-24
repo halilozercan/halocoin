@@ -30,64 +30,68 @@ class BlockchainService(Service):
         self.tx_queue = NoExceptionQueue(100)
         self.db = None
         self.account = None
+        self.clientdb = None
         self.in_memory_db = {}
         self.__state = BlockchainService.IDLE
 
     def on_register(self):
         self.db = self.engine.db
         self.account = self.engine.account
+        self.clientdb = self.engine.clientdb
         print("Started Blockchain")
         return True
 
     @threaded
     def process_blocks(self):
+        """
+        In this thread we check blocks queue for possible additions to blockchain.
+        Following type is expected to come out of the queue. Any other type will be rejected.
+        ([candidate_blocks in order], peer_node_id)
+        Only 3 services actually put stuff in queue: peer_listen, peer_check, miner
+        PeerListen and PeerCheck obeys the expected style.
+        Miner instead puts one block in candidate block list, node id is 'miner'
+        :return:
+        """
         try:
-            candidate_block = self.blocks_queue.get(timeout=1)
+            candidate = self.blocks_queue.get(timeout=1)
         except queue.Empty:
             return
         self.set_chain_state(BlockchainService.SYNCING)
         try:
-            if isinstance(candidate_block, tuple):
-                blocks = candidate_block[0]  # Get the list of blocks that arrived from a peer
-                node_id = candidate_block[1]  # Source of these blocks.
+            if isinstance(candidate, tuple):
+                blocks = candidate[0]
+                node_id = candidate[1]
                 total_number_of_blocks_added = 0
 
-                integrity_flag = True
                 for block in blocks:
-                    if not BlockchainService.block_integrity_check(block):
-                        integrity_flag = False
+                    if not BlockchainService.single_block_integrity_check(block) and node_id != 'miner':
+                        self.peer_reported_false_blocks(node_id)
+                        raise Exception('Peer {} reported false blocks'.format(node_id))
+
+                for block in blocks:
+                    add_block_result = self.add_block(block)
+                    if add_block_result == 2:  # A block that is ahead of us could not be added. No need to proceed.
+                        break
+                    elif add_block_result == 0:
+                        total_number_of_blocks_added += 1
+
+                length = self.db.get('length')
+                for i in range(20):
+                    block = self.db.get(length)
+                    if BlockchainService.fork_check(blocks, length, block):
+                        self.delete_block()
+                        length -= 1
+                    else:
                         break
 
-                if integrity_flag:
-                    length = self.db.get('length')
-                    for i in range(20):
-                        block = self.db.get(length)
-                        if BlockchainService.fork_check(blocks, length, block):
-                            self.delete_block()
-                            length -= 1
-                        else:
-                            break
-                    for block in blocks:
-                        add_block_result = self.add_block(block)
-                        if add_block_result == 2:  # A block that is ahead of us could not be added. No need to proceed.
-                            break
-                        elif add_block_result == 0:
-                            total_number_of_blocks_added += 1
-
-                    if total_number_of_blocks_added == 0:
-                        # All received blocks failed. Punish the peer by lowering rank.
-                        self.peer_reported_false_blocks(node_id)
-                    else:
-                        api.new_block()
-                else:
+                if total_number_of_blocks_added == 0:
+                    # All received blocks failed. Punish the peer by lowering rank.
                     self.peer_reported_false_blocks(node_id)
-            elif isinstance(candidate_block, list):
-                for block in candidate_block:
-                    self.add_block(block)
-                api.new_block()
-            self.set_chain_state(BlockchainService.IDLE)
-        except:
-            self.set_chain_state(BlockchainService.IDLE)
+                else:
+                    api.new_block()
+        except Exception as e:
+            tools.log(e)
+        self.set_chain_state(BlockchainService.IDLE)
         self.blocks_queue.task_done()
 
     @threaded
@@ -141,10 +145,10 @@ class BlockchainService(Service):
 
     @sync
     def peer_reported_false_blocks(self, node_id):
-        peer = self.account.get_peer(node_id)
+        peer = self.clientdb.get_peer(node_id)
         peer['rank'] *= 0.8
         peer['rank'] += 0.2 * 30
-        self.account.update_peer(peer)
+        self.clientdb.update_peer(peer)
 
     def add_tx(self, tx):
 
@@ -201,7 +205,7 @@ class BlockchainService(Service):
             tools.log('wrong target')
             return 3
 
-        recent_time_values = self.recent_blockthings('times', custom.median_block_time_limit, self.db.get('length'))
+        recent_time_values = self.recent_blockthings('times', custom.median_block_time_limit)
         median_block = tools.median(recent_time_values)
         if block['time'] < median_block:
             tools.log('Received block is generated earlier than median.')
@@ -280,7 +284,7 @@ class BlockchainService(Service):
         return True
 
     @staticmethod
-    def block_integrity_check(block):
+    def single_block_integrity_check(block):
         if not isinstance(block, dict):
             tools.log('Block is not a dict')
             return False
@@ -305,7 +309,7 @@ class BlockchainService(Service):
 
         return True
 
-    def recent_blockthings(self, key, size, length=0):
+    def recent_blockthings(self, key, size, length=0, blocks=None):
         """
         Legacy of zack-bitcoin. This is the true art of naming of functions.
         """
@@ -442,7 +446,7 @@ class BlockchainService(Service):
                 return Response(False, 'pubkeys do not match with certificate')
         return Response(True, 'Everything seems fine')
 
-    def target(self, length):
+    def target(self, length, blocks=None):
         def targetTimesFloat(target, number):
             a = int(str(target), 16)
             b = int(a * number)  # this should be rational multiplication followed by integer estimation
@@ -468,7 +472,7 @@ class BlockchainService(Service):
                     l = [tools.hex_sum(l[0], l[1])] + l[2:]
                 return l[0]
 
-            targets = self.recent_blockthings('targets', custom.history_length)
+            targets = self.recent_blockthings('targets', custom.history_length, blocks=blocks)
             w = weights(len(targets))  # should be rat instead of float
             tw = sum(w)
             targets = list(map(tools.hex_invert, targets))
@@ -477,7 +481,7 @@ class BlockchainService(Service):
             return tools.hex_invert(sumTargets(weighted_targets))
 
         def estimate_time():
-            times = self.recent_blockthings('times', custom.history_length)
+            times = self.recent_blockthings('times', custom.history_length, blocks=blocks)
             times = list(map(Decimal, times))
             # How long it took to generate blocks
             block_times = [times[i] - times[i - 1] for i in range(1, len(times))]

@@ -15,16 +15,16 @@ class PeerCheckService(Service):
         self.new_peers = new_peers
         self.db = None
         self.blockchain = None
-        self.account = None
+        self.clientdb = None
         self.node_id = "Anon"
         self.old_peers = []
 
     def on_register(self):
         self.db = self.engine.db
         self.blockchain = self.engine.blockchain
-        self.account = self.engine.account
+        self.clientdb = self.engine.clientdb
         for peer in self.new_peers:
-            self.account.add_peer(peer, 'friend_of_mine')
+            self.clientdb.add_peer(peer, 'friend_of_mine')
         self.node_id = self.db.get('node_id')
         print("Started Peers Check")
         return True
@@ -40,7 +40,7 @@ class PeerCheckService(Service):
             time.sleep(0.1)
             return
 
-        peers = self.account.get_peers()
+        peers = self.clientdb.get_peers()
         if len(peers) > 0:
             i = tools.exponential_random(1.0 / 2) % len(peers)
             peer = peers[i]
@@ -60,7 +60,7 @@ class PeerCheckService(Service):
             else:
                 peer['rank'] += 0.2 * 30
 
-            self.account.update_peer(peer)
+            self.clientdb.update_peer(peer)
 
         time.sleep(1)
 
@@ -84,7 +84,7 @@ class PeerCheckService(Service):
 
         peer['diffLength'] = greeted['diffLength']
         peer['length'] = greeted['length']
-        self.account.update_peer(peer)
+        self.clientdb.update_peer(peer)
 
         known_length = self.db.get('known_length')
         if greeted['length'] > known_length:
@@ -100,18 +100,18 @@ class PeerCheckService(Service):
         # send them blocks, share txs or download blocks.
 
         # Only transfer peers at every minute.
-        peer_history = self.account.get_peer_history(peer['node_id'])
+        peer_history = self.clientdb.get_peer_history(peer['node_id'])
         if time.time() - peer_history['peer_transfer'] > 60:
-            my_peers = self.account.get_peers()
+            my_peers = self.clientdb.get_peers()
             their_peers = ntwrk.command(peer_ip_port, {'action': 'peers'}, self.node_id)
             if type(their_peers) == list:
                 for p in their_peers:
-                    self.account.add_peer(p, 'friend_of_mine')
+                    self.clientdb.add_peer(p, 'friend_of_mine')
                 for p in my_peers:
                     ntwrk.command(peer_ip_port, {'action': 'receive_peer', 'peer': p}, self.node_id)
 
             peer_history['peer_transfer'] = time.time()
-            self.account.set_peer_history(peer['node_id'], peer_history)
+            self.clientdb.set_peer_history(peer['node_id'], peer_history)
 
         if them < us:
             self.give_block(peer_ip_port, greeted['length'])

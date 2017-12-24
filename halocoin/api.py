@@ -79,7 +79,7 @@ def upload_wallet():
     wallet_name = request.values.get('wallet_name', None)
     wallet_file = request.files['wallet_file']
     wallet_content = wallet_file.stream.read()
-    success = engine.instance.account.upload_wallet(wallet_name, wallet_content)
+    success = engine.instance.clientdb.upload_wallet(wallet_name, wallet_content)
     return generate_json_response({
         "success": success,
         "wallet_name": wallet_name
@@ -94,7 +94,7 @@ def download_wallet():
             "success": False,
             "error": "Give a valid wallet name"
         })
-    wallet_content = engine.instance.account.get_wallet(wallet_name)
+    wallet_content = engine.instance.clientdb.get_wallet(wallet_name)
     if wallet_content is None:
         return generate_json_response({
             "success": False,
@@ -112,12 +112,12 @@ def info_wallet():
     wallet_name = request.values.get('wallet_name', None)
     password = request.values.get('password', None)
     if wallet_name is None:
-        default_wallet = engine.instance.account.get_default_wallet()
+        default_wallet = engine.instance.clientdb.get_default_wallet()
         if default_wallet is not None:
             wallet_name = default_wallet['wallet_name']
             password = default_wallet['password']
 
-    encrypted_wallet_content = engine.instance.account.get_wallet(wallet_name)
+    encrypted_wallet_content = engine.instance.clientdb.get_wallet(wallet_name)
     if encrypted_wallet_content is not None:
         try:
             wallet = Wallet.from_string(tools.decrypt(password, encrypted_wallet_content))
@@ -140,18 +140,18 @@ def remove_wallet():
     from halocoin.model.wallet import Wallet
     wallet_name = request.values.get('wallet_name', None)
     password = request.values.get('password', None)
-    default_wallet = engine.instance.account.get_default_wallet()
+    default_wallet = engine.instance.clientdb.get_default_wallet()
     if default_wallet is not None and default_wallet['wallet_name'] == wallet_name:
         return generate_json_response({
             'success': False,
             'error': 'Cannot remove default wallet. First remove its default state!'
         })
 
-    encrypted_wallet_content = engine.instance.account.get_wallet(wallet_name)
+    encrypted_wallet_content = engine.instance.clientdb.get_wallet(wallet_name)
     if encrypted_wallet_content is not None:
         try:
             Wallet.from_string(tools.decrypt(password, encrypted_wallet_content))
-            engine.instance.account.remove_wallet(wallet_name)
+            engine.instance.clientdb.remove_wallet(wallet_name)
             return generate_json_response({
                 "success": True,
                 "message": "Successfully removed wallet"
@@ -175,9 +175,9 @@ def new_wallet():
     pw = request.values.get('password', None)
     set_default = request.values.get('set_default', None)
     wallet = Wallet(wallet_name)
-    success = engine.instance.account.new_wallet(pw, wallet)
+    success = engine.instance.clientdb.new_wallet(pw, wallet)
     if set_default:
-        engine.instance.account.set_default_wallet(wallet_name, pw)
+        engine.instance.clientdb.set_default_wallet(wallet_name, pw)
 
     return generate_json_response({
         "name": wallet_name,
@@ -187,20 +187,20 @@ def new_wallet():
 
 @app.route('/wallets', methods=['GET', 'POST'])
 def wallets():
-    default_wallet = engine.instance.account.get_default_wallet()
+    default_wallet = engine.instance.clientdb.get_default_wallet()
     if default_wallet is None:
         wallet_name = ''
     else:
         wallet_name = default_wallet['wallet_name']
     return generate_json_response({
-        'wallets': engine.instance.account.get_wallets(),
+        'wallets': engine.instance.clientdb.get_wallets(),
         'default_wallet': wallet_name
     })
 
 
 @app.route('/peers', methods=['GET', 'POST'])
 def peers():
-    return generate_json_response(engine.instance.account.get_peers())
+    return generate_json_response(engine.instance.clientdb.get_peers())
 
 
 @app.route('/node_id', methods=['GET', 'POST'])
@@ -215,11 +215,11 @@ def set_default_wallet():
     delete = request.values.get('delete', None)
     if delete is not None:
         return generate_json_response({
-            "success": engine.instance.account.delete_default_wallet()
+            "success": engine.instance.clientdb.delete_default_wallet()
         })
     else:
         return generate_json_response({
-            "success": engine.instance.account.set_default_wallet(wallet_name, password)
+            "success": engine.instance.clientdb.set_default_wallet(wallet_name, password)
         })
 
 
@@ -229,11 +229,11 @@ def history():
     from halocoin.model.wallet import Wallet
     address = request.values.get('address', None)
     if address is None:
-        default_wallet = engine.instance.account.get_default_wallet()
+        default_wallet = engine.instance.clientdb.get_default_wallet()
         if default_wallet is not None:
             wallet_name = default_wallet['wallet_name']
             password = default_wallet['password']
-            encrypted_wallet_content = engine.instance.account.get_wallet(wallet_name)
+            encrypted_wallet_content = engine.instance.clientdb.get_wallet(wallet_name)
             wallet = Wallet.from_string(tools.decrypt(password, encrypted_wallet_content))
             address = wallet.address
     account = engine.instance.account.get_account(wallet.address)
@@ -303,7 +303,7 @@ def send():
     password = request.values.get('password', None)
 
     if wallet_name is None:
-        default_wallet = engine.instance.account.get_default_wallet()
+        default_wallet = engine.instance.clientdb.get_default_wallet()
         if default_wallet is not None:
             wallet_name = default_wallet['wallet_name']
 
@@ -324,7 +324,7 @@ def send():
     tx = {'type': 'spend', 'amount': int(amount),
           'to': address, 'message': message}
 
-    encrypted_wallet_content = engine.instance.account.get_wallet(wallet_name)
+    encrypted_wallet_content = engine.instance.clientdb.get_wallet(wallet_name)
     if encrypted_wallet_content is not None:
         try:
             wallet = Wallet.from_string(tools.decrypt(password, encrypted_wallet_content))
@@ -360,7 +360,7 @@ def job_request():
     password = request.values.get('password', None)
 
     if wallet_name is None:
-        default_wallet = engine.instance.account.get_default_wallet()
+        default_wallet = engine.instance.clientdb.get_default_wallet()
         if default_wallet is not None:
             wallet_name = default_wallet['wallet_name']
 
@@ -380,7 +380,7 @@ def job_request():
 
     tx = {'type': 'job_request', 'amount': int(amount), 'job_id': job_id}
 
-    encrypted_wallet_content = engine.instance.account.get_wallet(wallet_name)
+    encrypted_wallet_content = engine.instance.clientdb.get_wallet(wallet_name)
     if encrypted_wallet_content is not None:
         try:
             wallet = Wallet.from_string(tools.decrypt(password, encrypted_wallet_content))
@@ -587,11 +587,11 @@ def balance():
     from halocoin.model.wallet import Wallet
     address = request.values.get('address', None)
     if address is None:
-        default_wallet = engine.instance.account.get_default_wallet()
+        default_wallet = engine.instance.clientdb.get_default_wallet()
         if default_wallet is not None:
             wallet_name = default_wallet['wallet_name']
             password = default_wallet['password']
-            encrypted_wallet_content = engine.instance.account.get_wallet(wallet_name)
+            encrypted_wallet_content = engine.instance.clientdb.get_wallet(wallet_name)
             wallet = Wallet.from_string(tools.decrypt(password, encrypted_wallet_content))
             address = wallet.address
 
@@ -615,12 +615,12 @@ def start_miner():
     password = request.values.get('password', None)
 
     if wallet_name is None:
-        default_wallet = engine.instance.account.get_default_wallet()
+        default_wallet = engine.instance.clientdb.get_default_wallet()
         if default_wallet is not None:
             wallet_name = default_wallet['wallet_name']
             password = default_wallet['password']
 
-    encrypted_wallet_content = engine.instance.account.get_wallet(wallet_name)
+    encrypted_wallet_content = engine.instance.clientdb.get_wallet(wallet_name)
     if encrypted_wallet_content is not None:
         try:
             wallet = Wallet.from_string(tools.decrypt(password, encrypted_wallet_content))
@@ -665,12 +665,12 @@ def start_power():
     password = request.values.get('password', None)
 
     if wallet_name is None:
-        default_wallet = engine.instance.account.get_default_wallet()
+        default_wallet = engine.instance.clientdb.get_default_wallet()
         if default_wallet is not None:
             wallet_name = default_wallet['wallet_name']
             password = default_wallet['password']
 
-    encrypted_wallet_content = engine.instance.account.get_wallet(wallet_name)
+    encrypted_wallet_content = engine.instance.clientdb.get_wallet(wallet_name)
     if encrypted_wallet_content is not None:
         try:
             wallet = Wallet.from_string(tools.decrypt(password, encrypted_wallet_content))
@@ -705,8 +705,8 @@ def status_power():
         'running': engine.instance.power.get_state() == Service.RUNNING,
         'assigned': ''
     }
-    default_wallet_props = engine.instance.account.get_default_wallet()
-    default_wallet = engine.instance.account.get_wallet(default_wallet_props['wallet_name'])
+    default_wallet_props = engine.instance.clientdb.get_default_wallet()
+    default_wallet = engine.instance.clientdb.get_wallet(default_wallet_props['wallet_name'])
     default_wallet = Wallet.from_string(tools.decrypt(default_wallet_props['password'], default_wallet))
     own_address = default_wallet.address
     own_account = engine.instance.account.get_account(own_address)

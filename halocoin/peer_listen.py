@@ -15,13 +15,13 @@ class PeerListenService(Service):
         self.engine = engine
         self.db = None
         self.blockchain = None
-        self.account = None
+        self.clientdb = None
         self.node_id = None
 
     def on_register(self):
         self.db = self.engine.db
         self.blockchain = self.engine.blockchain
-        self.account = self.engine.account
+        self.clientdb = self.engine.clientdb
 
         if not self.db.exists('node_id'):
             self.db.put('node_id', str(uuid.uuid4()))
@@ -94,7 +94,7 @@ class PeerListenService(Service):
         :param __remote_ip__: IP address of remote as seen from this network.
         :return: Our own greetings message
         """
-        from halocoin.account import AccountService
+        from halocoin.clientdb import AccountService
         peer = copy.deepcopy(AccountService.default_peer)
         peer.update(
             node_id=node_id,
@@ -104,7 +104,7 @@ class PeerListenService(Service):
             diffLength=diffLength,
             rank=1
         )
-        self.account.add_peer(peer, 'greetings')
+        self.clientdb.add_peer(peer, 'greetings')
         return {
             'node_id': self.node_id,
             'port': self.engine.config['port']['peers'],
@@ -120,7 +120,7 @@ class PeerListenService(Service):
         :return: None
         """
         peer.update(rank=1)  # We do not care about earlier rank.
-        self.account.add_peer(peer, 'friend_of_mine')
+        self.clientdb.add_peer(peer, 'friend_of_mine')
 
     @sync
     def block_count(self):
@@ -143,7 +143,7 @@ class PeerListenService(Service):
 
     @sync
     def peers(self):
-        return self.account.get_peers()
+        return self.clientdb.get_peers()
 
     @sync
     def txs(self):
