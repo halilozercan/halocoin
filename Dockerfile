@@ -15,5 +15,5 @@ VOLUME /data
 EXPOSE 7001
 EXPOSE 7002
 
-ENTRYPOINT ["/usr/local/bin/halocoin"]
+ENTRYPOINT ["/usr/local/bin/coinamid"]
 CMD ["start", "--dir", "/data"]
