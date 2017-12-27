@@ -14,3 +14,4 @@ Werkzeug==0.12.2
 flask
 flask-socketio
 psutil
+pyopenssl
