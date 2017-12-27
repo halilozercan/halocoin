@@ -245,7 +245,7 @@ class BlockchainService(Service):
 
         self.account.update_database_with_block(block)
 
-        for orphan in sorted(orphans, key=lambda x: x['count']):
+        for orphan in sorted(orphans, key=lambda x: x['count'] if 'count' in x else -1):
             self.add_tx(orphan)
 
         return 0

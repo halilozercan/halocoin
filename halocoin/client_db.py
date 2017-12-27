@@ -73,6 +73,14 @@ class ClientDBService(Service):
             return False
 
     @sync
+    def get_peer(self, node_id):
+        peers = self.get_peers()
+        for _peer in peers:
+            if _peer['node_id'] == node_id:
+                return _peer
+        return None
+
+    @sync
     def get_peers(self):
         peers = self.get('peer_list')
         if peers is None:

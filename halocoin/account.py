@@ -120,7 +120,8 @@ class AccountService(Service):
             first_condition = (job['status_list'][-1]['action'] == 'add' or job['status_list'][-1]['action'] == 'unassign')
             account = self.get_account(send_address)
             second_condition = (account['assigned_job'] == '')
-            return first_condition and second_condition
+            third_condition = job['min_amount'] <= tx['amount'] <= job['max_amount']
+            return first_condition and second_condition and third_condition
 
     @sync
     def update_database_with_block(self, block):

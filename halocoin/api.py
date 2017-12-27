@@ -396,9 +396,12 @@ def job_request():
     if 'signatures' not in tx:
         tx['signatures'] = [tools.sign(tools.det_hash(tx), wallet.privkey)]
     engine.instance.blockchain.tx_queue.put(tx)
-    response["success"] = True
-    response["message"] = 'Your job {} request bid with amount {} is added to the pool'\
-        .format(tx['job_id'], tx['amount'])
+    response["success"] = engine.instance.account.check_tx_validity_to_blockchain(tx)
+    if response['success']:
+        response["message"] = 'Your job {} request bid with amount {} is added to the pool'\
+            .format(tx['job_id'], tx['amount'])
+    else:
+        response["error"] = 'Your job request failed to pass integrity check'
     return generate_json_response(response)
 
 
@@ -447,7 +450,9 @@ def job_dump():
     from ecdsa import SigningKey
     job = {
         'id': request.values.get('job_id', None),
-        'timestamp': request.values.get('job_timestamp', None)
+        'timestamp': request.values.get('job_timestamp', None),
+        'max_amount': request.values.get('max_amount', 10000),
+        'min_amount': request.values.get('min_amount', 1000)
     }
     cert_pem = request.values.get('cert_pem', None)
     priv_key_pem = request.values.get('privkey_pem', None)
