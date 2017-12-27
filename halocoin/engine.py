@@ -23,12 +23,12 @@ def test_database(db):
         if test_response == 'TEST':
             results[0] = True
 
-    sid = db.simulate()
-    response = db.put('test', 'TEST_SIM', sid)
+    db.simulate()
+    response = db.sput('test', 'TEST_SIM')
     if response:
-        test_response = db.get('test', sid)
+        test_response = db.sget('test')
         if test_response == 'TEST_SIM':
-            db.commit(sid)
+            db.commit()
             if db.get('test') == 'TEST_SIM':
                 results[1] = True
 

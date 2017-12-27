@@ -3,3 +3,8 @@ build
 dist
 *egg-info*
 coinami
+ui
+halocoin/build
+halocoin/dist
+halocoin/venv
+*.spec

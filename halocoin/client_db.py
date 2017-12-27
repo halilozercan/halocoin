@@ -36,7 +36,7 @@ class ClientDBService(Service):
         print("Started ClientDB")
         try:
             from sqlalchemy import create_engine, MetaData
-            db_location = os.path.join(self.engine.working_dir, 'clientdb')
+            db_location = os.path.join(self.engine.working_dir, 'client.db')
             self.dbengine = create_engine('sqlite:///' + db_location)
             self.metadata = MetaData(bind=self.dbengine)
             self.DB = SQLAlchemyStore(self.dbengine, self.metadata, 'kvstore')
@@ -196,7 +196,7 @@ class ClientDBService(Service):
 
     @sync
     def get_peer_history(self, node_id):
-        if self.exists('peer_history_' + node_id):
+        if self.get('peer_history_' + node_id) is not None:
             return self.get('peer_history_' + node_id)
         else:
             return {
@@ -252,10 +252,7 @@ class ClientDBService(Service):
 
     @sync
     def get_default_wallet(self):
-        if self.exists('default_wallet'):
-            return self.get('default_wallet')
-        else:
-            return None
+        return self.get('default_wallet')
 
     @sync
     def set_default_wallet(self, wallet_name, password):

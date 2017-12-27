@@ -19,10 +19,10 @@ class DatabaseService(Service):
         self.engine = engine
         self.dbname = dbname
         self.DB = None
+        self.simulation = None
         self.salt = None
         self.req_count = 0
         self.set_state(Service.INIT)
-        self.simulations = {}
 
     def on_register(self):
         try:
@@ -43,58 +43,75 @@ class DatabaseService(Service):
         return True
 
     @sync
-    def get(self, key, sid=None):
+    def get(self, key):
+        return self._get(self.DB, key)
+
+    @sync
+    def put(self, key, value):
+        return self._put(self.DB, key, value)
+
+    @sync
+    def exists(self, key):
+        return self._exists(self.DB, key)
+
+    @sync
+    def delete(self, key):
+        return self._delete(self.DB, key)
+
+    @sync
+    def sget(self, key):
+        return self._get(self.simulation, key)
+
+    @sync
+    def sput(self, key, value):
+        return self._put(self.simulation, key, value)
+
+    @sync
+    def sexists(self, key):
+        """
+        Unintentional sexism
+        :param key:
+        :return:
+        """
+        return self._exists(self.simulation, key)
+
+    @sync
+    def sdelete(self, key):
+        return self._delete(self.simulation, key)
+
+    def _get(self, db, key):
         """gets the key in args[0] using the salt"""
-        if sid is None:
-            db = self.DB
-        else:
-            db = self.simulations[sid]
         try:
             return yaml.load(db.get(self.salt + str(key)).decode())
         except Exception as e:
             return None
 
-    @sync
-    def put(self, key, value, sid=None):
+    def _put(self, db, key, value):
         """
         Puts the val in args[1] under the key in args[0] with the salt
         prepended to the key.
         """
-        if sid is None:
-            db = self.DB
-        else:
-            db = self.simulations[sid]
         try:
             db.put(self.salt + str(key), yaml.dump(value).encode())
             return True
         except Exception as e:
             return False
 
-    @sync
-    def exists(self, key, sid=None):
+    def _exists(self, db, key):
         """
         Checks if the key in args[0] with the salt prepended is
         in the database.
         """
-        if sid is None:
-            db = self.DB
-        else:
-            db = self.simulations[sid]
         try:
             return (self.salt + str(key)) in db
         except KeyError:
             return False
 
-    @sync
-    def delete(self, key, sid=None):
+    def _delete(self, db, key):
         """
         Removes the entry in the database under the the key in args[0]
         with the salt prepended.
         """
-        if sid is None:
-            db = self.DB
-        else:
-            db = self.simulations[sid]
         try:
             db.delete(self.salt + str(key))
             return True
@@ -103,23 +120,32 @@ class DatabaseService(Service):
 
     @sync
     def simulate(self):
-        import uuid
+        if self.simulation is not None:
+            tools.log('There is already an ongoing simulation!')
+            return False
         try:
-            sid = str(uuid.uuid4())
-            self.simulations[sid] = SQLSimulationStore(self.dbengine, self.metadata, 'kvstore')
-            return sid
+            self.simulation = SQLSimulationStore(self.dbengine, self.metadata, 'kvstore')
+            return True
         except:
-            return None
+            return False
 
     @sync
-    def commit(self, sid):
-        self.simulations[sid].commit()
-        del self.simulations[sid]
+    def commit(self):
+        if self.simulation is None:
+            tools.log('There isn\'t any ongoing simulation')
+            return False
+        self.simulation.commit()
+        self.simulation = None
+        return True
 
     @sync
-    def rollback(self, sid):
-        self.simulations[sid].rollback()
-        del self.simulations[sid]
+    def rollback(self):
+        if self.simulation is None:
+            tools.log('There isn\'t any ongoing simulation')
+            return False
+        self.simulation.rollback()
+        self.simulation = None
+        return True
 
 
 class SQLSimulationStore(KeyValueStore, CopyMixin):

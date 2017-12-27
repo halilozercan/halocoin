@@ -78,7 +78,7 @@ class MinerService(Service):
         if len(possible_blocks) > 0:
             tools.log('Mined block')
             tools.log(possible_blocks)
-            self.blockchain.blocks_queue.put(possible_blocks)
+            self.blockchain.blocks_queue.put((possible_blocks, 'miner'))
 
     def start_workers(self, candidate_block):
         self.close_workers()

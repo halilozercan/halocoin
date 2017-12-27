@@ -31,7 +31,6 @@ class BlockchainService(Service):
         self.db = None
         self.account = None
         self.clientdb = None
-        self.in_memory_db = {}
         self.__state = BlockchainService.IDLE
 
     def on_register(self):
@@ -64,9 +63,21 @@ class BlockchainService(Service):
                 total_number_of_blocks_added = 0
 
                 for block in blocks:
-                    if not BlockchainService.single_block_integrity_check(block) and node_id != 'miner':
+                    if not BlockchainService.block_integrity_check(block) and node_id != 'miner':
                         self.peer_reported_false_blocks(node_id)
                         raise Exception('Peer {} reported false blocks'.format(node_id))
+
+                # Here we go in simulation mode. If anything goes wrong, we rollback changes.
+                self.db.simulate()
+
+                length = self.db.get('length')
+                for i in range(20):
+                    block = self.db.get(length)
+                    if self.fork_check(blocks, length, block):
+                        self.delete_block()
+                        length -= 1
+                    else:
+                        break
 
                 for block in blocks:
                     add_block_result = self.add_block(block)
@@ -75,19 +86,12 @@ class BlockchainService(Service):
                     elif add_block_result == 0:
                         total_number_of_blocks_added += 1
 
-                length = self.db.get('length')
-                for i in range(20):
-                    block = self.db.get(length)
-                    if BlockchainService.fork_check(blocks, length, block):
-                        self.delete_block()
-                        length -= 1
-                    else:
-                        break
-
-                if total_number_of_blocks_added == 0:
+                if total_number_of_blocks_added == 0 or self.db.get('length') != blocks[-1]['length']:
                     # All received blocks failed. Punish the peer by lowering rank.
                     self.peer_reported_false_blocks(node_id)
+                    self.db.rollback()
                 else:
+                    self.db.commit()
                     api.new_block()
         except Exception as e:
             tools.log(e)
@@ -205,11 +209,13 @@ class BlockchainService(Service):
             tools.log('wrong target')
             return 3
 
+        """
         recent_time_values = self.recent_blockthings('times', custom.median_block_time_limit)
         median_block = tools.median(recent_time_values)
         if block['time'] < median_block:
             tools.log('Received block is generated earlier than median.')
             return 3
+        """
 
         # Check that block includes exactly one mint transaction
         if 'txs' not in block:
@@ -245,7 +251,6 @@ class BlockchainService(Service):
         return 0
 
     def delete_block(self):
-        """ Removes the most recent block from the blockchain. """
         length = self.db.get('length')
         if length < 0:
             return
@@ -284,7 +289,7 @@ class BlockchainService(Service):
         return True
 
     @staticmethod
-    def single_block_integrity_check(block):
+    def block_integrity_check(block):
         if not isinstance(block, dict):
             tools.log('Block is not a dict')
             return False
@@ -309,17 +314,14 @@ class BlockchainService(Service):
 
         return True
 
-    def recent_blockthings(self, key, size, length=0, blocks=None):
+    def recent_blockthings(self, key, size, length=0):
         """
         Legacy of zack-bitcoin. This is the true art of naming of functions.
         """
         if length == 0:
             length = self.db.get('length')
 
-        if key in self.in_memory_db:
-            storage = self.in_memory_db[key]
-        else:
-            storage = self.db.get(key)
+        storage = self.db.get(key)
         start = max((length - size), 0)
         result = []
         for i in range(start, length):
@@ -327,7 +329,6 @@ class BlockchainService(Service):
             if not leng in storage:
                 storage[leng] = self.db.get(leng)[key[:-1]]  # Remove last character that is 's' e.g. targets => target
             result.append(storage[leng])
-        self.in_memory_db[key] = storage
         self.db.put(key, storage)
         return result
 
@@ -374,8 +375,7 @@ class BlockchainService(Service):
             return False
         return True
 
-    @staticmethod
-    def fork_check(newblocks, length, top_block_on_chain):
+    def fork_check(self, newblocks, length, top_block_on_chain):
         """
         Check whether a fork happens while adding these blocks.
         If a fork is detected, return the index of last matched block.
@@ -387,8 +387,10 @@ class BlockchainService(Service):
         recent_hash = tools.det_hash(top_block_on_chain)
         their_hashes = list(map(lambda x: x['prevHash'] if x['length'] > 0 else 0, newblocks))
         their_hashes += [tools.det_hash(newblocks[-1])]
-        b = (recent_hash not in their_hashes) and newblocks[0]['length'] - 1 < length < newblocks[-1]['length']
-        return b
+        a = (recent_hash not in their_hashes)
+        b = newblocks[0]['length'] - 1 < length < newblocks[-1]['length']
+        c = tools.det_hash(newblocks[0]) == tools.det_hash(self.db.get(newblocks[0]['length']))
+        return a and b and c
 
     def tx_integrity_check(self, tx):
         """
@@ -446,7 +448,7 @@ class BlockchainService(Service):
                 return Response(False, 'pubkeys do not match with certificate')
         return Response(True, 'Everything seems fine')
 
-    def target(self, length, blocks=None):
+    def target(self, length):
         def targetTimesFloat(target, number):
             a = int(str(target), 16)
             b = int(a * number)  # this should be rational multiplication followed by integer estimation
@@ -472,7 +474,7 @@ class BlockchainService(Service):
                     l = [tools.hex_sum(l[0], l[1])] + l[2:]
                 return l[0]
 
-            targets = self.recent_blockthings('targets', custom.history_length, blocks=blocks)
+            targets = self.recent_blockthings('targets', custom.history_length)
             w = weights(len(targets))  # should be rat instead of float
             tw = sum(w)
             targets = list(map(tools.hex_invert, targets))
@@ -481,7 +483,7 @@ class BlockchainService(Service):
             return tools.hex_invert(sumTargets(weighted_targets))
 
         def estimate_time():
-            times = self.recent_blockthings('times', custom.history_length, blocks=blocks)
+            times = self.recent_blockthings('times', custom.history_length)
             times = list(map(Decimal, times))
             # How long it took to generate blocks
             block_times = [times[i] - times[i - 1] for i in range(1, len(times))]
