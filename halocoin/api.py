@@ -529,6 +529,9 @@ def blockcount():
 
 @app.route('/txs', methods=['GET', 'POST'])
 def txs():
+    purge = request.values.get('purge', None)
+    if purge is not None:
+        engine.instance.blockchain.tx_pool_pop_all()
     pool = engine.instance.blockchain.tx_pool()
     for i, tx in enumerate(pool):
         if tx['type'] == 'spend':

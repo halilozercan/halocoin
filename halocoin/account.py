@@ -107,7 +107,9 @@ class AccountService(Service):
             recv_account['amount'] += tx['amount']
             return recv_account['amount'] >= 0
         elif tx['type'] == 'auth_reg':
-            return tools.check_certificate_chain(tx['certificate'])
+            cert_valid = tools.check_certificate_chain(tx['certificate'])
+            early_reg = self.find_name_by_certificate(tx['certificate']) is None
+            return cert_valid and early_reg
         elif tx['type'] == 'job_dump':
             return not self.db.exists('job_' + tx['job']['id'])
         elif tx['type'] == 'job_request':
