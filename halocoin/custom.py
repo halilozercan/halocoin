@@ -14,7 +14,7 @@ history_length = 1440
 # total weight.
 inflection = Decimal('0.985')
 # How often to generate a block in seconds
-blocktime = 60 * 5
+blocktime = 60
 halve_at = (365 * 24 * 60 * 60 / blocktime)  # Approximately one year
 recalculate_target_at = (24*60*60 // blocktime)  # It's everyday bro!
 
