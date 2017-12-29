@@ -1,0 +1,1 @@
+rabix --quiet coinami.cwl /input/coinami.job.json

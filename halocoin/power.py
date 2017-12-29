@@ -103,10 +103,11 @@ class PowerService(Service):
 
     @sync
     def execute_job(self, job_id):
+        """rabix --quiet --basedir coinami.cw -- --reads_1 jobid.1.fastq --reads_2 jobid.2.fastq --reference /reference/human.fa --threads 4 --output_loc result.zip"""
         import subprocess
         job_directory = os.path.join(self.engine.working_dir, 'jobs', job_id)
         result_file = os.path.join(job_directory, 'result.zip')
-        result = subprocess.run([self.engine.config['coinami']['rabix_path'],
+        result = subprocess.run([self.engine.config['coinami']['docker'],
                                  '--quiet', '--basedir',
                                  os.path.dirname(self.engine.config['coinami']['workflow_path']),
                                  self.engine.config['coinami']['workflow_path'],

@@ -1,6 +1,6 @@
-FROM ubuntu:17.04
+FROM coinami/reference
 
-RUN apt-get update -y
+RUN apt-get update -y --fix-missing
 RUN apt-get -y install software-properties-common wget default-jre \
     vim less zip gcc zlib1g-dev libbz2-dev liblzma-dev make git python3-pip
 
@@ -34,5 +34,11 @@ RUN wget https://github.com/broadinstitute/picard/releases/download/2.16.0/picar
 # Coinami Workflow Repo -> /coinami-workflow
 RUN git clone https://github.com/halilozercan/coinami-workflow.git /coinami-workflow
 
-# Copy all reference files to /reference
-COPY reference/ /reference
+WORKDIR /coinami-workflow
+ADD executor.sh /coinami-workflow/executor.sh
+RUN chmod a+x executor.sh
+
+VOLUME /input
+VOLUME /output
+
+ENTRYPOINT ["sh", "/coinami-workflow/executor.sh"]
