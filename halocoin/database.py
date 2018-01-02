@@ -44,40 +44,31 @@ class DatabaseService(Service):
 
     @sync
     def get(self, key):
-        return self._get(self.DB, key)
+        if self.simulation is None:
+            return self._get(self.DB, key)
+        else:
+            return self._get(self.simulation, key)
 
     @sync
     def put(self, key, value):
-        return self._put(self.DB, key, value)
+        if self.simulation is None:
+            return self._put(self.DB, key, value)
+        else:
+            return self._put(self.simulation, key, value)
 
     @sync
     def exists(self, key):
-        return self._exists(self.DB, key)
+        if self.simulation is None:
+            return self._exists(self.DB, key)
+        else:
+            return self._exists(self.simulation, key)
 
     @sync
     def delete(self, key):
-        return self._delete(self.DB, key)
-
-    @sync
-    def sget(self, key):
-        return self._get(self.simulation, key)
-
-    @sync
-    def sput(self, key, value):
-        return self._put(self.simulation, key, value)
-
-    @sync
-    def sexists(self, key):
-        """
-        Unintentional sexism
-        :param key:
-        :return:
-        """
-        return self._exists(self.simulation, key)
-
-    @sync
-    def sdelete(self, key):
-        return self._delete(self.simulation, key)
+        if self.simulation is None:
+            return self._delete(self.DB, key)
+        else:
+            return self._delete(self.simulation, key)
 
     def _get(self, db, key):
         """gets the key in args[0] using the salt"""

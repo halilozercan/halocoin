@@ -4,6 +4,7 @@ import logging
 import os
 import random
 import struct
+import time
 
 from halocoin import custom
 
@@ -252,3 +253,20 @@ def get_commonname_from_certificate(intermediate_cert_pem):
     from slugify import slugify
     intermediate_cert = load_certificate(FILETYPE_PEM, intermediate_cert_pem)
     return slugify(intermediate_cert.get_subject().commonName)
+
+last = 0
+
+
+def echo(text):
+    global last
+    print(text)
+    last = time.time()
+
+
+def techo(text):
+    global last
+    if last == 0:
+        print(text)
+    else:
+        print(text + ": {}".format(time.time()-last))
+        last = time.time()

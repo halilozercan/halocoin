@@ -7,6 +7,7 @@ from halocoin import custom, api
 from halocoin import tools
 from halocoin.ntwrk import Response
 from halocoin.service import Service, threaded, sync, NoExceptionQueue
+from halocoin.tools import echo, techo
 
 
 class BlockchainService(Service):
@@ -68,7 +69,7 @@ class BlockchainService(Service):
                         raise Exception('Peer {} reported false blocks'.format(node_id))
 
                 # Here we go in simulation mode. If anything goes wrong, we rollback changes.
-                self.db.simulate()
+                #self.db.simulate()
 
                 length = self.db.get('length')
                 for i in range(20):
@@ -89,9 +90,9 @@ class BlockchainService(Service):
                 if total_number_of_blocks_added == 0 or self.db.get('length') != blocks[-1]['length']:
                     # All received blocks failed. Punish the peer by lowering rank.
                     self.peer_reported_false_blocks(node_id)
-                    self.db.rollback()
+                    #self.db.rollback()
                 else:
-                    self.db.commit()
+                    #self.db.commit()
                     api.new_block()
         except Exception as e:
             tools.log(e)
@@ -179,6 +180,8 @@ class BlockchainService(Service):
          Median is good for weeding out liars, so long as the liars don't have 51%
          hashpower. """
 
+        echo("adding block")
+
         length = self.db.get('length')
 
         if int(block['length']) < int(length) + 1:
@@ -186,7 +189,7 @@ class BlockchainService(Service):
         elif int(block['length']) > int(length) + 1:
             return 2
 
-        if (length >= 0 and block['diffLength'] != tools.hex_sum(self.db.get('diffLength'), tools.hex_invert(block['target']))) \
+        if (length >= 0 and block['diffLength'] != tools.hex_sum(self.db.get(str(length))['diffLength'], tools.hex_invert(block['target']))) \
                 or (length < 0 and block['diffLength'] != tools.hex_invert(block['target'])):
             tools.log(block['diffLength'])
             tools.log(tools.hex_sum(self.db.get('diffLength'), tools.hex_invert(block['target'])))
@@ -248,6 +251,7 @@ class BlockchainService(Service):
         for orphan in sorted(orphans, key=lambda x: x['count'] if 'count' in x else -1):
             self.add_tx(orphan)
 
+        techo("After block added")
         return 0
 
     def delete_block(self):

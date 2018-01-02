@@ -136,13 +136,14 @@ class AccountService(Service):
 
         from collections import defaultdict
         requested_jobs = defaultdict(list)
+
         for tx in block['txs']:
             send_address = tools.tx_owner_address(tx)
             send_account = self.get_account(send_address)
 
             if tx['type'] == 'mint':
                 send_account['amount'] += tools.block_reward(block['length'])
-                send_account['mined_blocks'].append(block['length'])
+                #send_account['mined_blocks'].append(block['length'])
                 self.update_account(send_address, send_account)
             elif tx['type'] == 'spend':
                 recv_address = tx['to']
