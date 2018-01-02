@@ -103,20 +103,15 @@ class PowerService(Service):
 
     @sync
     def execute_job(self, job_id):
-        """rabix --quiet --basedir coinami.cw -- --reads_1 jobid.1.fastq --reads_2 jobid.2.fastq --reference /reference/human.fa --threads 4 --output_loc result.zip"""
         import subprocess
         job_directory = os.path.join(self.engine.working_dir, 'jobs', job_id)
-        result_file = os.path.join(job_directory, 'result.zip')
-        result = subprocess.run([self.engine.config['coinami']['docker'],
-                                 '--quiet', '--basedir',
-                                 os.path.dirname(self.engine.config['coinami']['workflow_path']),
-                                 self.engine.config['coinami']['workflow_path'],
-                                 '--',
-                                 '--reads_1', os.path.join(job_directory, job_id + '.1.fastq'),
-                                 '--reads_2', os.path.join(job_directory, job_id + '.2.fastq'),
-                                 '--reference', self.engine.config['coinami']['reference_path'],
-                                 '--threads', '4',
-                                 '--output_loc', 'result.zip'])
+        output_directory = os.path.join(job_directory, 'output')
+        if not os.path.exists(output_directory):
+            os.makedirs(output_directory)
+        result_file = os.path.join(output_directory, 'result.zip')
+        result = subprocess.run([self.engine.config['coinami']['docker'], 'run', '-it', '--user=$UID',
+                                 '-v', job_directory + ':/input', '-v', output_directory + ':/output',
+                                 self.engine.config['coinami']['container']])
         if result.check_returncode() == 0 and os.path.exists(result_file):
             entry = self.db.get('local_job_repo_' + job_id)
             entry['status'] = 'executed'
