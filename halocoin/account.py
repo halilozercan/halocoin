@@ -88,23 +88,19 @@ class AccountService(Service):
         elif tx['type'] == 'reward':
             # TODO: Same auth
             # Check whether rewarding transaction has
-            # (job_dump.auth=reward.auth), (reward = auction bidding), (receiver = auction winner)
+            # (job_dump.auth=reward.auth)
             job = self.db.get('job_' + tx['job_id'])
             last_change = job['status_list'][-1]
             # This job is not assigned to anyone right now.
             if last_change['action'] != 'assign':
                 return False
 
-            # Reward is addressed to wrong address.
-            if last_change['address'] != tx['to']:
-                return False
-
-            recv_account = self.db.get(last_change['address'])
+            recv_account = self.get_account(last_change['address'])
             # Receiving account does not have the same assignment
             if recv_account['assigned_job'] != tx['job_id']:
                 return False
 
-            recv_account['amount'] += tx['amount']
+            recv_account['amount'] += last_change['amount']
             return recv_account['amount'] >= 0
         elif tx['type'] == 'auth_reg':
             cert_valid = tools.check_certificate_chain(tx['certificate'])
@@ -158,13 +154,14 @@ class AccountService(Service):
                 self.update_account(send_address, send_account)
                 self.update_account(recv_address, recv_account)
             elif tx['type'] == 'reward':
-                recv_address = tx['to']
-                self.reward_job(tx['job_id'], recv_address, block['length'])
+                job = self.db.get('job_' + tx['job_id'])
+                last_change = job['status_list'][-1]
+                self.reward_job(tx['job_id'], last_change['address'], block['length'])
 
-                recv_account = self.get_account(recv_address)
-                recv_account['amount'] += tx['amount']
+                recv_account = self.get_account(last_change['address'])
+                recv_account['amount'] += last_change['amount']
                 recv_account['tx_blocks'].append(block['length'])
-                self.update_account(recv_address, recv_account)
+                self.update_account(last_change['address'], recv_account)
             elif tx['type'] == 'auth_reg':
                 self.put_certificate(tx['certificate'])
             elif tx['type'] == 'job_dump':

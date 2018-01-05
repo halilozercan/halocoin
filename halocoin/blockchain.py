@@ -180,8 +180,6 @@ class BlockchainService(Service):
          Median is good for weeding out liars, so long as the liars don't have 51%
          hashpower. """
 
-        echo("adding block")
-
         length = self.db.get('length')
 
         if int(block['length']) < int(length) + 1:
@@ -250,8 +248,6 @@ class BlockchainService(Service):
 
         for orphan in sorted(orphans, key=lambda x: x['count'] if 'count' in x else -1):
             self.add_tx(orphan)
-
-        techo("After block added")
         return 0
 
     def delete_block(self):
@@ -404,7 +400,7 @@ class BlockchainService(Service):
         :return:
         """
 
-        if tx['type'] == 'spend' or tx['type'] == 'reward':
+        if tx['type'] == 'spend':
             if 'to' not in tx or not isinstance(tx['to'], str):
                 return Response(False, 'Reward or spend transactions must be addressed')
             if not BlockchainService.tx_signature_check(tx):
@@ -421,6 +417,8 @@ class BlockchainService(Service):
                 return Response(False, 'Bidding amount is missing from the request')
 
         if tx['type'] == 'reward':
+            if not BlockchainService.tx_signature_check(tx):
+                return Response(False, 'Transaction is not properly signed')
             if 'auth' not in tx:
                 return Response(False, 'Reward transactions must include auth name')
             cert = self.account.find_certificate_by_name(tx['auth'])

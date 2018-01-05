@@ -80,8 +80,8 @@ def generate_default_config():
     }
 
     config["coinami"] = {
-        "rabix_path": "/home/halil/Tools/rabix/rabix-cli-1.0.3/rabix",
-        "workflow_path": "/home/halil/coinami-workflow/coinami.cwl"
+        "docker": "/usr/bin/docker",
+        "container": "coinami/power"
     }
     return config
 

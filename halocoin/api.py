@@ -409,20 +409,12 @@ def job_request():
 def reward():
     from ecdsa import SigningKey
     job_id = request.values.get('job_id', None)
-    address = request.values.get('address', None)
-    amount = int(request.values.get('amount', 0))
     cert_pem = request.values.get('cert_pem', None)
     priv_key_pem = request.values.get('privkey_pem', None)
 
     response = {"success": False}
     if job_id is None:
         response['error'] = "You need to specify a job id for the reward"
-        return generate_json_response(response)
-    if address is None:
-        response['error'] = "You need to specify a receiving address for the reward"
-        return generate_json_response(response)
-    if amount <= 0:
-        response['error'] = "Reward amount cannot be smaller than or equal to 0"
         return generate_json_response(response)
     elif priv_key_pem is None:
         response['error'] = "Reward transactions need to be signed by private key belonging to certificate"
@@ -431,7 +423,7 @@ def reward():
         response['error'] = "To reward, you must specify a common name or certificate that is granted by root"
         return generate_json_response(response)
 
-    tx = {'type': 'reward', 'job_id': job_id, 'to': address, 'amount': amount}
+    tx = {'type': 'reward', 'job_id': job_id}
 
     privkey = SigningKey.from_pem(priv_key_pem)
     common_name = tools.get_commonname_from_certificate(cert_pem)
@@ -441,7 +433,7 @@ def reward():
     tx['signatures'] = [tools.sign(tools.det_hash(tx), privkey)]
     engine.instance.blockchain.tx_queue.put(tx)
     response["success"] = True
-    response["message"] = 'Reward amount:{} to:{} sent to the pool'.format(tx['amount'], tx['to'])
+    response["message"] = 'Reward to:{} sent to the pool'.format(tx['job_id'])
     return generate_json_response(response)
 
 
