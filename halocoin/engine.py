@@ -17,9 +17,13 @@ from halocoin.service import Service, async
 
 def test_database(db):
     results = [False, False]
+    tools.echo("put")
     response = db.put('test', 'TEST')
+    tools.techo("put")
     if response:
+        tools.echo("get")
         test_response = db.get('test')
+        tools.techo("get")
         if test_response == 'TEST':
             results[0] = True
 

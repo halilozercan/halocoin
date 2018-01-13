@@ -54,13 +54,12 @@ def make_api_request(method, files=None, **kwargs):
     return response
 
 
-def print_txs(txs, length=-1):
+def print_txs(txs):
     table = []
     for tx in txs:
         tx['from'] = tools.tx_owner_address(tx)
         if tx['type'] == 'mint':
             tx['to'] = 'N/A'
-            tx['amount'] = tools.block_reward(length)
             tx['message'] = ''
         table.append([tx['type'], tx['from'], tx['to'], tx['amount'], tx['message']])
 
@@ -104,7 +103,7 @@ def print_blocks(blocks):
 
     if len(blocks) == 1:
         print(Colors.WARNING + "\nTransactions in the Block:\n" + Colors.ENDC)
-        print_txs(blocks[0]['txs'], length=blocks[0]['length'])
+        print_txs(blocks[0]['txs'])
 
 
 def print_history(history):
@@ -129,7 +128,7 @@ def print_history(history):
             print("In Block {} {} mined amount {}".format(
                 tx['block'],
                 Colors.HEADER + tools.tx_owner_address(tx) + Colors.ENDC,
-                tools.block_reward(tx['block'])))
+                tx['amount']))
 
 
 def extract_configuration(args):

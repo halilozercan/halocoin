@@ -68,9 +68,6 @@ class BlockchainService(Service):
                         self.peer_reported_false_blocks(node_id)
                         raise Exception('Peer {} reported false blocks'.format(node_id))
 
-                # Here we go in simulation mode. If anything goes wrong, we rollback changes.
-                #self.db.simulate()
-
                 length = self.db.get('length')
                 for i in range(20):
                     block = self.db.get(length)
@@ -90,9 +87,7 @@ class BlockchainService(Service):
                 if total_number_of_blocks_added == 0 or self.db.get('length') != blocks[-1]['length']:
                     # All received blocks failed. Punish the peer by lowering rank.
                     self.peer_reported_false_blocks(node_id)
-                    #self.db.rollback()
                 else:
-                    #self.db.commit()
                     api.new_block()
         except Exception as e:
             tools.log(e)
@@ -248,6 +243,7 @@ class BlockchainService(Service):
 
         for orphan in sorted(orphans, key=lambda x: x['count'] if 'count' in x else -1):
             self.add_tx(orphan)
+
         return 0
 
     def delete_block(self):
@@ -399,6 +395,17 @@ class BlockchainService(Service):
         :param tx:
         :return:
         """
+        if not isinstance(tx, dict):
+            return Response(False, 'Transaction is not a proper python dict')
+
+        if tx['version'] != custom.version:
+            return Response(False, 'belongs to an earlier version')
+
+        if tx['type'] == 'mint':
+            # In coinami, block reward is not constant.
+            # It is evaluated by the average of rewarding transactions history.
+            if 'amount' not in tx or not isinstance(tx['amount'], int):
+                return Response(False, 'Transaction amount is not given or not a proper integer')
 
         if tx['type'] == 'spend':
             if 'to' not in tx or not isinstance(tx['to'], str):
@@ -421,22 +428,12 @@ class BlockchainService(Service):
                 return Response(False, 'Transaction is not properly signed')
             if 'auth' not in tx:
                 return Response(False, 'Reward transactions must include auth name')
-            cert = self.account.find_certificate_by_name(tx['auth'])
-            if cert is None:
-                return Response(False, 'given auth name does not have a known certificate')
-            if tx['pubkeys'] != [tools.get_pubkey_from_certificate(cert).to_string()]:
-                return Response(False, 'pubkeys do not match with known pubkeys of auth')
             if 'job_id' not in tx:
                 return Response(False, 'Reward must be addressed to a job id')
 
         if tx['type'] == 'job_dump':
             if 'auth' not in tx:
                 return Response(False, 'Job dump transactions must include auth name')
-            cert = self.account.find_certificate_by_name(tx['auth'])
-            if cert is None:
-                return Response(False, 'given auth name does not have a known certificate')
-            elif tx['pubkeys'] != [tools.get_pubkey_from_certificate(cert).to_string()]:
-                return Response(False, 'pubkeys do not match with known pubkeys of auth')
             if 'job' not in tx or not isinstance(tx['job'], dict) or \
                             'id' not in tx['job'] or 'timestamp' not in tx['job']:
                 return Response(False, 'Job dump transactions must include a job in it. Makes sense right?')
@@ -448,6 +445,8 @@ class BlockchainService(Service):
                 return Response(False, 'Auth must register with a valid certificate')
             elif tx['pubkeys'] != [tools.get_pubkey_from_certificate(tx['certificate']).to_string()]:
                 return Response(False, 'pubkeys do not match with certificate')
+            elif 'host' not in tx or not isinstance(tx['host'], str):
+                return Response(False, 'Authorities require to provide a hosting address')
         return Response(True, 'Everything seems fine')
 
     def target(self, length):

@@ -75,17 +75,19 @@ class PowerService(Service):
 
     @sync
     def initiate_job(self, job_id):
+        print('Assigned {}'.format(job_id))
         self.db.put('local_job_repo_' + job_id, {
             "status": "assigned",
         })
 
     @sync
     def download_job(self, job_id):
+        print('Downloading {}'.format(job_id))
         # TODO: Authorities must have a job endpoint template.
         # TODO: Add signature verification while requesting jobs to download.
         # TODO: implementation
         job = self.account.get_job(job_id)
-        endpoint = "http://0.0.0.0:5000/job_download/{}".format(job_id)
+        endpoint = "http://139.179.21.17:5000/job_download/{}".format(job_id)
         job_directory = os.path.join(self.engine.working_dir, 'jobs', job_id)
         if not os.path.exists(job_directory):
             os.makedirs(job_directory)
@@ -117,6 +119,7 @@ class PowerService(Service):
 
     @sync
     def execute_job(self, job_id):
+        print('Executing {}'.format(job_id))
         import docker
         client = docker.from_env()
         job_directory = os.path.join(self.engine.working_dir, 'jobs', job_id)
@@ -140,8 +143,9 @@ class PowerService(Service):
 
     @sync
     def upload_job(self, job_id):
+        print('Uploading {}'. format(job_id))
         job = self.account.get_job(job_id)
-        endpoint = "http://0.0.0.0:5000/job_upload/{}".format(job_id)
+        endpoint = "http://139.179.21.17:5000/job_upload/{}".format(job_id)
         result_directory = os.path.join(self.engine.working_dir, 'jobs', job_id, 'output')
         if not os.path.exists(result_directory):
             os.makedirs(result_directory)
@@ -156,14 +160,18 @@ class PowerService(Service):
         values = {'payload': payload}
 
         r = requests.post(endpoint, files=files, data=values)
-        if r.status_code == 200:
+        if r.status_code == 200 and r.json()['success']:
             entry = self.db.get('local_job_repo_' + job_id)
             entry['status'] = 'uploaded'
             self.db.put('local_job_repo_' + job_id, entry)
 
     @sync
     def done_job(self, job_id):
-        # TODO: Implementation
+        job = self.account.get_job(job_id)
+        job_directory = os.path.join(self.engine.working_dir, 'jobs', job_id)
+        if os.path.exists(job_directory):
+            os.removedirs(job_directory)
+
         entry = self.db.get('local_job_repo_' + job_id)
         entry['status'] = 'done'
         self.db.put('local_job_repo_' + job_id, entry)
@@ -175,10 +183,11 @@ class PowerService(Service):
         - Query Job repository for the task.
         - If job is not downloaded:
             - Download the job.
-        - Start rabix process.
+        - Start container.
         - Upload the result.
         - Mark the job as done.
-        - Return to beginning.
+            - Remove the downloaded files
+        - Repeat
         """
         if self.blockchain.get_chain_state() == blockchain.BlockchainService.SYNCING:
             time.sleep(0.1)

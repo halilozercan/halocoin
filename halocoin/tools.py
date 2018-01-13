@@ -8,6 +8,8 @@ import time
 
 from halocoin import custom
 
+alphabet = '123456789abcdefghijkmnopqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ'
+
 
 def init_logging(DEBUG, working_dir, log_file):
     if DEBUG:
@@ -28,13 +30,6 @@ def get_default_dir():
     home = expanduser("~")
     default_dir = os.path.join(home, '.halocoin')
     return os.environ.get("HALOCOIN_DATA_DIR", default_dir)
-
-
-def block_reward(length):
-    import math
-    a = length // custom.halve_at
-    b = custom.block_reward / math.pow(2, a)
-    return int(b)
 
 
 def log(message):
@@ -77,7 +72,6 @@ def hash_without_nonce(block):
 
 def base58_encode(num):
     num = int(num.hex(), 16)
-    alphabet = '123456789abcdefghijkmnopqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ'
     base_count = len(alphabet)
     encode = ''
     if num < 0:
@@ -89,6 +83,16 @@ def base58_encode(num):
     if num:
         encode = alphabet[num] + encode
     return encode
+
+
+def is_address_valid(address):
+    if len(address) != 32:
+        return False
+    if not str(address[:2]).isdigit():
+        return False
+    if not str(address[2:]).isalnum():
+        return False
+    return True
 
 
 def make_address(pubkeys, n):

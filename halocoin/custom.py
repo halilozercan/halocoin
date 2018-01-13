@@ -1,8 +1,8 @@
 import os
 from cdecimal import Decimal
 
-version = "0.0006c"
-block_reward = 10 ** 3  # Initial block reward
+version = "0.0007c"
+block_reward = 10 ** 2  # Initial block reward
 miner_core_count = -1  # -1 evaluates to number of cores
 # Lower limits on what the "time" tag in a block can say.
 median_block_time_limit = 100
@@ -10,13 +10,14 @@ median_block_time_limit = 100
 # How far back in history do we look when we use statistics to guess at
 # the current blocktime and difficulty.
 history_length = 1440
+# How far in history we look when we determine next block reward
+
 # This constant is selected such that the 50 most recent blocks count for 1/2 the
 # total weight.
 inflection = Decimal('0.985')
 # How often to generate a block in seconds
-blocktime = 60
-halve_at = (365 * 24 * 60 * 60 / blocktime)  # Approximately one year
-recalculate_target_at = (24*60*60 // blocktime)  # It's everyday bro!
+blocktime = 60 * 5
+recalculate_target_at = (12*60*60 // blocktime)  # It's every half day
 
 # Precalculate
 memoized_weights = [inflection ** i for i in range(recalculate_target_at)]

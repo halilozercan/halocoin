@@ -29,6 +29,10 @@ class DatabaseService(Service):
             from sqlalchemy import create_engine, MetaData
             db_location = os.path.join(self.engine.working_dir, self.dbname)
             self.dbengine = create_engine('sqlite:///' + db_location)
+            #from sqlalchemy.pool import StaticPool
+            #self.dbengine = create_engine('sqlite://',
+            #                              connect_args={'check_same_thread': False},
+            #                              poolclass=StaticPool)
             self.metadata = MetaData(bind=self.dbengine)
             self.DB = SQLAlchemyStore(self.dbengine, self.metadata, 'kvstore')
             self.DB.table.create()
@@ -36,7 +40,7 @@ class DatabaseService(Service):
             pass
         except Exception as e:
             tools.log(e)
-            sys.stderr.write('Redis connection cannot be established!\nFalling to SQLAlchemy')
+            sys.stderr.write('Database connection cannot be established!\n')
             return False
 
         self.salt = custom.version
@@ -143,17 +147,18 @@ class SQLSimulationStore(KeyValueStore, CopyMixin):
     """
     This is a copy of SQLAlchemyStore with transaction no commit support(simulation).
     """
+
     def __init__(self, bind, metadata, tablename):
         from sqlalchemy.orm import sessionmaker
         self.bind = bind
 
         self.table = Table(tablename, metadata,
-            # 250 characters is the maximum key length that we guarantee can be
-            # handled by any kind of backend
-            Column('key', String(250), primary_key=True),
-            Column('value', LargeBinary, nullable=False),
-            extend_existing=True
-        )
+                           # 250 characters is the maximum key length that we guarantee can be
+                           # handled by any kind of backend
+                           Column('key', String(250), primary_key=True),
+                           Column('value', LargeBinary, nullable=False),
+                           extend_existing=True
+                           )
         Session = sessionmaker()
         Session.configure(bind=bind)
         self.session = Session()
@@ -176,8 +181,8 @@ class SQLSimulationStore(KeyValueStore, CopyMixin):
 
     def _get(self, key):
         rv = self.session.execute(
-                select([self.table.c.value], self.table.c.key == key).limit(1)
-             ).scalar()
+            select([self.table.c.value], self.table.c.key == key).limit(1)
+        ).scalar()
 
         if not rv:
             raise KeyError(key)
@@ -203,7 +208,7 @@ class SQLSimulationStore(KeyValueStore, CopyMixin):
         return dest
 
     def _put(self, key, data):
-            # delete the old
+        # delete the old
         self.session.execute(self.table.delete(self.table.c.key == key))
 
         # insert new

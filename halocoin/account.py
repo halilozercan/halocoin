@@ -71,7 +71,7 @@ class AccountService(Service):
         send_account = self.get_account(send_address)
 
         if tx['type'] == 'mint':
-            send_account['amount'] += tools.block_reward(current_length)
+            send_account['amount'] += tx['amount']
             return send_account['amount'] >= 0
         elif tx['type'] == 'spend':
             if tx['count'] != self.known_tx_count(send_address):
@@ -86,13 +86,19 @@ class AccountService(Service):
             recv_account['amount'] += tx['amount']
             return (recv_account['amount'] >= 0) and (send_account['amount'] >= 0)
         elif tx['type'] == 'reward':
-            # TODO: Same auth
+            cert = self.find_certificate_by_name(tx['auth'])
+            if cert is None:
+                return False
+            if tx['pubkeys'] != [tools.get_pubkey_from_certificate(cert).to_string()]:
+                return False
             # Check whether rewarding transaction has
             # (job_dump.auth=reward.auth)
             job = self.db.get('job_' + tx['job_id'])
             last_change = job['status_list'][-1]
             # This job is not assigned to anyone right now.
             if last_change['action'] != 'assign':
+                return False
+            if job['auth'] != tx['auth']:
                 return False
 
             recv_account = self.get_account(last_change['address'])
@@ -107,7 +113,16 @@ class AccountService(Service):
             early_reg = self.find_name_by_certificate(tx['certificate']) is None
             return cert_valid and early_reg
         elif tx['type'] == 'job_dump':
-            return not self.db.exists('job_' + tx['job']['id'])
+            # Check if auth is known
+            cert = self.find_certificate_by_name(tx['auth'])
+            if cert is None:
+                return False
+            elif tx['pubkeys'] != [tools.get_pubkey_from_certificate(cert).to_string()]:
+                return False
+            # Check if job already exists
+            if self.db.exists('job_' + tx['job']['id']):
+                return False
+            return True
         elif tx['type'] == 'job_request':
             """
             Rules are simple: 
@@ -263,6 +278,29 @@ class AccountService(Service):
                                                [tx] + self.blockchain.tx_pool())
 
         return account['amount'] >= 0
+
+    @sync
+    def block_reward(self, length):
+        from halocoin import custom
+        power_reward_per_block = [0] * custom.history_length
+        for reward in rewards:
+            rewarded_at = reward[0]
+            time = reward[1]
+            reward_amount = reward[2]
+            start_at = min(0, rewarded_at - time)
+            for i in range(start_at + 1, rewarded_at + 1):
+                power_reward_per_block[i] += (reward_amount / time)
+
+        weighted_averages = [memoized_weights[i] * Decimal(p) for i, p in enumerate(power_reward_per_block)]
+        p = sum(weighted_averages) / h
+        m = base_reward  # This should be calculated by taking weighted average of last h block rewards
+        next_block_reward = int(base_reward * (p / m))
+        return next_block_reward
+
+        import math
+        a = length // custom.halve_at
+        b = custom.block_reward / math.pow(2, a)
+        return int(b)
 
     @sync
     def put_certificate(self, cert_pem):
