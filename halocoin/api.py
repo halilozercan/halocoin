@@ -4,11 +4,10 @@ import tempfile
 import threading
 
 import psutil as psutil
-from engineio import async_threading
 from flask import Flask, request, Response, send_file
 from flask_socketio import SocketIO
 
-from halocoin import tools, engine
+from halocoin import tools, engine, custom
 from halocoin.blockchain import BlockchainService
 from halocoin.service import Service
 
@@ -274,24 +273,6 @@ def jobs():
     return generate_json_response(result)
 
 
-@app.route('/jobs2')
-def jobs2():
-    """
-    Jobs from blockchain history
-    :return:
-    """
-    result = []
-    length = engine.instance.db.get('length')
-    for i in range(length):
-        block = engine.instance.db.get(str(i))
-        for tx in block['txs']:
-            if tx['type'] != 'mint':
-                tx['block'] = i
-                result.append(tx)
-
-    return generate_json_response(result)
-
-
 @app.route('/send', methods=['GET', 'POST'])
 # @blockchain_synced
 def send():
@@ -322,7 +303,7 @@ def send():
         return generate_json_response(response)
 
     tx = {'type': 'spend', 'amount': int(amount),
-          'to': address, 'message': message}
+          'to': address, 'message': message, 'version': custom.version}
 
     encrypted_wallet_content = engine.instance.clientdb.get_wallet(wallet_name)
     if encrypted_wallet_content is not None:
@@ -378,7 +359,7 @@ def job_request():
         response['error'] = "Password missing!"
         return generate_json_response(response)
 
-    tx = {'type': 'job_request', 'amount': int(amount), 'job_id': job_id}
+    tx = {'type': 'job_request', 'amount': int(amount), 'job_id': job_id, 'version': custom.version}
 
     encrypted_wallet_content = engine.instance.clientdb.get_wallet(wallet_name)
     if encrypted_wallet_content is not None:
@@ -423,7 +404,7 @@ def reward():
         response['error'] = "To reward, you must specify a common name or certificate that is granted by root"
         return generate_json_response(response)
 
-    tx = {'type': 'reward', 'job_id': job_id}
+    tx = {'type': 'reward', 'job_id': job_id, 'version': custom.version}
 
     privkey = SigningKey.from_pem(priv_key_pem)
     common_name = tools.get_commonname_from_certificate(cert_pem)
@@ -460,7 +441,7 @@ def job_dump():
         response['error'] = "To give jobs, you must specify a certificate that is granted by root"
         return generate_json_response(response)
 
-    tx = {'type': 'job_dump', 'job': job}
+    tx = {'type': 'job_dump', 'job': job, 'version': custom.version}
 
     privkey = SigningKey.from_pem(priv_key_pem)
     common_name = tools.get_commonname_from_certificate(cert_pem)
@@ -479,6 +460,7 @@ def auth_reg():
     from ecdsa import SigningKey
     cert_pem = request.values.get('cert_pem', None)
     priv_key_pem = request.values.get('privkey_pem', None)
+    host = request.values.get('host', None)
 
     response = {"success": False}
     if priv_key_pem is None:
@@ -487,21 +469,23 @@ def auth_reg():
     elif cert_pem is None:
         response['error'] = "Certificate is required for registration"
         return generate_json_response(response)
+    elif host is None:
+        response['error'] = "Authorities must provide a hosting address"
+        return generate_json_response(response)
 
-    tx = {'type': 'auth_reg'}
+    tx = {'type': 'auth_reg', 'version': custom.version}
 
     privkey = SigningKey.from_pem(priv_key_pem)
 
-    common_name = engine.instance.account.find_name_by_certificate(cert_pem)
-    if common_name is None and not tools.check_certificate_chain(cert_pem):
+    common_name = tools.get_commonname_from_certificate(cert_pem)
+    if engine.instance.account.get_auth(common_name) is not None:
+        response['error'] = "An authority with common name {} is already registered.".format(common_name)
+        return generate_json_response(response)
+    if not tools.check_certificate_chain(cert_pem):
         response['error'] = "Given certificate is not granted by root"
         return generate_json_response(response)
-    elif common_name is None:
-        # Add this certificate to transaction
-        tx['certificate'] = cert_pem
-    else:
-        response['error'] = "This auth is already registered"
-        return generate_json_response(response)
+
+    tx['certificate'] = cert_pem
 
     tx['pubkeys'] = [privkey.get_verifying_key().to_string()]  # We use pubkey as string
     tx['signatures'] = [tools.sign(tools.det_hash(tx), privkey)]

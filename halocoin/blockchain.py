@@ -401,12 +401,6 @@ class BlockchainService(Service):
         if tx['version'] != custom.version:
             return Response(False, 'belongs to an earlier version')
 
-        if tx['type'] == 'mint':
-            # In coinami, block reward is not constant.
-            # It is evaluated by the average of rewarding transactions history.
-            if 'amount' not in tx or not isinstance(tx['amount'], int):
-                return Response(False, 'Transaction amount is not given or not a proper integer')
-
         if tx['type'] == 'spend':
             if 'to' not in tx or not isinstance(tx['to'], str):
                 return Response(False, 'Reward or spend transactions must be addressed')

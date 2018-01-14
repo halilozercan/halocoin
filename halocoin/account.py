@@ -71,7 +71,7 @@ class AccountService(Service):
         send_account = self.get_account(send_address)
 
         if tx['type'] == 'mint':
-            send_account['amount'] += tx['amount']
+            send_account['amount'] += tools.block_reward(current_length)
             return send_account['amount'] >= 0
         elif tx['type'] == 'spend':
             if tx['count'] != self.known_tx_count(send_address):
@@ -86,10 +86,10 @@ class AccountService(Service):
             recv_account['amount'] += tx['amount']
             return (recv_account['amount'] >= 0) and (send_account['amount'] >= 0)
         elif tx['type'] == 'reward':
-            cert = self.find_certificate_by_name(tx['auth'])
-            if cert is None:
+            auth = self.get_auth(tx['auth'])
+            if auth is None:
                 return False
-            if tx['pubkeys'] != [tools.get_pubkey_from_certificate(cert).to_string()]:
+            if tx['pubkeys'] != [tools.get_pubkey_from_certificate(auth['certificate']).to_string()]:
                 return False
             # Check whether rewarding transaction has
             # (job_dump.auth=reward.auth)
@@ -110,14 +110,15 @@ class AccountService(Service):
             return recv_account['amount'] >= 0
         elif tx['type'] == 'auth_reg':
             cert_valid = tools.check_certificate_chain(tx['certificate'])
-            early_reg = self.find_name_by_certificate(tx['certificate']) is None
+            common_name = tools.get_commonname_from_certificate(tx['certificate'])
+            early_reg = self.get_auth(common_name) is None
             return cert_valid and early_reg
         elif tx['type'] == 'job_dump':
             # Check if auth is known
-            cert = self.find_certificate_by_name(tx['auth'])
-            if cert is None:
+            auth = self.get_auth(tx['auth'])
+            if auth is None:
                 return False
-            elif tx['pubkeys'] != [tools.get_pubkey_from_certificate(cert).to_string()]:
+            elif tx['pubkeys'] != [tools.get_pubkey_from_certificate(auth['certificate']).to_string()]:
                 return False
             # Check if job already exists
             if self.db.exists('job_' + tx['job']['id']):
@@ -178,7 +179,7 @@ class AccountService(Service):
                 recv_account['tx_blocks'].append(block['length'])
                 self.update_account(last_change['address'], recv_account)
             elif tx['type'] == 'auth_reg':
-                self.put_certificate(tx['certificate'])
+                self.put_auth(tx['certificate'], tx['host'])
             elif tx['type'] == 'job_dump':
                 self.add_new_job(tx['job'], tx['auth'], block['length'])
             elif tx['type'] == 'job_request':
@@ -237,7 +238,7 @@ class AccountService(Service):
                 self.db.put(tx_owner_address, owner_account)
                 self.db.put(tx['to'], receiver_account)
             elif tx['type'] == 'auth_reg':
-                self.delete_certificate(tx['certificate'])
+                self.delete_auth(tx['certificate'])
             elif tx['type'] == 'job_dump':
                 self.delete_job(tx['job']['id'])
             elif tx['type'] == 'job_request' or tx['type'] == 'reward':
@@ -280,53 +281,23 @@ class AccountService(Service):
         return account['amount'] >= 0
 
     @sync
-    def block_reward(self, length):
-        from halocoin import custom
-        power_reward_per_block = [0] * custom.history_length
-        for reward in rewards:
-            rewarded_at = reward[0]
-            time = reward[1]
-            reward_amount = reward[2]
-            start_at = min(0, rewarded_at - time)
-            for i in range(start_at + 1, rewarded_at + 1):
-                power_reward_per_block[i] += (reward_amount / time)
-
-        weighted_averages = [memoized_weights[i] * Decimal(p) for i, p in enumerate(power_reward_per_block)]
-        p = sum(weighted_averages) / h
-        m = base_reward  # This should be calculated by taking weighted average of last h block rewards
-        next_block_reward = int(base_reward * (p / m))
-        return next_block_reward
-
-        import math
-        a = length // custom.halve_at
-        b = custom.block_reward / math.pow(2, a)
-        return int(b)
+    def get_auth(self, auth_name):
+        return self.db.get('auth_' + auth_name)
 
     @sync
-    def put_certificate(self, cert_pem):
+    def put_auth(self, cert_pem, host):
         if tools.check_certificate_chain(cert_pem):
             common_name = tools.get_commonname_from_certificate(cert_pem)
-            self.db.put('cert_' + common_name, cert_pem)
+            auth = {
+                'certificate': cert_pem,
+                'host': host
+            }
+            self.db.put('auth_' + common_name, auth)
 
     @sync
     def delete_certificate(self, cert_pem):
         common_name = tools.get_commonname_from_certificate(cert_pem)
-        self.db.delete('cert_' + common_name, cert_pem)
-
-    @sync
-    def find_certificate_by_name(self, name):
-        return self.db.get('cert_' + name)
-
-    @sync
-    def find_name_by_certificate(self, cert_pem):
-        if tools.check_certificate_chain(cert_pem):
-            common_name = tools.get_commonname_from_certificate(cert_pem)
-            if self.db.exists('cert_' + common_name):
-                return common_name
-            else:
-                return None
-        else:
-            return None
+        self.db.delete('auth_' + common_name)
 
     @sync
     def get_available_jobs(self):

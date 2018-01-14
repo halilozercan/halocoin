@@ -57,6 +57,13 @@ def sign(msg, privkey):
     return privkey.sign(msg)
 
 
+def block_reward(length):
+    import math
+    a = length // custom.halve_at
+    b = custom.block_reward / math.pow(2, a)
+    return int(b)
+
+
 def det_hash(x):
     """Deterministically takes sha256 of dict, list, int, or string."""
     import yaml

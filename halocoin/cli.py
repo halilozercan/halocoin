@@ -293,7 +293,7 @@ def job_dump(args):
 def auth_reg(args):
     cert_pem = open(args.certificate, 'rb').read()
     privkey_pem = open(args.privkey, 'rb').read()
-    print(make_api_request(args.action, cert_pem=cert_pem, privkey_pem=privkey_pem))
+    print(make_api_request(args.action, cert_pem=cert_pem, privkey_pem=privkey_pem, host=args.host))
 
 
 @action
@@ -383,6 +383,8 @@ def run(argv):
                         help='Directory for halocoin to use.')
     parser.add_argument('--port', action="store", type=int, dest='port',
                         help='Override API port defined in config file.')
+    parser.add_argument('--host', action="store", type=str, dest='host',
+                        help='Define a host address while registering an auth.')
 
     args = parser.parse_args(argv[1:])
 

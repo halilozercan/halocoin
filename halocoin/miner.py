@@ -108,6 +108,7 @@ class MinerService(Service):
 
     def make_mint(self, pubkey):
         return {'type': 'mint',
+                'version': custom.version,
                 'pubkeys': [pubkey],
                 'signatures': ['first_sig'],
                 'count': 0}
