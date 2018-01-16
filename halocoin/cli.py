@@ -260,6 +260,18 @@ def send(args):
 
 
 @action
+def deposit(args):
+    from getpass import getpass
+    if args.pw is None:
+        wallet_pw = getpass('Wallet password: ')
+    else:
+        wallet_pw = args.pw
+
+    print(make_api_request(args.action, amount=args.amount,
+                           wallet_name=args.wallet_name, password=wallet_pw))
+
+
+@action
 def job_request(args):
     from getpass import getpass
     if args.pw is None:
@@ -285,7 +297,7 @@ def job_dump(args):
     import time
     cert_pem = open(args.certificate, 'rb').read()
     privkey_pem = open(args.privkey, 'rb').read()
-    print(make_api_request(args.action, job_id=args.job_id, job_timestamp=time.time(),
+    print(make_api_request(args.action, job_id=args.job_id, job_timestamp=time.time(), amount=args.amount,
                            cert_pem=cert_pem, privkey_pem=privkey_pem))
 
 
@@ -293,7 +305,7 @@ def job_dump(args):
 def auth_reg(args):
     cert_pem = open(args.certificate, 'rb').read()
     privkey_pem = open(args.privkey, 'rb').read()
-    print(make_api_request(args.action, cert_pem=cert_pem, privkey_pem=privkey_pem, host=args.host))
+    print(make_api_request(args.action, cert_pem=cert_pem, privkey_pem=privkey_pem, host=args.host, supply=args.amount))
 
 
 @action

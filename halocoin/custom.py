@@ -16,15 +16,16 @@ history_length = 1440
 # total weight.
 inflection = Decimal('0.985')
 # How often to generate a block in seconds
-blocktime = 60 * 5
+blocktime = 60 * 2
 halve_at = (365 * 24 * 60 * 60 / blocktime)  # Approximately one year
 recalculate_target_at = (12*60*60 // blocktime)  # It's every half day
 
 # Precalculate
 memoized_weights = [inflection ** i for i in range(recalculate_target_at)]
 
-# drop jobs after this many blocks
-drop_job_block_count = 60
+assignment_period = 25
+
+first_target = '0' * 3 + 'f' * 61
 
 # Coinami root certificate.
 # Everyone will accept any certificate that is signed by the root

@@ -149,6 +149,6 @@ class PeerCheckService(Service):
         b = [max(block_count_peer - 5, 0), min(self.db.get('length'),
                                                block_count_peer + self.engine.config['peers']['download_limit'])]
         for i in range(b[0], b[1] + 1):
-            blocks.append(self.db.get(i))
+            blocks.append(self.blockchain.get_block(i))
         ntwrk.command(peer_ip_port, {'action': 'push_block', 'blocks': blocks}, self.node_id)
         return 0

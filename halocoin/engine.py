@@ -17,27 +17,21 @@ from halocoin.service import Service, async
 
 def test_database(db):
     results = [False, False]
-    tools.echo("put")
     response = db.put('test', 'TEST')
-    tools.techo("put")
     if response:
-        tools.echo("get")
         test_response = db.get('test')
-        tools.techo("get")
         if test_response == 'TEST':
             results[0] = True
 
-    """
     db.simulate()
-    response = db.sput('test', 'TEST_SIM')
+    response = db.put('test', 'TEST_SIM')
     if response:
-        test_response = db.sget('test')
+        test_response = db.get('test')
         if test_response == 'TEST_SIM':
-            db.commit()
-            if db.get('test') == 'TEST_SIM':
+            db.rollback()
+            if db.get('test') == 'TEST':
                 results[1] = True
-                """
-    results[1] = True
+
     return results[0] and results[1]
 
 

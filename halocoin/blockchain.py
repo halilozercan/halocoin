@@ -3,6 +3,8 @@ import queue
 import time
 from cdecimal import Decimal
 
+import yaml
+
 from halocoin import custom, api
 from halocoin import tools
 from halocoin.ntwrk import Response
@@ -20,7 +22,7 @@ class BlockchainService(Service):
     job_dump: Announcing jobs that are prepared and ready to be downloaded
     job_request: Entering a pool for a job request.
     """
-    tx_types = ['spend', 'mint', 'reward', 'auth_reg', 'job_dump', 'job_request']
+    tx_types = ['spend', 'mint', 'reward', 'auth_reg', 'job_dump', 'deposit', 'withdraw']
     IDLE = 1
     SYNCING = 2
 
@@ -70,7 +72,7 @@ class BlockchainService(Service):
 
                 length = self.db.get('length')
                 for i in range(20):
-                    block = self.db.get(length)
+                    block = self.get_block(length)
                     if self.fork_check(blocks, length, block):
                         self.delete_block()
                         length -= 1
@@ -100,6 +102,8 @@ class BlockchainService(Service):
             candidate_tx = self.tx_queue.get(timeout=1)
         except queue.Empty:
             return
+        #while self.get_chain_state() == BlockchainService.SYNCING:
+            #time.sleep(0.01)
         self.add_tx(candidate_tx)
         self.tx_queue.task_done()
 
@@ -150,6 +154,7 @@ class BlockchainService(Service):
         peer['rank'] += 0.2 * 30
         self.clientdb.update_peer(peer)
 
+    @sync
     def add_tx(self, tx):
 
         if not isinstance(tx, dict):
@@ -164,25 +169,36 @@ class BlockchainService(Service):
         integrity_check = self.tx_integrity_check(tx)
         if not integrity_check.getFlag():
             return Response(False, 'Transaction failed integrity check: ' + integrity_check.getData())
-        if not self.account.check_tx_validity_to_blockchain(tx):
+        self.db.simulate()
+        block = {
+            'length': self.db.get('length') + 1,
+            'txs': self.tx_pool() + [tx]
+        }
+        if not self.account.update_database_with_block(block):
             return Response(False, 'Transaction failed current state check')
+        self.db.rollback()
 
         self.tx_pool_add(tx)
         return Response(True, 'Added tx into the pool: ' + str(tx))
 
+    @sync
     def add_block(self, block):
         """Attempts adding a new block to the blockchain.
          Median is good for weeding out liars, so long as the liars don't have 51%
          hashpower. """
 
+        tools.echo('add block')
+
         length = self.db.get('length')
+        block_at_length = self.get_block(length)
 
         if int(block['length']) < int(length) + 1:
             return 1
         elif int(block['length']) > int(length) + 1:
             return 2
 
-        if (length >= 0 and block['diffLength'] != tools.hex_sum(self.db.get(str(length))['diffLength'], tools.hex_invert(block['target']))) \
+        if (length >= 0 and block['diffLength'] != tools.hex_sum(block_at_length['diffLength'],
+                                                                 tools.hex_invert(block['target']))) \
                 or (length < 0 and block['diffLength'] != tools.hex_invert(block['target'])):
             tools.log(block['diffLength'])
             tools.log(tools.hex_sum(self.db.get('diffLength'), tools.hex_invert(block['target'])))
@@ -190,7 +206,7 @@ class BlockchainService(Service):
             tools.log('difflength is wrong')
             return 3
 
-        if length >= 0 and tools.det_hash(self.db.get(length)) != block['prevHash']:
+        if length >= 0 and tools.det_hash(block_at_length) != block['prevHash']:
             tools.log('prevhash different')
             return 3
 
@@ -224,26 +240,32 @@ class BlockchainService(Service):
             tools.log('Received block includes wrong amount of mint txs')
             return 3
 
-        # TODO: Add tx integrity check for all tx types
         flag = True
         for tx in block['txs']:
             flag &= self.tx_integrity_check(tx).getFlag()
-            flag &= self.account.check_tx_validity_to_blockchain(tx)
+            #flag &= self.account.check_tx_validity_to_blockchain(tx)
         if not flag:
             tools.log('Received block failed special txs check.')
             return 3
 
-        self.db.put(block['length'], block)
+        self.db.simulate()
+        result = self.account.update_database_with_block(block)
+        if result:
+            self.db.commit()
+        else:
+            self.db.rollback()
+            return 3
+
+        self.put_block(block['length'], block)
         self.db.put('length', block['length'])
         self.db.put('diffLength', block['diffLength'])
 
         orphans = self.tx_pool_pop_all()
 
-        self.account.update_database_with_block(block)
-
         for orphan in sorted(orphans, key=lambda x: x['count'] if 'count' in x else -1):
-            self.add_tx(orphan)
+            self.tx_queue.put(orphan)
 
+        tools.techo('add block')
         return 0
 
     def delete_block(self):
@@ -251,17 +273,7 @@ class BlockchainService(Service):
         if length < 0:
             return
 
-        targets = self.db.get('targets')
-        if str(length) in targets:
-            targets.pop(str(length))
-        self.db.put('targets', targets)
-
-        times = self.db.get('times')
-        if str(length) in times:
-            times.pop(str(length))
-        self.db.put('times', times)
-
-        block = self.db.get(length)
+        block = self.db.get_block(length)
         self.account.rollback_block(block)
 
         orphans = self.tx_pool_pop_all()
@@ -269,20 +281,35 @@ class BlockchainService(Service):
         for tx in block['txs']:
             orphans.append(tx)
 
-        self.db.delete(length)
+        self.del_block(length)
         length -= 1
 
         self.db.put('length', length)
         if length == -1:
             self.db.put('diffLength', '0')
         else:
-            block = self.db.get(length)
+            block = self.get_block(length)
             self.db.put('diffLength', block['diffLength'])
 
         for orphan in sorted(orphans, key=lambda x: x['count']):
-            self.add_tx(orphan)
+            self.tx_queue.put(orphan)
 
         return True
+
+    @sync
+    def get_block(self, length):
+        length = str(length).zfill(12)
+        return self.db.get('block_' + length)
+
+    @sync
+    def put_block(self, length, block):
+        length = str(length).zfill(12)
+        return self.db.put('block_' + length, block)
+
+    @sync
+    def del_block(self, length):
+        length = str(length).zfill(12)
+        return self.db.delete('block_' + length)
 
     @staticmethod
     def block_integrity_check(block):
@@ -310,22 +337,19 @@ class BlockchainService(Service):
 
         return True
 
-    def recent_blockthings(self, key, size, length=0):
+    def recent_blockthings(self, key, size):
         """
-        Legacy of zack-bitcoin. This is the true art of naming of functions.
+        Legacy of zack-bitcoin. This is the true art of function naming.
         """
-        if length == 0:
-            length = self.db.get('length')
-
-        storage = self.db.get(key)
+        length = self.db.get('length')
         start = max((length - size), 0)
         result = []
-        for i in range(start, length):
-            leng = str(i)
-            if not leng in storage:
-                storage[leng] = self.db.get(leng)[key[:-1]]  # Remove last character that is 's' e.g. targets => target
-            result.append(storage[leng])
-        self.db.put(key, storage)
+        start_key = ('block_' + str(start).zfill(12)).encode()
+        stop_key = ('block_' + str(length).zfill(12)).encode()
+        blocks = list(self.db.iterator(start=start_key, stop=stop_key, include_stop=False))
+        for _key, value in blocks:
+            value = yaml.load(value.decode())
+            result.append(value[key[:-1]])
         return result
 
     @staticmethod
@@ -385,7 +409,7 @@ class BlockchainService(Service):
         their_hashes += [tools.det_hash(newblocks[-1])]
         a = (recent_hash not in their_hashes)
         b = newblocks[0]['length'] - 1 < length < newblocks[-1]['length']
-        c = tools.det_hash(newblocks[0]) == tools.det_hash(self.db.get(newblocks[0]['length']))
+        c = tools.det_hash(newblocks[0]) == tools.det_hash(self.get_block(newblocks[0]['length']))
         return a and b and c
 
     def tx_integrity_check(self, tx):
@@ -410,37 +434,43 @@ class BlockchainService(Service):
                 return Response(False, 'Address is not valid')
             if 'amount' not in tx or not isinstance(tx['amount'], int):
                 return Response(False, 'Transaction amount is not given or not a proper integer')
-
-        if tx['type'] == 'job_request':
-            if 'job_id' not in tx:
-                return Response(False, 'Job id missing from the request')
-            elif 'amount' not in tx:
-                return Response(False, 'Bidding amount is missing from the request')
-
-        if tx['type'] == 'reward':
+            if 'count' not in tx or not isinstance(tx['count'], int):
+                return Response(False, 'transaction count is missing')
+        elif tx['type'] == 'reward':
             if not BlockchainService.tx_signature_check(tx):
                 return Response(False, 'Transaction is not properly signed')
             if 'auth' not in tx:
                 return Response(False, 'Reward transactions must include auth name')
             if 'job_id' not in tx:
                 return Response(False, 'Reward must be addressed to a job id')
-
-        if tx['type'] == 'job_dump':
-            if 'auth' not in tx:
-                return Response(False, 'Job dump transactions must include auth name')
-            if 'job' not in tx or not isinstance(tx['job'], dict) or \
-                            'id' not in tx['job'] or 'timestamp' not in tx['job']:
-                return Response(False, 'Job dump transactions must include a job in it. Makes sense right?')
-            if 'max_amount' not in tx['job'] or 'min_amount' not in tx['job']:
-                return Response(False, 'Job dump transactions must specify maximum and minimum allowed rewards')
-
-        if tx['type'] == 'auth_reg':
+            if 'to' not in tx or not tools.is_address_valid(tx['to']):
+                return Response(False, 'There must be a receiver of the reward.')
+        # TODO: Add signature check for authority transactions
+        elif tx['type'] == 'auth_reg':
             if 'certificate' not in tx:
                 return Response(False, 'Auth must register with a valid certificate')
             elif tx['pubkeys'] != [tools.get_pubkey_from_certificate(tx['certificate']).to_string()]:
                 return Response(False, 'pubkeys do not match with certificate')
             elif 'host' not in tx or not isinstance(tx['host'], str):
                 return Response(False, 'Authorities require to provide a hosting address')
+            elif 'supply' not in tx or not isinstance(tx['supply'], int):
+                return Response(False, 'Initial supply is not found')
+        elif tx['type'] == 'job_dump':
+            if 'auth' not in tx:
+                return Response(False, 'Job dump transactions must include auth name')
+            if 'job' not in tx or not isinstance(tx['job'], dict) or \
+                            'id' not in tx['job'] or 'timestamp' not in tx['job']:
+                return Response(False, 'Job dump transactions must include a job in it. Makes sense right?')
+            if 'amount' not in tx['job']:
+                return Response(False, 'Job dump transactions must specify the reward')
+        elif tx['type'] == 'deposit' or tx['type'] == 'withdraw':
+            if not BlockchainService.tx_signature_check(tx):
+                return Response(False, 'Transaction is not properly signed')
+            if 'amount' not in tx or not isinstance(tx['amount'], int):
+                return Response(False, 'Transaction amount is not given or not a proper integer')
+            if 'count' not in tx or not isinstance(tx['count'], int):
+                return Response(False, 'transaction count is missing')
+
         return Response(True, 'Everything seems fine')
 
     def target(self, length):
@@ -488,14 +518,13 @@ class BlockchainService(Service):
 
         """ Returns the target difficulty at a particular blocklength. """
         if length < 100:
-            return bytearray.fromhex('0' * 4 + 'f' * 60)  # Use same difficulty for first few blocks.
+            return bytearray.fromhex(custom.first_target)  # Use same difficulty for first few blocks.
         if length == 100 or length % custom.recalculate_target_at == 0:
             retarget = estimate_time() / custom.blocktime
             result = targetTimesFloat(estimate_target(), retarget)
             return bytearray.fromhex(result)
         elif 100 < length < custom.recalculate_target_at:
-            return self.db.get(100)['target']
+            return self.get_block(100)['target']
         else:
             last_block = length - (length % custom.recalculate_target_at)
-            return self.db.get(last_block)['target']
-
+            return self.get_block(last_block)['target']

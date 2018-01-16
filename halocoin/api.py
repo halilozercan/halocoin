@@ -126,7 +126,8 @@ def info_wallet():
                 "pubkey": wallet.get_pubkey_str(),
                 "privkey": wallet.get_privkey_str(),
                 "address": wallet.address,
-                "balance": account['amount']
+                "balance": account['amount'],
+                "deposit": account['stake']
             })
         except:
             return generate_json_response("Password incorrect")
@@ -331,12 +332,11 @@ def send():
     return generate_json_response(response)
 
 
-@app.route('/job_request', methods=['GET', 'POST'])
+@app.route('/deposit', methods=['GET', 'POST'])
 # @blockchain_synced
-def job_request():
+def deposit():
     from halocoin.model.wallet import Wallet
     amount = int(request.values.get('amount', 0))  # Bidding amount
-    job_id = request.values.get('job_id', None)
     wallet_name = request.values.get('wallet_name', None)
     password = request.values.get('password', None)
 
@@ -349,9 +349,6 @@ def job_request():
     if amount <= 0:
         response['error'] = "Amount cannot be lower than or equal to 0"
         return generate_json_response(response)
-    elif job_id is None:
-        response['error'] = "You need to specify a job id to request"
-        return generate_json_response(response)
     elif wallet_name is None:
         response['error'] = "Wallet name is not given and there is no default wallet"
         return generate_json_response(response)
@@ -359,7 +356,7 @@ def job_request():
         response['error'] = "Password missing!"
         return generate_json_response(response)
 
-    tx = {'type': 'job_request', 'amount': int(amount), 'job_id': job_id, 'version': custom.version}
+    tx = {'type': 'deposit', 'amount': int(amount), 'version': custom.version}
 
     encrypted_wallet_content = engine.instance.clientdb.get_wallet(wallet_name)
     if encrypted_wallet_content is not None:
@@ -372,17 +369,78 @@ def job_request():
         response['error'] = "Error occurred"
         return generate_json_response(response)
 
+    if 'count' not in tx:
+        try:
+            tx['count'] = engine.instance.account.known_tx_count(wallet.address)
+        except:
+            tx['count'] = 0
     if 'pubkeys' not in tx:
         tx['pubkeys'] = [wallet.get_pubkey_str()]  # We use pubkey as string
     if 'signatures' not in tx:
         tx['signatures'] = [tools.sign(tools.det_hash(tx), wallet.privkey)]
     engine.instance.blockchain.tx_queue.put(tx)
-    response["success"] = engine.instance.account.check_tx_validity_to_blockchain(tx)
+    response["success"] = True
     if response['success']:
-        response["message"] = 'Your job {} request bid with amount {} is added to the pool'\
-            .format(tx['job_id'], tx['amount'])
+        response["message"] = 'Your deposit with amount {} is added to the pool'\
+            .format(tx['amount'])
     else:
-        response["error"] = 'Your job request failed to pass integrity check'
+        response["error"] = 'Your deposit request failed to pass integrity check'
+    return generate_json_response(response)
+
+
+@app.route('/withdraw', methods=['GET', 'POST'])
+# @blockchain_synced
+def withdraw():
+    from halocoin.model.wallet import Wallet
+    amount = int(request.values.get('amount', 0))  # Bidding amount
+    wallet_name = request.values.get('wallet_name', None)
+    password = request.values.get('password', None)
+
+    if wallet_name is None:
+        default_wallet = engine.instance.clientdb.get_default_wallet()
+        if default_wallet is not None:
+            wallet_name = default_wallet['wallet_name']
+
+    response = {"success": False}
+    if amount <= 0:
+        response['error'] = "Amount cannot be lower than or equal to 0"
+        return generate_json_response(response)
+    elif wallet_name is None:
+        response['error'] = "Wallet name is not given and there is no default wallet"
+        return generate_json_response(response)
+    elif password is None:
+        response['error'] = "Password missing!"
+        return generate_json_response(response)
+
+    tx = {'type': 'withdraw', 'amount': int(amount), 'version': custom.version}
+
+    encrypted_wallet_content = engine.instance.clientdb.get_wallet(wallet_name)
+    if encrypted_wallet_content is not None:
+        try:
+            wallet = Wallet.from_string(tools.decrypt(password, encrypted_wallet_content))
+        except:
+            response['error'] = "Wallet password incorrect"
+            return generate_json_response(response)
+    else:
+        response['error'] = "Error occurred"
+        return generate_json_response(response)
+
+    if 'count' not in tx:
+        try:
+            tx['count'] = engine.instance.account.known_tx_count(wallet.address)
+        except:
+            tx['count'] = 0
+    if 'pubkeys' not in tx:
+        tx['pubkeys'] = [wallet.get_pubkey_str()]  # We use pubkey as string
+    if 'signatures' not in tx:
+        tx['signatures'] = [tools.sign(tools.det_hash(tx), wallet.privkey)]
+    engine.instance.blockchain.tx_queue.put(tx)
+    response["success"] = True
+    if response['success']:
+        response["message"] = 'Your deposit with amount {} is added to the pool'\
+            .format(tx['amount'])
+    else:
+        response["error"] = 'Your deposit request failed to pass integrity check'
     return generate_json_response(response)
 
 
@@ -424,8 +482,7 @@ def job_dump():
     job = {
         'id': request.values.get('job_id', None),
         'timestamp': request.values.get('job_timestamp', None),
-        'max_amount': request.values.get('max_amount', 10000),
-        'min_amount': request.values.get('min_amount', 1000)
+        'amount': int(request.values.get('amount', 0))
     }
     cert_pem = request.values.get('cert_pem', None)
     priv_key_pem = request.values.get('privkey_pem', None)
@@ -439,6 +496,9 @@ def job_dump():
         return generate_json_response(response)
     elif cert_pem is None:
         response['error'] = "To give jobs, you must specify a certificate that is granted by root"
+        return generate_json_response(response)
+    elif job['amount'] == 0:
+        response['error'] = "Reward amount is missing"
         return generate_json_response(response)
 
     tx = {'type': 'job_dump', 'job': job, 'version': custom.version}
@@ -461,6 +521,7 @@ def auth_reg():
     cert_pem = request.values.get('cert_pem', None)
     priv_key_pem = request.values.get('privkey_pem', None)
     host = request.values.get('host', None)
+    supply = int(request.values.get('supply', 0))
 
     response = {"success": False}
     if priv_key_pem is None:
@@ -472,8 +533,11 @@ def auth_reg():
     elif host is None:
         response['error'] = "Authorities must provide a hosting address"
         return generate_json_response(response)
+    elif supply == 0:
+        response['error'] = "Authorities must register with an initial supply"
+        return generate_json_response(response)
 
-    tx = {'type': 'auth_reg', 'version': custom.version}
+    tx = {'type': 'auth_reg', 'version': custom.version, 'host': host, 'supply': supply}
 
     privkey = SigningKey.from_pem(priv_key_pem)
 
@@ -548,7 +612,7 @@ def block():
         "blocks": []
     }
     for i in range(start, end + 1):
-        block = engine.instance.db.get(str(i))
+        block = engine.instance.blockchain.get_block(i)
         if block is None:
             break
         mint_tx = list(filter(lambda t: t['type'] == 'mint', block['txs']))[0]

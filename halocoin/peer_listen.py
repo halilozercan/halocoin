@@ -134,7 +134,7 @@ class PeerListenService(Service):
         out = []
         counter = 0
         while range[0] + counter <= range[1]:
-            block = self.db.get(range[0] + counter)
+            block = self.blockchain.get_block(range[0] + counter)
             if block and 'length' in block:
                 out.append(block)
             counter += 1

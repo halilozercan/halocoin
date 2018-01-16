@@ -129,7 +129,7 @@ class MinerService(Service):
         if length == -1:
             candidate_block = self.genesis(self.wallet.get_pubkey_str())
         else:
-            prev_block = self.db.get(length)
+            prev_block = self.blockchain.get_block(length)
             candidate_block = self.make_block(prev_block, self.blockchain.tx_pool(), self.wallet.get_pubkey_str())
         return candidate_block
 
@@ -150,6 +150,7 @@ class MinerService(Service):
             if current_hash <= candidate_block['target']:
                 queue.put(candidate_block)
         except Exception as e:
+            tools.log('miner fucked up' + str(e))
             pass
 
     @staticmethod

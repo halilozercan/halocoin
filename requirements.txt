@@ -16,7 +16,6 @@ greenlet==0.4.12
 idna==2.5
 itsdangerous==0.24
 Jinja2==2.10
-json-rpc==1.10.8
 m3-cdecimal==2.3
 macholib==1.9
 MarkupSafe==1.0
@@ -41,3 +40,4 @@ urllib3==1.22
 Werkzeug==0.12.2
 docker
 ujson
+plyvel

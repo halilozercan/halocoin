@@ -1,11 +1,12 @@
 import os
 import sys
 
+import plyvel
 import yaml
 from simplekv.db.sql import SQLAlchemyStore
 from sqlalchemy.exc import OperationalError
 
-from halocoin import tools, api
+from halocoin import tools, api, custom
 from halocoin.service import Service, sync
 
 
@@ -32,34 +33,27 @@ class ClientDBService(Service):
         self.blockchain = None
 
     def on_register(self):
-        self.blockchain = self.engine.blockchain
-        print("Started ClientDB")
         try:
-            from sqlalchemy import create_engine, MetaData
             db_location = os.path.join(self.engine.working_dir, 'client.db')
-            self.dbengine = create_engine('sqlite:///' + db_location)
-            self.metadata = MetaData(bind=self.dbengine)
-            self.DB = SQLAlchemyStore(self.dbengine, self.metadata, 'kvstore')
-            self.DB.table.create()
-        except OperationalError as e:
-            pass
+            DB = plyvel.DB(db_location, create_if_missing=True)
+            self.DB = DB.prefixed_db(custom.version.encode())
         except Exception as e:
             tools.log(e)
-            sys.stderr.write('Redis connection cannot be established!\nFalling to SQLAlchemy')
+            sys.stderr.write('Database connection cannot be established!\n')
             return False
         return True
 
     @sync
     def get(self, key):
         try:
-            return yaml.load(self.DB.get(str(key)).decode())
+            return yaml.load(self.DB.get(str(key).encode()).decode())
         except Exception as e:
             return None
 
     @sync
     def put(self, key, value):
         try:
-            self.DB.put(str(key), yaml.dump(value).encode())
+            self.DB.put(str(key).encode(), yaml.dump(value).encode())
             return True
         except Exception as e:
             return False
@@ -67,7 +61,7 @@ class ClientDBService(Service):
     @sync
     def delete(self, key):
         try:
-            self.DB.delete(str(key))
+            self.DB.delete(str(key).encode())
             return True
         except:
             return False

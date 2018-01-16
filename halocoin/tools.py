@@ -204,7 +204,10 @@ def signature_verify(message, signature, pubkey):
         pubkey = VerifyingKey.from_string(pubkey, curve=SECP256k1)
 
     if isinstance(pubkey, VerifyingKey):
-        return pubkey.verify(signature, message)
+        try:
+            return pubkey.verify(signature, message)
+        except:
+            return False
     else:
         return False
 
