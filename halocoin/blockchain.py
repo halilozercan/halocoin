@@ -1,5 +1,6 @@
 import copy
 import queue
+import threading
 import time
 from cdecimal import Decimal
 
@@ -9,7 +10,6 @@ from halocoin import custom, api
 from halocoin import tools
 from halocoin.ntwrk import Response
 from halocoin.service import Service, threaded, sync, NoExceptionQueue
-from halocoin.tools import echo, techo
 
 
 class BlockchainService(Service):
@@ -35,6 +35,7 @@ class BlockchainService(Service):
         self.account = None
         self.clientdb = None
         self.__state = BlockchainService.IDLE
+        self.addLock = threading.RLock()
 
     def on_register(self):
         self.db = self.engine.db
@@ -154,8 +155,8 @@ class BlockchainService(Service):
         peer['rank'] += 0.2 * 30
         self.clientdb.update_peer(peer)
 
-    @sync
     def add_tx(self, tx):
+        self.addLock.acquire()
 
         if not isinstance(tx, dict):
             return Response(False, 'Transactions must be dict typed')
@@ -179,13 +180,14 @@ class BlockchainService(Service):
         self.db.rollback()
 
         self.tx_pool_add(tx)
+        self.addLock.release()
         return Response(True, 'Added tx into the pool: ' + str(tx))
 
-    @sync
     def add_block(self, block):
         """Attempts adding a new block to the blockchain.
          Median is good for weeding out liars, so long as the liars don't have 51%
          hashpower. """
+        self.addLock.acquire()
 
         tools.echo('add block')
 
@@ -266,6 +268,7 @@ class BlockchainService(Service):
             self.tx_queue.put(orphan)
 
         tools.techo('add block')
+        self.addLock.release()
         return 0
 
     def delete_block(self):

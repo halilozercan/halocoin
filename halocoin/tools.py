@@ -33,8 +33,10 @@ def get_default_dir():
 
 
 def log(message):
+    import traceback
     if isinstance(message, Exception):
         logging.exception(message)
+        logging.critical(traceback.format_exc())
     else:
         logging.info('{}'.format(message))
 
@@ -93,7 +95,7 @@ def base58_encode(num):
 
 
 def is_address_valid(address):
-    if len(address) != 32:
+    if len(address) < 32:
         return False
     if not str(address[:2]).isdigit():
         return False

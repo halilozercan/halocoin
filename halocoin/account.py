@@ -126,25 +126,23 @@ class AccountService(Service):
                 # This job is not assigned to anyone right now.
                 if last_change['action'] != 'assign':
                     return False
+                # Reward address is not currently assigned to the job.
+                if last_change['address'] != tx['to']:
+                    return False
                 if job['auth'] != tx['auth']:
                     return False
 
-                recv_account = self.get_account(last_change['address'])
+                recv_account = self.get_account(tx['to'])
                 # Receiving account does not have the same assignment
                 if recv_account['assigned_job'] != tx['job_id']:
                     return False
 
-                recv_account['amount'] += last_change['amount']
-                if recv_account['amount'] < 0:
-                    return False
+                self.reward_job(tx['job_id'], tx['to'], block['length'])
 
-                last_change = job['status_list'][-1]
-                self.reward_job(tx['job_id'], last_change['address'], block['length'])
-
-                recv_account = self.get_account(last_change['address'])
-                recv_account['amount'] += last_change['amount']
+                recv_account = self.get_account(tx['to'])
+                recv_account['amount'] += job['amount']
                 recv_account['tx_blocks'].append(block['length'])
-                self.update_account(last_change['address'], recv_account)
+                self.update_account(tx['to'], recv_account)
             elif tx['type'] == 'auth_reg':
                 cert_valid = tools.check_certificate_chain(tx['certificate'])
                 common_name = tools.get_commonname_from_certificate(tx['certificate'])

@@ -9,7 +9,7 @@ median_block_time_limit = 100
 # Take the median of this many of the blocks.
 # How far back in history do we look when we use statistics to guess at
 # the current blocktime and difficulty.
-history_length = 1440
+history_length = 720
 # How far in history we look when we determine next block reward
 
 # This constant is selected such that the 50 most recent blocks count for 1/2 the
@@ -21,11 +21,11 @@ halve_at = (365 * 24 * 60 * 60 / blocktime)  # Approximately one year
 recalculate_target_at = (12*60*60 // blocktime)  # It's every half day
 
 # Precalculate
-memoized_weights = [inflection ** i for i in range(recalculate_target_at)]
+memoized_weights = [inflection ** i for i in range(history_length)]
 
-assignment_period = 25
+assignment_period = 50
 
-first_target = '0' * 3 + 'f' * 61
+first_target = '0' * 4 + 'f' * 60
 
 # Coinami root certificate.
 # Everyone will accept any certificate that is signed by the root

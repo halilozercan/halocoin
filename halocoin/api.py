@@ -239,25 +239,21 @@ def history():
     account = engine.instance.account.get_account(wallet.address)
     txs = {
         "send": [],
-        "recv": [],
-        "mine": []
+        "recv": []
     }
     for block_index in reversed(account['tx_blocks']):
-        block = engine.instance.db.get(str(block_index))
+        block = engine.instance.blockchain.get_block(block_index)
         for tx in block['txs']:
+            if tx['type'] == 'mint':
+                continue
             tx['block'] = block_index
             owner = tools.tx_owner_address(tx)
             if owner == address:
                 txs['send'].append(tx)
             elif tx['type'] == 'spend' and tx['to'] == address:
                 txs['recv'].append(tx)
-    for block_index in reversed(account['mined_blocks']):
-        block = engine.instance.db.get(str(block_index))
-        for tx in block['txs']:
-            tx['block'] = block_index
-            owner = tools.tx_owner_address(tx)
-            if owner == address:
-                txs['mine'].append(tx)
+            elif tx['type'] == 'reward' and tx['to'] == address:
+                txs['recv'].append(tx)
     return generate_json_response(txs)
 
 
@@ -448,12 +444,16 @@ def withdraw():
 def reward():
     from ecdsa import SigningKey
     job_id = request.values.get('job_id', None)
+    address = request.values.get('address', None)
     cert_pem = request.values.get('cert_pem', None)
     priv_key_pem = request.values.get('privkey_pem', None)
 
     response = {"success": False}
     if job_id is None:
         response['error'] = "You need to specify a job id for the reward"
+        return generate_json_response(response)
+    elif address is None:
+        response['error'] = "You need to specify a receiving address for the reward"
         return generate_json_response(response)
     elif priv_key_pem is None:
         response['error'] = "Reward transactions need to be signed by private key belonging to certificate"
@@ -462,7 +462,7 @@ def reward():
         response['error'] = "To reward, you must specify a common name or certificate that is granted by root"
         return generate_json_response(response)
 
-    tx = {'type': 'reward', 'job_id': job_id, 'version': custom.version}
+    tx = {'type': 'reward', 'job_id': job_id, 'to': address, 'version': custom.version}
 
     privkey = SigningKey.from_pem(priv_key_pem)
     common_name = tools.get_commonname_from_certificate(cert_pem)
