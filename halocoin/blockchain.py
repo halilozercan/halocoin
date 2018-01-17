@@ -81,7 +81,12 @@ class BlockchainService(Service):
                         break
 
                 for block in blocks:
-                    add_block_result = self.add_block(block)
+                    self.addLock.acquire()
+                    try:
+                        add_block_result = self.add_block(block)
+                    except Exception as e:
+                        tools.log(e)
+                    self.addLock.release()
                     if add_block_result == 2:  # A block that is ahead of us could not be added. No need to proceed.
                         break
                     elif add_block_result == 0:
@@ -105,7 +110,12 @@ class BlockchainService(Service):
             return
         #while self.get_chain_state() == BlockchainService.SYNCING:
             #time.sleep(0.01)
-        self.add_tx(candidate_tx)
+        self.addLock.acquire()
+        try:
+            self.add_tx(candidate_tx)
+        except Exception as e:
+            tools.log(e)
+        self.addLock.release()
         self.tx_queue.task_done()
 
     @sync
@@ -187,7 +197,6 @@ class BlockchainService(Service):
         """Attempts adding a new block to the blockchain.
          Median is good for weeding out liars, so long as the liars don't have 51%
          hashpower. """
-        self.addLock.acquire()
 
         tools.echo('add block')
 
@@ -268,7 +277,6 @@ class BlockchainService(Service):
             self.tx_queue.put(orphan)
 
         tools.techo('add block')
-        self.addLock.release()
         return 0
 
     def delete_block(self):
