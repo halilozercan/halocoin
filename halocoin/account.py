@@ -63,22 +63,6 @@ class AccountService(Service):
         return True
 
     @sync
-    def check_double_spending(self, txs):
-        """
-        This function scans a list of transactions to
-        check whether any double spending occurs.
-        :param txs: list of transactions
-        :return: True if there is no error
-        """
-
-        account_dict = {}
-        for tx in txs:
-            address = tools.tx_owner_address(tx)
-            if address not in account_dict.keys():
-                account_dict[address] = self.get_account(address)
-                account_dict[address]['count'] += 1
-
-    @sync
     def update_database_with_block(self, block):
         """
         This method should only be called after block passes every check.
