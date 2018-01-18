@@ -276,7 +276,7 @@ class BlockchainService(Service):
         if length < 0:
             return
 
-        block = self.db.get_block(length)
+        block = self.get_block(length)
         self.statedb.rollback_block(block)
 
         orphans = self.tx_pool_pop_all()

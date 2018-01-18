@@ -246,7 +246,7 @@ class StateDatabase:
 
     @lockit('blockchain')
     def rollback_block(self, block):
-        # TODO: 0.007c changes
+        # TODO: 0.008c changes
         """
         A block rollback means removing the block from chain.
         A block is defined by its transactions. Here we rollback every object in database to the version
@@ -265,7 +265,6 @@ class StateDatabase:
             owner_account = self.get_account(tx_owner_address)
             if tx['type'] == 'mint':
                 owner_account['amount'] -= tools.block_reward(block['length'])
-                owner_account['mined_blocks'].remove(block['length'])
                 self.db.put(tx_owner_address, owner_account)
             elif tx['type'] == 'spend':
                 owner_account['amount'] += tx['amount']
@@ -282,7 +281,7 @@ class StateDatabase:
                 self.delete_auth(tx['certificate'])
             elif tx['type'] == 'job_dump':
                 self.delete_job(tx['job']['id'])
-            elif tx['type'] == 'job_request' or tx['type'] == 'reward':
+            elif tx['type'] == 'reward':
                 job = self.get_job(tx['request']['job_id'])
                 for status in reversed(job['status_list']):
                     if status['block'] == block['length']:
