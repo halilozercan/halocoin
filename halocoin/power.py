@@ -41,7 +41,7 @@ class PowerService(Service):
     def on_register(self):
         self.db = self.engine.db
         self.blockchain = self.engine.blockchain
-        self.account = self.engine.account
+        self.account = self.engine.statedb
 
         if self.wallet is not None and hasattr(self.wallet, 'privkey'):
             return True

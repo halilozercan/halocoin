@@ -6,10 +6,10 @@ from cdecimal import Decimal
 
 import yaml
 
-from halocoin import custom, api
+from halocoin import custom, api, service
 from halocoin import tools
 from halocoin.ntwrk import Response
-from halocoin.service import Service, threaded, sync, NoExceptionQueue
+from halocoin.service import Service, threaded, sync, NoExceptionQueue, lockit
 
 
 class BlockchainService(Service):
@@ -32,14 +32,14 @@ class BlockchainService(Service):
         self.blocks_queue = NoExceptionQueue(3)
         self.tx_queue = NoExceptionQueue(100)
         self.db = None
-        self.account = None
+        self.statedb = None
         self.clientdb = None
         self.__state = BlockchainService.IDLE
         self.addLock = threading.RLock()
 
     def on_register(self):
         self.db = self.engine.db
-        self.account = self.engine.account
+        self.statedb = self.engine.statedb
         self.clientdb = self.engine.clientdb
         print("Started Blockchain")
         return True
@@ -89,7 +89,8 @@ class BlockchainService(Service):
 
                 if total_number_of_blocks_added == 0 or self.db.get('length') != blocks[-1]['length']:
                     # All received blocks failed. Punish the peer by lowering rank.
-                    self.peer_reported_false_blocks(node_id)
+                    if node_id != 'miner':
+                        self.peer_reported_false_blocks(node_id)
                 else:
                     api.new_block()
         except Exception as e:
@@ -99,13 +100,17 @@ class BlockchainService(Service):
 
     @threaded
     def process_txs(self):
+        if self.get_chain_state() == BlockchainService.SYNCING:
+            time.sleep(0.1)
+            return
+
         try:
             candidate_tx = self.tx_queue.get(timeout=1)
+            self.add_tx(candidate_tx)
         except queue.Empty:
             return
-        #while self.get_chain_state() == BlockchainService.SYNCING:
-            #time.sleep(0.01)
-        self.add_tx(candidate_tx)
+        except service.LockException as e:
+            tools.log(e)
         self.tx_queue.task_done()
 
     @sync
@@ -116,7 +121,7 @@ class BlockchainService(Service):
     def get_chain_state(self):
         return self.__state
 
-    @sync
+    @lockit('tx_pool')
     def tx_pool(self):
         """
         Return all the transactions waiting in the pool.
@@ -125,7 +130,7 @@ class BlockchainService(Service):
         """
         return self.db.get('txs')
 
-    @sync
+    @lockit('tx_pool')
     def tx_pool_add(self, tx):
         """
         This is an atomic add operation for txs pool.
@@ -137,7 +142,7 @@ class BlockchainService(Service):
         self.db.put('txs', txs)
         api.new_tx_in_pool()
 
-    @sync
+    @lockit('tx_pool')
     def tx_pool_pop_all(self):
         """
         Atomic operation to pop everything
@@ -148,16 +153,14 @@ class BlockchainService(Service):
         api.new_tx_in_pool()
         return txs
 
-    @sync
     def peer_reported_false_blocks(self, node_id):
         peer = self.clientdb.get_peer(node_id)
         peer['rank'] *= 0.8
         peer['rank'] += 0.2 * 30
         self.clientdb.update_peer(peer)
 
+    @lockit('blockchain', timeout=2)
     def add_tx(self, tx):
-        self.addLock.acquire()
-
         if not isinstance(tx, dict):
             return Response(False, 'Transactions must be dict typed')
 
@@ -167,7 +170,7 @@ class BlockchainService(Service):
             return Response(False, 'no duplicates')
         if 'type' not in tx or tx['type'] not in BlockchainService.tx_types or tx['type'] == 'mint':
             return Response(False, 'Invalid type')
-        integrity_check = self.tx_integrity_check(tx)
+        integrity_check = BlockchainService.tx_integrity_check(tx)
         if not integrity_check.getFlag():
             return Response(False, 'Transaction failed integrity check: ' + integrity_check.getData())
         self.db.simulate()
@@ -175,20 +178,19 @@ class BlockchainService(Service):
             'length': self.db.get('length') + 1,
             'txs': self.tx_pool() + [tx]
         }
-        if not self.account.update_database_with_block(block):
-            return Response(False, 'Transaction failed current state check')
+        current_state_check = self.statedb.update_database_with_block(block)
         self.db.rollback()
+        if not current_state_check:
+            return Response(False, 'Transaction failed current state check')
 
         self.tx_pool_add(tx)
-        self.addLock.release()
         return Response(True, 'Added tx into the pool: ' + str(tx))
 
+    @lockit('blockchain')
     def add_block(self, block):
         """Attempts adding a new block to the blockchain.
          Median is good for weeding out liars, so long as the liars don't have 51%
          hashpower. """
-        self.addLock.acquire()
-
         tools.echo('add block')
 
         length = self.db.get('length')
@@ -244,14 +246,13 @@ class BlockchainService(Service):
 
         flag = True
         for tx in block['txs']:
-            flag &= self.tx_integrity_check(tx).getFlag()
-            #flag &= self.account.check_tx_validity_to_blockchain(tx)
+            flag &= BlockchainService.tx_integrity_check(tx).getFlag()
         if not flag:
             tools.log('Received block failed special txs check.')
             return 3
 
         self.db.simulate()
-        result = self.account.update_database_with_block(block)
+        result = self.statedb.update_database_with_block(block)
         if result:
             self.db.commit()
         else:
@@ -268,7 +269,6 @@ class BlockchainService(Service):
             self.tx_queue.put(orphan)
 
         tools.techo('add block')
-        self.addLock.release()
         return 0
 
     def delete_block(self):
@@ -277,7 +277,7 @@ class BlockchainService(Service):
             return
 
         block = self.db.get_block(length)
-        self.account.rollback_block(block)
+        self.statedb.rollback_block(block)
 
         orphans = self.tx_pool_pop_all()
 
@@ -299,17 +299,17 @@ class BlockchainService(Service):
 
         return True
 
-    @sync
+    @lockit('blockchain')
     def get_block(self, length):
         length = str(length).zfill(12)
         return self.db.get('block_' + length)
 
-    @sync
+    @lockit('blockchain')
     def put_block(self, length, block):
         length = str(length).zfill(12)
         return self.db.put('block_' + length, block)
 
-    @sync
+    @lockit('blockchain')
     def del_block(self, length):
         length = str(length).zfill(12)
         return self.db.delete('block_' + length)
@@ -339,21 +339,6 @@ class BlockchainService(Service):
             return False
 
         return True
-
-    def recent_blockthings(self, key, size):
-        """
-        Legacy of zack-bitcoin. This is the true art of function naming.
-        """
-        length = self.db.get('length')
-        start = max((length - size), 0)
-        result = []
-        start_key = ('block_' + str(start).zfill(12)).encode()
-        stop_key = ('block_' + str(length).zfill(12)).encode()
-        blocks = list(self.db.iterator(start=start_key, stop=stop_key, include_stop=False))
-        for _key, value in blocks:
-            value = yaml.load(value.decode())
-            result.append(value[key[:-1]])
-        return result
 
     @staticmethod
     def sigs_match(_sigs, _pubs, msg):
@@ -415,7 +400,8 @@ class BlockchainService(Service):
         c = tools.det_hash(newblocks[0]) == tools.det_hash(self.get_block(newblocks[0]['length']))
         return a and b and c
 
-    def tx_integrity_check(self, tx):
+    @staticmethod
+    def tx_integrity_check(tx):
         """
         This functions test whether a transaction has basic things right.
         Does it have amount, recipient, RIGHT SIGNATURES and correct address types.
@@ -476,6 +462,18 @@ class BlockchainService(Service):
 
         return Response(True, 'Everything seems fine')
 
+    def recent_block_attributes(self, key, size):
+        length = self.db.get('length')
+        start = max((length - size), 0)
+        result = []
+        start_key = ('block_' + str(start).zfill(12)).encode()
+        stop_key = ('block_' + str(length).zfill(12)).encode()
+        blocks = list(self.db.iterator(start=start_key, stop=stop_key, include_stop=False))
+        for _key, value in blocks:
+            value = yaml.load(value.decode())
+            result.append(value[key[:-1]])
+        return result
+
     def target(self, length):
         def targetTimesFloat(target, number):
             a = int(str(target), 16)
@@ -502,7 +500,7 @@ class BlockchainService(Service):
                     l = [tools.hex_sum(l[0], l[1])] + l[2:]
                 return l[0]
 
-            targets = self.recent_blockthings('targets', custom.history_length)
+            targets = self.recent_block_attributes('targets', custom.history_length)
             w = weights(len(targets))  # should be rat instead of float
             tw = sum(w)
             targets = list(map(tools.hex_invert, targets))
@@ -511,7 +509,7 @@ class BlockchainService(Service):
             return tools.hex_invert(sumTargets(weighted_targets))
 
         def estimate_time():
-            times = self.recent_blockthings('times', custom.history_length)
+            times = self.recent_block_attributes('times', custom.history_length)
             times = list(map(Decimal, times))
             # How long it took to generate blocks
             block_times = [times[i] - times[i - 1] for i in range(1, len(times))]

@@ -4,10 +4,10 @@ import time
 
 from halocoin import api
 from halocoin import tools
-from halocoin.account import AccountService
+from halocoin.account import StateDatabase
 from halocoin.blockchain import BlockchainService
-from halocoin.client_db import ClientDBService
-from halocoin.database import DatabaseService
+from halocoin.client_db import ClientDB
+from halocoin.database import KeyValueStore
 from halocoin.miner import MinerService
 from halocoin.peer_check import PeerCheckService
 from halocoin.peer_listen import PeerListenService
@@ -44,22 +44,17 @@ class Engine(Service):
         self.config = config
         self.working_dir = working_dir
 
-        self.db = DatabaseService(self, self.config['database']['location'])
+        self.db = KeyValueStore(self, self.config['database']['location'])
         self.blockchain = BlockchainService(self)
         self.peers_check = PeerCheckService(self, self.config['peers']['list'])
         self.peer_receive = PeerListenService(self)
-        self.clientdb = ClientDBService(self)
-        self.account = AccountService(self)
+        self.clientdb = ClientDB(self)
+        self.statedb = StateDatabase(self)
         self.miner = MinerService(self)
         self.power = PowerService(self)
 
     def on_register(self):
         print('Starting halocoin')
-        if not self.db.register():
-            return False
-
-        print("Firing up the Database")
-        time.sleep(0.1)
 
         if not test_database(self.db):
             tools.log("Database service is not working.")
@@ -80,16 +75,6 @@ class Engine(Service):
             self.db.put('known_length', -1)
             self.db.put('job_list', [])
         self.db.put('stop', False)
-
-        if not self.clientdb.register():
-            sys.stderr.write("ClientDB service has failed. Exiting!\n")
-            self.unregister_sub_services()
-            return False
-
-        if not self.account.register():
-            sys.stderr.write("Account service has failed. Exiting!\n")
-            self.unregister_sub_services()
-            return False
 
         if not self.blockchain.register():
             sys.stderr.write("Blockchain service has failed. Exiting!\n")
@@ -124,15 +109,6 @@ class Engine(Service):
         if self.blockchain.get_state() == Service.RUNNING:
             self.blockchain.unregister()
             running_services.add(self.blockchain)
-        if self.account.get_state() == Service.RUNNING:
-            self.account.unregister()
-            running_services.add(self.account)
-        if self.clientdb.get_state() == Service.RUNNING:
-            self.clientdb.unregister()
-            running_services.add(self.account)
-        if self.db.get_state() == Service.RUNNING:
-            self.db.unregister()
-            running_services.add(self.db)
 
         for service in running_services:
             service.join()

@@ -120,7 +120,7 @@ def info_wallet():
     if encrypted_wallet_content is not None:
         try:
             wallet = Wallet.from_string(tools.decrypt(password, encrypted_wallet_content))
-            account = engine.instance.account.get_account(wallet.address, apply_tx_pool=True)
+            account = engine.instance.statedb.get_account(wallet.address, apply_tx_pool=True)
             return generate_json_response({
                 "name": wallet.name,
                 "pubkey": wallet.get_pubkey_str(),
@@ -236,7 +236,7 @@ def history():
             encrypted_wallet_content = engine.instance.clientdb.get_wallet(wallet_name)
             wallet = Wallet.from_string(tools.decrypt(password, encrypted_wallet_content))
             address = wallet.address
-    account = engine.instance.account.get_account(wallet.address)
+    account = engine.instance.statedb.get_account(wallet.address)
     txs = {
         "send": [],
         "recv": []
@@ -262,10 +262,10 @@ def jobs():
     type = request.values.get('type', 'all')
     result = {'available': None, 'assigned': None}
     if type == 'available' or type == 'all':
-        result['available'] = engine.instance.account.get_available_jobs()
+        result['available'] = engine.instance.statedb.get_available_jobs()
 
     if type == 'assigned' or type == 'all':
-        result['assigned'] = engine.instance.account.get_assigned_jobs()
+        result['assigned'] = engine.instance.statedb.get_assigned_jobs()
 
     return generate_json_response(result)
 
@@ -315,7 +315,7 @@ def send():
 
     if 'count' not in tx:
         try:
-            tx['count'] = engine.instance.account.known_tx_count(wallet.address)
+            tx['count'] = engine.instance.statedb.known_tx_count(wallet.address)
         except:
             tx['count'] = 0
     if 'pubkeys' not in tx:
@@ -367,7 +367,7 @@ def deposit():
 
     if 'count' not in tx:
         try:
-            tx['count'] = engine.instance.account.known_tx_count(wallet.address)
+            tx['count'] = engine.instance.statedb.known_tx_count(wallet.address)
         except:
             tx['count'] = 0
     if 'pubkeys' not in tx:
@@ -423,7 +423,7 @@ def withdraw():
 
     if 'count' not in tx:
         try:
-            tx['count'] = engine.instance.account.known_tx_count(wallet.address)
+            tx['count'] = engine.instance.statedb.known_tx_count(wallet.address)
         except:
             tx['count'] = 0
     if 'pubkeys' not in tx:
@@ -542,7 +542,7 @@ def auth_reg():
     privkey = SigningKey.from_pem(priv_key_pem)
 
     common_name = tools.get_commonname_from_certificate(cert_pem)
-    if engine.instance.account.get_auth(common_name) is not None:
+    if engine.instance.statedb.get_auth(common_name) is not None:
         response['error'] = "An authority with common name {} is already registered.".format(common_name)
         return generate_json_response(response)
     if not tools.check_certificate_chain(cert_pem):
@@ -643,7 +643,7 @@ def balance():
             wallet = Wallet.from_string(tools.decrypt(password, encrypted_wallet_content))
             address = wallet.address
 
-    account = engine.instance.account.get_account(address, apply_tx_pool=True)
+    account = engine.instance.statedb.get_account(address, apply_tx_pool=True)
     return generate_json_response({'balance': account['amount']})
 
 
@@ -757,7 +757,7 @@ def status_power():
     default_wallet = engine.instance.clientdb.get_wallet(default_wallet_props['wallet_name'])
     default_wallet = Wallet.from_string(tools.decrypt(default_wallet_props['password'], default_wallet))
     own_address = default_wallet.address
-    own_account = engine.instance.account.get_account(own_address)
+    own_account = engine.instance.statedb.get_account(own_address)
     assigned_job = own_account['assigned_job']
     status['assigned'] = assigned_job
     return generate_json_response(status)

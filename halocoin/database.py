@@ -1,20 +1,15 @@
 import os
 import sys
-from io import BytesIO
 
 import plyvel
 import yaml
-from simplekv import KeyValueStore, CopyMixin
-from simplekv._compat import imap, text_type
-from sqlalchemy import Table, Column, String, LargeBinary, select, exists
 
 from halocoin import tools, custom
-from halocoin.service import Service, sync
+from halocoin.service import lockit
 
 
-class DatabaseService(Service):
+class KeyValueStore:
     def __init__(self, engine, dbname):
-        Service.__init__(self, name='database')
         self.engine = engine
         self.dbname = dbname
         self.DB = None
@@ -23,9 +18,6 @@ class DatabaseService(Service):
         self.salt = None
         self.req_count = 0
         self.log = set()
-        self.set_state(Service.INIT)
-
-    def on_register(self):
         try:
             db_location = os.path.join(self.engine.working_dir, self.dbname)
             DB = plyvel.DB(db_location, create_if_missing=True)
@@ -34,10 +26,7 @@ class DatabaseService(Service):
         except Exception as e:
             tools.log(e)
             sys.stderr.write('Database connection cannot be established!\n')
-            return False
-        return True
 
-    @sync
     def get(self, key):
         """gets the key in args[0] using the salt"""
         try:
@@ -45,7 +34,6 @@ class DatabaseService(Service):
         except Exception as e:
             return None
 
-    @sync
     def put(self, key, value):
         """
         Puts the val in args[1] under the key in args[0] with the salt
@@ -60,7 +48,6 @@ class DatabaseService(Service):
         except Exception as e:
             return False
 
-    @sync
     def exists(self, key):
         """
         Checks if the key in args[0] with the salt prepended is
@@ -69,7 +56,6 @@ class DatabaseService(Service):
         result = self.get(key)
         return result is not None
 
-    @sync
     def delete(self, key):
         """
         Removes the entry in the database under the the key in args[0]
@@ -83,7 +69,7 @@ class DatabaseService(Service):
         except:
             return False
 
-    @sync
+    @lockit('simulation')
     def simulate(self):
         if self.snapshot is not None:
             tools.log('There is already an ongoing simulation!')
@@ -95,7 +81,7 @@ class DatabaseService(Service):
         except:
             return False
 
-    @sync
+    @lockit('simulation')
     def commit(self):
         """
         Commit simply erases the earlier snapshot.
@@ -108,7 +94,7 @@ class DatabaseService(Service):
         self.log = set()
         return True
 
-    @sync
+    @lockit('simulation')
     def rollback(self):
         if self.snapshot is None:
             tools.log('There isn\'t any ongoing simulation')
@@ -122,90 +108,3 @@ class DatabaseService(Service):
         self.log = set()
         self.snapshot = None
         return True
-
-
-class SQLSimulationStore(KeyValueStore, CopyMixin):
-    """
-    This is a copy of SQLAlchemyStore with transaction no commit support(simulation).
-    """
-
-    def __init__(self, bind, metadata, tablename):
-        from sqlalchemy.orm import sessionmaker
-        self.bind = bind
-
-        self.table = Table(tablename, metadata,
-                           # 250 characters is the maximum key length that we guarantee can be
-                           # handled by any kind of backend
-                           Column('key', String(250), primary_key=True),
-                           Column('value', LargeBinary, nullable=False),
-                           extend_existing=True
-                           )
-        Session = sessionmaker()
-        Session.configure(bind=bind)
-        self.session = Session()
-
-    def commit(self):
-        self.session.commit()
-
-    def rollback(self):
-        self.session.rollback()
-
-    def _has_key(self, key):
-        return self.bind.execute(
-            select([exists().where(self.table.c.key == key)])
-        ).scalar()
-
-    def _delete(self, key):
-        self.bind.execute(
-            self.table.delete(self.table.c.key == key)
-        )
-
-    def _get(self, key):
-        rv = self.session.execute(
-            select([self.table.c.value], self.table.c.key == key).limit(1)
-        ).scalar()
-
-        if not rv:
-            raise KeyError(key)
-
-        return rv
-
-    def _open(self, key):
-        return BytesIO(self._get(key))
-
-    def _copy(self, source, dest):
-        data = self.session.execute(
-            select([self.table.c.value], self.table.c.key == source).limit(1)
-        ).scalar()
-        if not data:
-            raise KeyError(source)
-
-        # delete the potential existing previous key
-        self.session.execute(self.table.delete(self.table.c.key == dest))
-        self.session.execute(self.table.insert({
-            'key': dest,
-            'value': data,
-        }))
-        return dest
-
-    def _put(self, key, data):
-        # delete the old
-        self.session.execute(self.table.delete(self.table.c.key == key))
-
-        # insert new
-        self.session.execute(self.table.insert({
-            'key': key,
-            'value': data
-        }))
-
-        return key
-
-    def _put_file(self, key, file):
-        return self._put(key, file.read())
-
-    def iter_keys(self, prefix=u""):
-        query = select([self.table.c.key])
-        if prefix != "":
-            query = query.where(self.table.c.key.like(prefix + '%'))
-        return imap(lambda v: text_type(v[0]),
-                    self.session.execute(query))

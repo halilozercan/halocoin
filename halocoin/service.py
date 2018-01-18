@@ -1,6 +1,7 @@
 import queue
 import sys
 import threading
+from functools import partial
 
 from halocoin import tools
 from halocoin.ntwrk.message import Order
@@ -299,3 +300,41 @@ def threaded(func):
     wrapper.decorator = threaded.__name__
     wrapper._original = func
     return wrapper
+
+
+locks = {}
+
+
+class LockException(Exception):
+    def __init__(self, message):
+        Exception.__init__(self, message)
+
+
+def lockit(lock_name, timeout=-1):
+    def _lockit(func):
+        """
+        Decorator for any service method that needs to run in the event loop.
+        Results return after execution.
+        :param func: Function to be decorated
+        :return: Decorated version of function
+        """
+
+        def wrapper(self, *args, **kwargs):
+            global locks
+            if '__lock_{}__'.format(lock_name) in locks.keys():
+                mylock = locks['__lock_{}__'.format(lock_name)]
+            else:
+                mylock = threading.RLock()
+                locks['__lock_{}__'.format(lock_name)] = mylock
+            is_acquired = mylock.acquire(timeout=timeout)
+            if is_acquired:
+                result = func(self, *args, **kwargs)
+            else:
+                raise LockException('Lock named {} could not be acquired in the given time'.format(lock_name))
+            mylock.release()
+            return result
+
+        wrapper._original = func
+        wrapper.thread_safe = True
+        return wrapper
+    return _lockit

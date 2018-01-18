@@ -1,10 +1,10 @@
 import copy
 
 from halocoin import tools, custom
-from halocoin.service import Service, sync
+from halocoin.service import Service, sync, lockit
 
 
-class AccountService(Service):
+class StateDatabase:
     """
     AccountService is where we evaluate and store the current state of blockchain.
     User accounts referring addresses, jobs, authorities and many more are stored here.
@@ -23,62 +23,67 @@ class AccountService(Service):
     }
 
     def __init__(self, engine):
-        Service.__init__(self, name='account')
         self.engine = engine
-        self.db = None
-        self.blockchain = None
-
-    def on_register(self):
         self.db = self.engine.db
         self.blockchain = self.engine.blockchain
-        print("Started Account")
-        return True
 
-    @sync
+    @lockit('account')
     def get_account(self, address, apply_tx_pool=False):
+        def update_account_with_txs(address, account, txs):
+            """
+            Not many use cases. Dont care
+            """
+            for tx in txs:
+                owner = tools.tx_owner_address(tx)
+                if tx['type'] == 'spend':
+                    if owner == address:
+                        account['amount'] -= -tx['amount']
+                        account['count'] += 1
+                    if tx['to'] == address:
+                        account['amount'] += tx['amount']
+                elif tx['type'] == 'reward':
+                    # TODO: implement if reward is for this account
+                    pass
+                elif tx['type'] == 'deposit':
+                    if owner == address:
+                        account['amount'] -= tx['amount']
+                        account['stake'] += tx['amount']
+                        account['count'] += 1
+                elif tx['type'] == 'withdraw':
+                    if owner == address:
+                        account['amount'] += tx['amount']
+                        account['stake'] -= tx['amount']
+                        account['count'] += 1
+
+            return account
+
         if self.db.exists(address):
             account = self.db.get(address)
         else:
-            account = copy.deepcopy(AccountService.default_account)
+            account = copy.deepcopy(StateDatabase.default_account)
 
         if apply_tx_pool:
             txs = self.blockchain.tx_pool()
-            account = self.update_account_with_txs(address, account, txs)
+            account = update_account_with_txs(address, account, txs)
 
         if 'tx_blocks' not in account:
             account['tx_blocks'] = []
 
         return account
 
-    @sync
+    @lockit('account')
     def remove_account(self, address):
         self.db.delete(address)
         return True
 
-    @sync
+    @lockit('account')
     def update_account(self, address, new_account):
         if new_account['amount'] < 0 or new_account['stake'] < 0:
             return False
         self.db.put(address, new_account)
         return True
 
-    @sync
-    def check_double_spending(self, txs):
-        """
-        This function scans a list of transactions to
-        check whether any double spending occurs.
-        :param txs: list of transactions
-        :return: True if there is no error
-        """
-
-        account_dict = {}
-        for tx in txs:
-            address = tools.tx_owner_address(tx)
-            if address not in account_dict.keys():
-                account_dict[address] = self.get_account(address)
-                account_dict[address]['count'] += 1
-
-    @sync
+    @lockit('blockchain')
     def update_database_with_block(self, block):
         """
         This method should only be called after block passes every check.
@@ -239,7 +244,7 @@ class AccountService(Service):
 
         return True
 
-    @sync
+    @lockit('blockchain')
     def rollback_block(self, block):
         # TODO: 0.007c changes
         """
@@ -286,31 +291,7 @@ class AccountService(Service):
                         break
                 self.db.update_job(job)
 
-    def update_account_with_txs(self, address, account, txs):
-        """
-        Not many use cases. Dont care
-        """
-        for tx in txs:
-            owner = tools.tx_owner_address(tx)
-            if tx['type'] == 'spend':
-                if owner == address:
-                    account['amount'] -= -tx['amount']
-                    account['count'] += 1
-                if tx['to'] == address:
-                    account['amount'] += tx['amount']
-            elif tx['type'] == 'reward':
-                # TODO: implement if reward is for this account
-                pass
-            elif tx['type'] == 'deposit':
-                account['amount'] -= tx['amount']
-                account['stake'] += tx['amount']
-                account['count'] += 1
-            elif tx['type'] == 'withdraw':
-                account['amount'] += tx['amount']
-                account['stake'] -= tx['amount']
-                account['count'] += 1
-        return account
-
+    @lockit('blockchain')
     def known_tx_count(self, address, count_pool=True, txs_in_pool=None):
         # Returns the number of transactions that pubkey has broadcast.
         def number_of_unconfirmed_txs(_address):
@@ -323,11 +304,11 @@ class AccountService(Service):
             surplus += number_of_unconfirmed_txs(address)
         return account['count'] + surplus
 
-    @sync
+    @lockit('auth')
     def get_auth(self, auth_name):
         return self.db.get('auth_' + auth_name)
 
-    @sync
+    @lockit('auth')
     def put_auth(self, cert_pem, host, supply):
         if tools.check_certificate_chain(cert_pem):
             common_name = tools.get_commonname_from_certificate(cert_pem)
@@ -338,16 +319,16 @@ class AccountService(Service):
             }
             self.db.put('auth_' + common_name, auth)
 
-    @sync
+    @lockit('auth')
     def update_auth(self, auth_name, auth):
         self.db.put('auth_' + auth_name, auth)
 
-    @sync
+    @lockit('auth')
     def delete_auth(self, cert_pem):
         common_name = tools.get_commonname_from_certificate(cert_pem)
         self.db.delete('auth_' + common_name)
 
-    @sync
+    @lockit('stake')
     def get_stake_pool(self):
         result = self.db.get('stake_pool')
         if result is None:
@@ -355,19 +336,19 @@ class AccountService(Service):
         else:
             return set(self.db.get('stake_pool'))
 
-    @sync
+    @lockit('stake')
     def put_address_in_stake_pool(self, address):
         stake_pool = self.get_stake_pool()
         stake_pool.add(address)
         self.db.put('stake_pool', stake_pool)
 
-    @sync
+    @lockit('stake')
     def remove_address_from_stake_pool(self, address):
         stake_pool = self.get_stake_pool()
         stake_pool.remove(address)
         self.db.put('stake_pool', stake_pool)
 
-    @sync
+    @lockit('jobs')
     def get_available_jobs(self):
         job_list = self.db.get('job_list')
         result = {}
@@ -378,7 +359,7 @@ class AccountService(Service):
                 result[job_id] = self.db.get('job_' + job_id)
         return result
 
-    @sync
+    @lockit('jobs')
     def get_assigned_jobs(self):
         job_list = self.db.get('job_list')
         result = {}
@@ -389,7 +370,7 @@ class AccountService(Service):
                 result[job_id] = self.db.get('job_' + job_id)
         return result
 
-    @sync
+    @lockit('jobs')
     def add_new_job(self, job, auth, block_number):
         job['auth'] = auth
         job['status_list'] = [{
@@ -402,7 +383,7 @@ class AccountService(Service):
         self.db.put('job_' + job['id'], job)
         return True
 
-    @sync
+    @lockit('jobs')
     def assign_job(self, job_id, address, block_number):
         job = self.db.get('job_' + job_id)
         if job['status_list'][-1]['action'] != 'add' and job['status_list'][-1]['action'] != 'unassign':
@@ -424,7 +405,7 @@ class AccountService(Service):
             self.remove_address_from_stake_pool(address)
         return True
 
-    @sync
+    @lockit('jobs')
     def reward_job(self, job_id, address, block_number):
         job = self.db.get('job_' + job_id)
         if job['status_list'][-1]['action'] != 'assign':
@@ -443,7 +424,7 @@ class AccountService(Service):
         self.update_account(address, account)
         return True
 
-    @sync
+    @lockit('jobs')
     def unassign_job(self, job_id, block_number):
         job = self.db.get('job_' + job_id)
         if job['status_list'][-1]['action'] != 'assign':
@@ -462,15 +443,15 @@ class AccountService(Service):
         self.update_account(last_assigned_address, last_assigned_account)
         return True
 
-    @sync
+    @lockit('jobs')
     def get_job(self, job_id):
         return self.db.get('job_' + job_id)
 
-    @sync
+    @lockit('jobs')
     def update_job(self, job):
         return self.db.put('job_' + job['id'], job)
 
-    @sync
+    @lockit('jobs')
     def delete_job(self, job_id):
         job_list = self.db.get('job_list')
         job_list.remove(job_id)

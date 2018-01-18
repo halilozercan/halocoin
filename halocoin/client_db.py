@@ -7,10 +7,10 @@ from simplekv.db.sql import SQLAlchemyStore
 from sqlalchemy.exc import OperationalError
 
 from halocoin import tools, api, custom
-from halocoin.service import Service, sync
+from halocoin.service import Service, sync, lockit
 
 
-class ClientDBService(Service):
+class ClientDB:
     """
     This is a separate database from blockchain related data.
     Anything that needs to be stored on client side that doesn't depend on blockchain
@@ -27,12 +27,9 @@ class ClientDBService(Service):
     }
 
     def __init__(self, engine):
-        Service.__init__(self, name='client_db')
         self.engine = engine
         self.DB = None
         self.blockchain = None
-
-    def on_register(self):
         try:
             db_location = os.path.join(self.engine.working_dir, 'client.db')
             DB = plyvel.DB(db_location, create_if_missing=True)
@@ -40,17 +37,13 @@ class ClientDBService(Service):
         except Exception as e:
             tools.log(e)
             sys.stderr.write('Database connection cannot be established!\n')
-            return False
-        return True
 
-    @sync
     def get(self, key):
         try:
             return yaml.load(self.DB.get(str(key).encode()).decode())
         except Exception as e:
             return None
 
-    @sync
     def put(self, key, value):
         try:
             self.DB.put(str(key).encode(), yaml.dump(value).encode())
@@ -58,7 +51,6 @@ class ClientDBService(Service):
         except Exception as e:
             return False
 
-    @sync
     def delete(self, key):
         try:
             self.DB.delete(str(key).encode())
@@ -66,7 +58,7 @@ class ClientDBService(Service):
         except:
             return False
 
-    @sync
+    @lockit('peers')
     def get_peer(self, node_id):
         peers = self.get_peers()
         for _peer in peers:
@@ -74,7 +66,7 @@ class ClientDBService(Service):
                 return _peer
         return None
 
-    @sync
+    @lockit('peers')
     def get_peers(self):
         peers = self.get('peer_list')
         if peers is None:
@@ -82,7 +74,7 @@ class ClientDBService(Service):
         peers = sorted(peers, key=lambda x: x['rank'])
         return peers
 
-    @sync
+    @lockit('peers')
     def add_peer(self, peer, type):
         """
         Add peer can be triggered by 2 different actions: Greetings, Friend of mine
@@ -151,7 +143,7 @@ class ClientDBService(Service):
         api.peer_update()
         self.put('peer_list', peers)
 
-    @sync
+    @lockit('peers')
     def update_peer(self, peer):
         """
         Update peer at node_id=peer['node_id']
@@ -170,7 +162,7 @@ class ClientDBService(Service):
         api.peer_update()
         self.put('peer_list', peers)
 
-    @sync
+    @lockit('peers')
     def is_peer(self, peer):
         """
         Integrity check of a peer object.
@@ -185,7 +177,7 @@ class ClientDBService(Service):
             return False
 
         # Its key set must match default keys
-        if set(peer.keys()) != set(ClientDBService.default_peer.keys()):
+        if set(peer.keys()) != set(ClientDB.default_peer.keys()):
             return False
 
         if not tools.validate_uuid4(peer['node_id']):
@@ -196,7 +188,7 @@ class ClientDBService(Service):
 
         return True
 
-    @sync
+    @lockit('peers')
     def get_peer_history(self, node_id):
         if self.get('peer_history_' + node_id) is not None:
             return self.get('peer_history_' + node_id)
@@ -206,17 +198,17 @@ class ClientDBService(Service):
                 "peer_transfer": 0
             }
 
-    @sync
+    @lockit('peers')
     def set_peer_history(self, node_id, peer_history):
         self.put('peer_history_' + node_id, peer_history)
 
-    @sync
+    @lockit('wallets')
     def get_wallets(self):
         if self.get("wallets") is not None:
             return self.get("wallets")
         return {}
 
-    @sync
+    @lockit('wallets')
     def get_wallet(self, name):
         wallets = self.get_wallets()
         if name in wallets:
@@ -224,7 +216,7 @@ class ClientDBService(Service):
         else:
             return None
 
-    @sync
+    @lockit('wallets')
     def new_wallet(self, enc_key, wallet_obj):
         wallets = self.get_wallets()
         if wallet_obj.name in wallets:
@@ -233,7 +225,7 @@ class ClientDBService(Service):
         self.put("wallets", wallets)
         return True
 
-    @sync
+    @lockit('wallets')
     def upload_wallet(self, wallet_name, wallet_str):
         wallets = self.get_wallets()
         if wallet_name in wallets:
@@ -242,7 +234,7 @@ class ClientDBService(Service):
         self.put("wallets", wallets)
         return True
 
-    @sync
+    @lockit('wallets')
     def remove_wallet(self, name):
         try:
             wallets = self.get_wallets()
@@ -252,11 +244,11 @@ class ClientDBService(Service):
         except Exception as e:
             return False
 
-    @sync
+    @lockit('wallets')
     def get_default_wallet(self):
         return self.get('default_wallet')
 
-    @sync
+    @lockit('wallets')
     def set_default_wallet(self, wallet_name, password):
         try:
             from halocoin.model.wallet import Wallet
@@ -275,7 +267,7 @@ class ClientDBService(Service):
             tools.log(e)
             return False
 
-    @sync
+    @lockit('wallets')
     def delete_default_wallet(self):
         self.delete('default_wallet')
         api.changed_default_wallet()
