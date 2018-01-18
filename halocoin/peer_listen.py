@@ -5,6 +5,7 @@ import uuid
 
 from halocoin import ntwrk, custom
 from halocoin import tools
+from halocoin.client_db import ClientDB
 from halocoin.ntwrk import Message
 from halocoin.service import Service, threaded, sync
 
@@ -93,8 +94,7 @@ class PeerListenService(Service):
         :param __remote_ip__: IP address of remote as seen from this network.
         :return: Our own greetings message
         """
-        from halocoin.client_db import ClientDBService
-        peer = copy.deepcopy(ClientDBService.default_peer)
+        peer = copy.deepcopy(ClientDB.default_peer)
         peer.update(
             node_id=node_id,
             ip=__remote_ip__[0],

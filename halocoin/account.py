@@ -1,12 +1,12 @@
 import copy
 
 from halocoin import tools, custom
-from halocoin.service import Service, sync, lockit
+from halocoin.service import lockit
 
 
 class StateDatabase:
     """
-    AccountService is where we evaluate and store the current state of blockchain.
+    StateDatabase is where we evaluate and store the current state of blockchain.
     User accounts referring addresses, jobs, authorities and many more are stored here.
     State change can be triggered by only adding or removing a block.
     A state can be simulated against a transaction, multiple transactions or blocks.
