@@ -1,6 +1,7 @@
 import queue
 import sys
 import threading
+import traceback
 
 from halocoin import tools
 from halocoin.ntwrk.message import Order
@@ -71,7 +72,10 @@ class Service:
         def threaded_wrapper(func):
             def insider(*args, **kwargs):
                 while self.__threads[func.__name__]["running"]:
-                    func(*args, **kwargs)
+                    try:
+                        func(*args, **kwargs)
+                    except Exception as e:
+                        tools.log('Exception occurred at thread {}\n{}'.format(func.__name__, traceback.format_exc()))
                 return 0
 
             return insider

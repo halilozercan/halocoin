@@ -154,13 +154,10 @@ class BlockchainService(Service):
         self.clientdb.update_peer(peer)
 
     def add_tx(self, tx):
-        print("Adding tx: " + str(tx))
         if not isinstance(tx, dict):
             return Response(False, 'Transactions must be dict typed')
 
         txs_in_pool = self.tx_pool()
-
-        print("Txs in pool count: " + str(len(txs_in_pool)))
 
         if tx in txs_in_pool:
             return Response(False, 'no duplicates')
@@ -174,11 +171,9 @@ class BlockchainService(Service):
             'length': self.db.get('length') + 1,
             'txs': txs_in_pool + [tx]
         }
-        print("Txs in pool + tx: " + str(txs_in_pool+[tx]))
         current_state_check = self.statedb.update_database_with_block(block)
         self.db.rollback()
         if not current_state_check:
-            print("Tx failed current state check")
             return Response(False, 'Transaction failed current state check')
 
         self.tx_pool_add(tx)

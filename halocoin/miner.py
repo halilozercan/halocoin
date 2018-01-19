@@ -7,7 +7,7 @@ from multiprocessing import Process
 from halocoin import blockchain
 from halocoin import custom
 from halocoin import tools
-from halocoin.service import Service, threaded
+from halocoin.service import Service, threaded, lockit
 
 
 class MinerService(Service):
@@ -111,6 +111,7 @@ class MinerService(Service):
                'txs': [self.make_mint(pubkey)]}
         return out
 
+    @lockit('kvstore')
     def get_candidate_block(self):
         length = self.db.get('length')
         print('Miner working for block', (length + 1))
