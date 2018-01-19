@@ -30,18 +30,18 @@ class PowerService(Service):
     def __init__(self, engine):
         Service.__init__(self, "power")
         self.engine = engine
-        self.db = None
         self.blockchain = None
-        self.account = None
+        self.clientdb = None
+        self.statedb = None
         self.wallet = None
 
     def set_wallet(self, wallet):
         self.wallet = wallet
 
     def on_register(self):
-        self.db = self.engine.db
+        self.clientdb = self.engine.clientdb
         self.blockchain = self.engine.blockchain
-        self.account = self.engine.statedb
+        self.statedb = self.engine.statedb
 
         if self.wallet is not None and hasattr(self.wallet, 'privkey'):
             return True
@@ -54,13 +54,13 @@ class PowerService(Service):
 
     @sync
     def get_job_status(self, job_id):
-        if self.db.exists('local_job_repo_' + job_id):
+        if self.clientdb.exists('local_job_repo_' + job_id):
             job_directory = os.path.join(self.engine.working_dir, 'jobs', job_id)
             result_file = os.path.join(job_directory, 'output', 'result.zip')
             job_file = os.path.join(job_directory, 'coinami.job.json')
             result_exists = os.path.exists(result_file)
             job_exists = os.path.exists(job_file)
-            entry = self.db.get('local_job_repo_' + job_id)
+            entry = self.clientdb.get('local_job_repo_' + job_id)
             if entry['status'] == 'executed' or entry['status'] == 'downloaded':
                 if result_exists:
                     return "executed"
@@ -76,7 +76,7 @@ class PowerService(Service):
     @sync
     def initiate_job(self, job_id):
         print('Assigned {}'.format(job_id))
-        self.db.put('local_job_repo_' + job_id, {
+        self.clientdb.put('local_job_repo_' + job_id, {
             "status": "assigned",
         })
 
@@ -86,7 +86,7 @@ class PowerService(Service):
         # TODO: Authorities must have a job endpoint template.
         # TODO: Add signature verification while requesting jobs to download.
         # TODO: implementation
-        job = self.account.get_job(job_id)
+        job = self.statedb.get_job(job_id)
         endpoint = "http://139.179.21.17:5000/job_download/{}".format(job_id)
         job_directory = os.path.join(self.engine.working_dir, 'jobs', job_id)
         if not os.path.exists(job_directory):
@@ -110,9 +110,9 @@ class PowerService(Service):
             zip_ref = zipfile.ZipFile(job_file, 'r')
             zip_ref.extractall(job_directory)
             zip_ref.close()
-            entry = self.db.get('local_job_repo_' + job_id)
+            entry = self.clientdb.get('local_job_repo_' + job_id)
             entry['status'] = 'downloaded'
-            self.db.put('local_job_repo_' + job_id, entry)
+            self.clientdb.put('local_job_repo_' + job_id, entry)
             return True
         else:
             return False
@@ -134,9 +134,9 @@ class PowerService(Service):
             output_directory: {'bind': '/output', 'mode': 'rw'}
         })
         if os.path.exists(result_file):
-            entry = self.db.get('local_job_repo_' + job_id)
+            entry = self.clientdb.get('local_job_repo_' + job_id)
             entry['status'] = 'executed'
-            self.db.put('local_job_repo_' + job_id, entry)
+            self.clientdb.put('local_job_repo_' + job_id, entry)
             return True
         else:
             return False
@@ -144,7 +144,7 @@ class PowerService(Service):
     @sync
     def upload_job(self, job_id):
         print('Uploading {}'. format(job_id))
-        job = self.account.get_job(job_id)
+        job = self.statedb.get_job(job_id)
         endpoint = "http://139.179.21.17:5000/job_upload/{}".format(job_id)
         result_directory = os.path.join(self.engine.working_dir, 'jobs', job_id, 'output')
         if not os.path.exists(result_directory):
@@ -161,20 +161,20 @@ class PowerService(Service):
 
         r = requests.post(endpoint, files=files, data=values)
         if r.status_code == 200 and r.json()['success']:
-            entry = self.db.get('local_job_repo_' + job_id)
+            entry = self.clientdb.get('local_job_repo_' + job_id)
             entry['status'] = 'uploaded'
-            self.db.put('local_job_repo_' + job_id, entry)
+            self.clientdb.put('local_job_repo_' + job_id, entry)
 
     @sync
     def done_job(self, job_id):
-        job = self.account.get_job(job_id)
+        job = self.statedb.get_job(job_id)
         job_directory = os.path.join(self.engine.working_dir, 'jobs', job_id)
         if os.path.exists(job_directory):
             os.removedirs(job_directory)
 
-        entry = self.db.get('local_job_repo_' + job_id)
+        entry = self.clientdb.get('local_job_repo_' + job_id)
         entry['status'] = 'done'
-        self.db.put('local_job_repo_' + job_id, entry)
+        self.clientdb.put('local_job_repo_' + job_id, entry)
 
     @threaded
     def worker(self):
@@ -194,7 +194,7 @@ class PowerService(Service):
             return
 
         own_address = self.wallet.address
-        own_account = self.account.get_account(own_address)
+        own_account = self.statedb.get_account(own_address)
         assigned_job = own_account['assigned_job']
         if assigned_job == '':
             time.sleep(5)
