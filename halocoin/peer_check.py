@@ -86,9 +86,9 @@ class PeerCheckService(Service):
         peer['length'] = greeted['length']
         self.clientdb.update_peer(peer)
 
-        known_length = self.db.get('known_length')
+        known_length = self.clientdb.get('known_length')
         if greeted['length'] > known_length:
-            self.db.put('known_length', greeted['length'])
+            self.clientdb.put('known_length', greeted['length'])
 
         length = self.db.get('length')
         diff_length = self.db.get('diffLength')

@@ -45,8 +45,7 @@ class BlockchainService(Service):
         return True
 
     @threaded
-    @lockit('blockchain')
-    def process_blocks(self):
+    def blockchain_process(self):
         """
         In this thread we check blocks queue for possible additions to blockchain.
         Following type is expected to come out of the queue. Any other type will be rejected.
@@ -119,7 +118,7 @@ class BlockchainService(Service):
     def get_chain_state(self):
         return self.__state
 
-    @lockit('tx_pool')
+    @lockit('kvstore')
     def tx_pool(self):
         """
         Return all the transactions waiting in the pool.
@@ -128,7 +127,7 @@ class BlockchainService(Service):
         """
         return self.db.get('txs')
 
-    @lockit('tx_pool')
+    @lockit('kvstore')
     def tx_pool_add(self, tx):
         """
         This is an atomic add operation for txs pool.
@@ -140,7 +139,7 @@ class BlockchainService(Service):
         self.db.put('txs', txs)
         api.new_tx_in_pool()
 
-    @lockit('tx_pool')
+    @lockit('kvstore')
     def tx_pool_pop_all(self):
         """
         Atomic operation to pop everything
@@ -291,17 +290,17 @@ class BlockchainService(Service):
 
         return True
 
-    @lockit('blockcount')
+    @lockit('kvstore')
     def get_block(self, length):
         length = str(length).zfill(12)
         return self.db.get('block_' + length)
 
-    @lockit('blockcount')
+    @lockit('kvstore')
     def put_block(self, length, block):
         length = str(length).zfill(12)
         return self.db.put('block_' + length, block)
 
-    @lockit('blockcount')
+    @lockit('kvstore')
     def del_block(self, length):
         length = str(length).zfill(12)
         return self.db.delete('block_' + length)
@@ -466,6 +465,7 @@ class BlockchainService(Service):
             result.append(value[key[:-1]])
         return result
 
+    @lockit('kvstore')
     def target(self, length):
         def targetTimesFloat(target, number):
             a = int(str(target), 16)

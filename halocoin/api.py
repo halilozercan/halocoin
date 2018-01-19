@@ -26,7 +26,7 @@ def blockchain_synced(func):
             return func(*args, **kwargs)
         else:
             return 'Blockchain is syncing. This method is not reliable while operation continues.\n' + \
-                   str(engine.instance.db.get('length')) + '-' + str(engine.instance.db.get('known_length'))
+                   str(engine.instance.db.get('length')) + '-' + str(engine.instance.clientdb.get('known_length'))
 
     # To keep the function name same for RPC helper
     wrapper.__name__ = func.__name__
@@ -563,7 +563,7 @@ def auth_reg():
 @app.route('/blockcount', methods=['GET', 'POST'])
 def blockcount():
     result = dict(length=engine.instance.db.get('length'),
-                  known_length=engine.instance.db.get('known_length'))
+                  known_length=engine.instance.clientdb.get('known_length'))
     result_text = json.dumps(result)
     return Response(response=result_text, headers={"Content-Type": "application/json"})
 

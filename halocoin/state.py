@@ -27,12 +27,9 @@ class StateDatabase:
         self.db = self.engine.db
         self.blockchain = self.engine.blockchain
 
-    @lockit('account')
+    @lockit('kvstore')
     def get_account(self, address, apply_tx_pool=False):
         def update_account_with_txs(address, account, txs):
-            """
-            Not many use cases. Dont care
-            """
             for tx in txs:
                 owner = tools.tx_owner_address(tx)
                 if tx['type'] == 'spend':
@@ -71,12 +68,11 @@ class StateDatabase:
 
         return account
 
-    @lockit('account')
+    @lockit('kvstore')
     def remove_account(self, address):
         self.db.delete(address)
         return True
 
-    @lockit('account')
     def update_account(self, address, new_account):
         if new_account['amount'] < 0 or new_account['stake'] < 0:
             return False
@@ -288,7 +284,7 @@ class StateDatabase:
                         break
                 self.db.update_job(job)
 
-    @lockit('tx_pool')
+    @lockit('kvstore')
     def known_tx_count(self, address, count_pool=True, txs_in_pool=None):
         # Returns the number of transactions that pubkey has broadcast.
         def number_of_unconfirmed_txs(_address):
@@ -301,6 +297,7 @@ class StateDatabase:
             surplus += number_of_unconfirmed_txs(address)
         return account['count'] + surplus
 
+    @lockit('kvstore')
     def get_auth(self, auth_name):
         return self.db.get('auth_' + auth_name)
 
@@ -321,6 +318,7 @@ class StateDatabase:
         common_name = tools.get_commonname_from_certificate(cert_pem)
         self.db.delete('auth_' + common_name)
 
+    @lockit('kvstore')
     def get_stake_pool(self):
         result = self.db.get('stake_pool')
         if result is None:
@@ -338,6 +336,7 @@ class StateDatabase:
         stake_pool.remove(address)
         self.db.put('stake_pool', stake_pool)
 
+    @lockit('kvstore')
     def get_available_jobs(self):
         job_list = self.db.get('job_list')
         result = {}
@@ -348,6 +347,7 @@ class StateDatabase:
                 result[job_id] = self.db.get('job_' + job_id)
         return result
 
+    @lockit('kvstore')
     def get_assigned_jobs(self):
         job_list = self.db.get('job_list')
         result = {}
@@ -428,6 +428,7 @@ class StateDatabase:
         self.update_account(last_assigned_address, last_assigned_account)
         return True
 
+    @lockit('kvstore')
     def get_job(self, job_id):
         return self.db.get('job_' + job_id)
 

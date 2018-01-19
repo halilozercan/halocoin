@@ -1,7 +1,6 @@
 import queue
 import sys
 import threading
-from functools import partial
 
 from halocoin import tools
 from halocoin.ntwrk.message import Order
@@ -336,6 +335,7 @@ def lockit(lock_name, timeout=-1):
 
         wrapper._original = func
         wrapper.thread_safe = True
+        wrapper.__name__ = func.__name__
         return wrapper
     return _lockit
 

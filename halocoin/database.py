@@ -5,7 +5,7 @@ import threading
 import plyvel
 import yaml
 
-from halocoin import tools, custom, service
+from halocoin import tools, custom
 from halocoin.service import lockit
 
 
@@ -20,6 +20,7 @@ class KeyValueStore:
         self.salt = None
         self.req_count = 0
         self.log = set()
+        self.snapshots = {}
         try:
             db_location = os.path.join(self.engine.working_dir, self.dbname)
             DB = plyvel.DB(db_location, create_if_missing=True)
@@ -29,13 +30,14 @@ class KeyValueStore:
             tools.log(e)
             sys.stderr.write('Database connection cannot be established!\n')
 
-    @lockit('kvstore')
     def get(self, key):
-        """gets the key in args[0] using the salt"""
         db = self.DB
-        # If there is a simulation going on and we are not inside a blockchain namespace,
-        # then we must use the earlier snapshot for this operation
-        if self.snapshot is not None and not service.check_lock('blockchain'):
+        tname = threading.current_thread().getName()
+        if tname != "blockchain_process" and tname != "MainThread" and self.snapshot is not None:
+            # Request is coming from blockchain process thread.
+            # All actions are directed to ongoing database
+            # If there is a simulation going on and we are not inside a blockchain namespace,
+            # then we must use the earlier snapshot for this operation
             db = self.snapshot
         try:
             return yaml.load(db.get(str(key).encode()).decode())
@@ -43,10 +45,8 @@ class KeyValueStore:
             return None
 
     def put(self, key, value):
-        """
-        Puts the val in args[1] under the key in args[0] with the salt
-        prepended to the key.
-        """
+        if threading.current_thread().getName() != 'blockchain_process':
+            print(threading.current_thread().getName())
         try:
             encoded_value = yaml.dump(value).encode()
             self.DB.put(str(key).encode(), encoded_value)
@@ -57,18 +57,10 @@ class KeyValueStore:
             return False
 
     def exists(self, key):
-        """
-        Checks if the key in args[0] with the salt prepended is
-        in the database.
-        """
         result = self.get(key)
         return result is not None
 
     def delete(self, key):
-        """
-        Removes the entry in the database under the the key in args[0]
-        with the salt prepended.
-        """
         try:
             self.DB.delete(str(key).encode())
             if self.snapshot is not None:
@@ -77,7 +69,6 @@ class KeyValueStore:
         except:
             return False
 
-    @lockit('blockchain')
     @lockit('kvstore')
     def simulate(self):
         """
@@ -97,7 +88,6 @@ class KeyValueStore:
         except:
             return False
 
-    @lockit('blockchain')
     @lockit('kvstore')
     def commit(self):
         """
@@ -111,7 +101,6 @@ class KeyValueStore:
         self.log = set()
         return True
 
-    @lockit('blockchain')
     @lockit('kvstore')
     def rollback(self):
         if self.snapshot is None:

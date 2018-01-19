@@ -1,10 +1,8 @@
 import signal
 import sys
-import time
 
 from halocoin import api
 from halocoin import tools
-from halocoin.state import StateDatabase
 from halocoin.blockchain import BlockchainService
 from halocoin.client_db import ClientDB
 from halocoin.database import KeyValueStore
@@ -12,10 +10,10 @@ from halocoin.miner import MinerService
 from halocoin.peer_check import PeerCheckService
 from halocoin.peer_listen import PeerListenService
 from halocoin.power import PowerService
-from halocoin.service import Service, async, lockit
+from halocoin.service import Service, async
+from halocoin.state import StateDatabase
 
 
-@lockit('blockchain')
 def test_database(db):
     results = [False, False]
     response = db.put('test', 'TEST')
@@ -70,12 +68,10 @@ class Engine(Service):
             self.db.put('peer_list', [])
             self.db.put('targets', {})
             self.db.put('times', {})
-            self.db.put('mine', False)
             self.db.put('diffLength', '0')
             self.db.put('accounts', {})
-            self.db.put('known_length', -1)
             self.db.put('job_list', [])
-        self.db.put('stop', False)
+            self.clientdb.put('known_length', -1)
 
         if not self.blockchain.register():
             sys.stderr.write("Blockchain service has failed. Exiting!\n")
