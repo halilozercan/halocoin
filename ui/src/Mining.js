@@ -4,6 +4,7 @@ import Address from './widgets/address.js';
 import Send from './widgets/send.js';
 import Miner from './widgets/miner.js';
 import Power from './widgets/power.js';
+import Stake from './widgets/stake.js';
 import JobListing from './widgets/job_listing.js';
 
 class Mining extends Component {
@@ -14,6 +15,7 @@ class Mining extends Component {
         <div className="row">
           <Miner />
           <Power />
+          <Stake wallet={this.props.default_wallet}/>
         </div>
         <div className="row">
           <JobListing notify={this.props.notify}/>

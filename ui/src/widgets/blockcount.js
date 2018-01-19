@@ -25,6 +25,9 @@ class Blockcount extends Component {
     this.props.socket.on('new_block', (socket) => {
       this.update();
     })
+    this.props.socket.on('new_tx_in_pool', (socket) => {
+      this.update();
+    })
   }
 
   update() {
@@ -39,12 +42,23 @@ class Blockcount extends Component {
         return state;
       });
     });
+
+    axios.get("/txs").then((response) => {
+      let data = response.data;
+      this.setState((state) => {
+        state['tx_pool_size'] = data.length;
+        return state;
+      });
+    });
   }
 
   render() {
     return (
       <Paper style={bottomBarStyle}  zDepth={1}>
         Blockcount: {this.state.length}/{this.state.known_length}
+        <p style={{"float":"right"}}>
+        Waiting Transactions: {this.state.tx_pool_size}
+        </p>
       </Paper>
     );
   }

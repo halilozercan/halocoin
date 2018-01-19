@@ -71,6 +71,7 @@ class BlockchainService(Service):
                         self.peer_reported_false_blocks(node_id)
                         raise Exception('Peer {} reported false blocks'.format(node_id))
 
+                self.db.simulate()
                 length = self.db.get('length')
                 for i in range(20):
                     block = self.get_block(length)
@@ -89,9 +90,11 @@ class BlockchainService(Service):
 
                 if total_number_of_blocks_added == 0 or self.db.get('length') != blocks[-1]['length']:
                     # All received blocks failed. Punish the peer by lowering rank.
+                    self.db.rollback()
                     if node_id != 'miner':
                         self.peer_reported_false_blocks(node_id)
                 else:
+                    self.db.commit()
                     api.new_block()
         except Exception as e:
             tools.log(e)
@@ -191,7 +194,6 @@ class BlockchainService(Service):
         """Attempts adding a new block to the blockchain.
          Median is good for weeding out liars, so long as the liars don't have 51%
          hashpower. """
-        tools.echo('add block')
 
         length = self.db.get('length')
         block_at_length = self.get_block(length)
@@ -200,6 +202,8 @@ class BlockchainService(Service):
             return 1
         elif int(block['length']) > int(length) + 1:
             return 2
+
+        tools.echo('add block')
 
         if (length >= 0 and block['diffLength'] != tools.hex_sum(block_at_length['diffLength'],
                                                                  tools.hex_invert(block['target']))) \
@@ -251,12 +255,7 @@ class BlockchainService(Service):
             tools.log('Received block failed special txs check.')
             return 3
 
-        self.db.simulate()
-        result = self.statedb.update_database_with_block(block)
-        if result:
-            self.db.commit()
-        else:
-            self.db.rollback()
+        if not self.statedb.update_database_with_block(block):
             return 3
 
         self.put_block(block['length'], block)

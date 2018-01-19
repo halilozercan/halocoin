@@ -1,5 +1,6 @@
 import os
 import sys
+import threading
 
 import plyvel
 import yaml
@@ -15,6 +16,7 @@ class KeyValueStore:
         self.DB = None
         self.iterator = None
         self.snapshot = None
+        self.simLock = threading.RLock()
         self.salt = None
         self.req_count = 0
         self.log = set()
@@ -71,10 +73,17 @@ class KeyValueStore:
 
     @lockit('simulation')
     def simulate(self):
+        """
+        Database simulations are thread based batch transactions.
+        When a simulation is started by a thread, any get or put operation
+        is executed on the simulated database.
+
+        Other threads
+        :return:
+        """
+        self.simLock.acquire()
         if self.snapshot is not None:
             tools.log('There is already an ongoing simulation!')
-            raise Exception('There is already an ongoing simulation!')
-            # return False
         try:
             self.snapshot = self.DB.snapshot()
             return True
@@ -92,6 +101,7 @@ class KeyValueStore:
             return False
         self.snapshot = None
         self.log = set()
+        self.simLock.release()
         return True
 
     @lockit('simulation')
@@ -107,4 +117,5 @@ class KeyValueStore:
                 self.DB.delete(key)
         self.log = set()
         self.snapshot = None
+        self.simLock.release()
         return True

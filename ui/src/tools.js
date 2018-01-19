@@ -7,7 +7,7 @@ export const timestampToDatetime = (timestamp) => {
 }
 
 export const axiosInstance = axios.create({
-  baseURL: 'http://localhost:7001'
+  baseURL: 'http://0.0.0.0:7001'
 });
 
-axios.defaults.baseURL = 'http://localhost:7001';
+axios.defaults.baseURL = 'http://0.0.0.0:7001';

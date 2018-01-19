@@ -127,7 +127,8 @@ def info_wallet():
                 "privkey": wallet.get_privkey_str(),
                 "address": wallet.address,
                 "balance": account['amount'],
-                "deposit": account['stake']
+                "deposit": account['stake'],
+                "assigned_job": account['assigned_job'],
             })
         except:
             return generate_json_response("Password incorrect")

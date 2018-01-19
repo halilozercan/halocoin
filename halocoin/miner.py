@@ -56,7 +56,8 @@ class MinerService(Service):
 
         possible_blocks = []
         while not MinerService.is_everyone_dead(self.pool) and self.threaded_running():
-            if self.db.get('length')+1 != candidate_block['length'] or self.blockchain.tx_pool() != tx_pool:
+            current_length = self.db.get('length')
+            if current_length+1 != candidate_block['length'] or self.blockchain.tx_pool() != tx_pool:
                 candidate_block = self.get_candidate_block()
                 tx_pool = self.blockchain.tx_pool()
                 self.start_workers(candidate_block)
@@ -79,6 +80,8 @@ class MinerService(Service):
             tools.log('Mined block')
             tools.log(possible_blocks)
             self.blockchain.blocks_queue.put((possible_blocks, 'miner'))
+            self.close_workers()
+        time.sleep(1)
 
     def start_workers(self, candidate_block):
         self.close_workers()
