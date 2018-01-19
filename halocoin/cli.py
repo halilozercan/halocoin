@@ -364,6 +364,11 @@ def txs(args):
     print_txs(txs)
 
 
+@action
+def version(args):
+    print(custom.version)
+
+
 def run(argv):
     parser = argparse.ArgumentParser(description='CLI for halocoin.')
     parser.add_argument('action', choices=actions.keys())
