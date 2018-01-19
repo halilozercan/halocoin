@@ -11,6 +11,11 @@ from halocoin import tools, engine, custom
 from halocoin.blockchain import BlockchainService
 from halocoin.service import Service
 
+tx_queue_response = {
+    "result": None,
+    "event": threading.Event()
+}
+
 
 class ComplexEncoder(json.JSONEncoder):
     def default(self, obj):
@@ -323,9 +328,11 @@ def send():
         tx['pubkeys'] = [wallet.get_pubkey_str()]  # We use pubkey as string
     if 'signatures' not in tx:
         tx['signatures'] = [tools.sign(tools.det_hash(tx), wallet.privkey)]
+    tx_queue_response['event'] = threading.Event()
     engine.instance.blockchain.tx_queue.put(tx)
-    response["success"] = True
-    response["message"] = 'Tx amount:{} to:{} added to the pool'.format(tx['amount'], tx['to'])
+    tx_queue_response['event'].wait()
+    response["success"] = tx_queue_response['message'].getFlag()
+    response["message"] = tx_queue_response['message'].getData()
     return generate_json_response(response)
 
 
@@ -375,13 +382,11 @@ def deposit():
         tx['pubkeys'] = [wallet.get_pubkey_str()]  # We use pubkey as string
     if 'signatures' not in tx:
         tx['signatures'] = [tools.sign(tools.det_hash(tx), wallet.privkey)]
+    tx_queue_response['event'] = threading.Event()
     engine.instance.blockchain.tx_queue.put(tx)
-    response["success"] = True
-    if response['success']:
-        response["message"] = 'Your deposit with amount {} is added to the pool'\
-            .format(tx['amount'])
-    else:
-        response["error"] = 'Your deposit request failed to pass integrity check'
+    tx_queue_response['event'].wait()
+    response["success"] = tx_queue_response['message'].getFlag()
+    response["message"] = tx_queue_response['message'].getData()
     return generate_json_response(response)
 
 
@@ -431,13 +436,11 @@ def withdraw():
         tx['pubkeys'] = [wallet.get_pubkey_str()]  # We use pubkey as string
     if 'signatures' not in tx:
         tx['signatures'] = [tools.sign(tools.det_hash(tx), wallet.privkey)]
+    tx_queue_response['event'] = threading.Event()
     engine.instance.blockchain.tx_queue.put(tx)
-    response["success"] = True
-    if response['success']:
-        response["message"] = 'Your deposit with amount {} is added to the pool'\
-            .format(tx['amount'])
-    else:
-        response["error"] = 'Your deposit request failed to pass integrity check'
+    tx_queue_response['event'].wait()
+    response["success"] = tx_queue_response['message'].getFlag()
+    response["message"] = tx_queue_response['message'].getData()
     return generate_json_response(response)
 
 
@@ -471,9 +474,11 @@ def reward():
 
     tx['pubkeys'] = [privkey.get_verifying_key().to_string()]  # We use pubkey as string
     tx['signatures'] = [tools.sign(tools.det_hash(tx), privkey)]
+    tx_queue_response['event'] = threading.Event()
     engine.instance.blockchain.tx_queue.put(tx)
-    response["success"] = True
-    response["message"] = 'Reward to:{} sent to the pool'.format(tx['job_id'])
+    tx_queue_response['event'].wait()
+    response["success"] = tx_queue_response['message'].getFlag()
+    response["message"] = tx_queue_response['message'].getData()
     return generate_json_response(response)
 
 
@@ -510,9 +515,11 @@ def job_dump():
 
     tx['pubkeys'] = [privkey.get_verifying_key().to_string()]  # We use pubkey as string
     tx['signatures'] = [tools.sign(tools.det_hash(tx), privkey)]
+    tx_queue_response['event'] = threading.Event()
     engine.instance.blockchain.tx_queue.put(tx)
-    response["success"] = True
-    response["message"] = 'Job dump succesfully is added to the transaction pool'
+    tx_queue_response['event'].wait()
+    response["success"] = tx_queue_response['message'].getFlag()
+    response["message"] = tx_queue_response['message'].getData()
     return generate_json_response(response)
 
 
@@ -554,9 +561,11 @@ def auth_reg():
 
     tx['pubkeys'] = [privkey.get_verifying_key().to_string()]  # We use pubkey as string
     tx['signatures'] = [tools.sign(tools.det_hash(tx), privkey)]
+    tx_queue_response['event'] = threading.Event()
     engine.instance.blockchain.tx_queue.put(tx)
-    response["success"] = True
-    response["message"] = 'Auth registration is added to the pool'
+    tx_queue_response['event'].wait()
+    response["success"] = tx_queue_response['message'].getFlag()
+    response["message"] = tx_queue_response['message'].getData()
     return generate_json_response(response)
 
 

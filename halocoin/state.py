@@ -240,7 +240,7 @@ class StateDatabase:
         return True
 
     def rollback_block(self, block):
-        # TODO: 0.008c changes
+        # TODO: 0.007-9c changes
         """
         A block rollback means removing the block from chain.
         A block is defined by its transactions. Here we rollback every object in database to the version
@@ -267,10 +267,28 @@ class StateDatabase:
 
                 receiver_account = self.db.get(tx['to'])
                 receiver_account['amount'] -= tx['amount']
-                owner_account['tx_blocks'].remove(block['length'])
+                receiver_account['tx_blocks'].remove(block['length'])
 
                 self.db.put(tx_owner_address, owner_account)
                 self.db.put(tx['to'], receiver_account)
+            elif tx['type'] == 'deposit':
+                owner_account['amount'] += tx['amount']
+                owner_account['stake'] -= tx['amount']
+                owner_account['count'] -= 1
+                owner_account['tx_blocks'].remove(block['length'])
+
+                self.update_account(tx_owner_address, owner_account)
+                if owner_account['stake'] == 0:
+                    self.remove_address_from_stake_pool(tx_owner_address)
+            elif tx['type'] == 'withdraw':
+                owner_account['amount'] -= tx['amount']
+                owner_account['stake'] += tx['amount']
+                owner_account['count'] -= 1
+                owner_account['tx_blocks'].remove(block['length'])
+
+                self.update_account(tx_owner_address, owner_account)
+                if owner_account['stake'] > 0:
+                    self.put_address_in_stake_pool(tx_owner_address)
             elif tx['type'] == 'auth_reg':
                 self.delete_auth(tx['certificate'])
             elif tx['type'] == 'job_dump':

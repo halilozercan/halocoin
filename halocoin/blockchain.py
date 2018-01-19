@@ -6,7 +6,7 @@ from cdecimal import Decimal
 
 import yaml
 
-from halocoin import custom, api, service
+from halocoin import custom, api
 from halocoin import tools
 from halocoin.ntwrk import Response
 from halocoin.service import Service, threaded, sync, NoExceptionQueue, lockit
@@ -96,19 +96,20 @@ class BlockchainService(Service):
                         api.new_block()
             except Exception as e:
                 tools.log(e)
-            self.set_chain_state(BlockchainService.IDLE)
             self.blocks_queue.task_done()
         except queue.Empty:
             pass
 
         try:
             candidate_tx = self.tx_queue.get(timeout=1)
-            self.add_tx(candidate_tx)
+            result = self.add_tx(candidate_tx)
+            api.tx_queue_response['message'] = result
+            api.tx_queue_response['event'].set()
+            self.tx_queue.task_done()
         except queue.Empty:
-            return
-        except service.LockException as e:
-            tools.log(e)
-        self.tx_queue.task_done()
+            pass
+
+        self.set_chain_state(BlockchainService.IDLE)
 
     @sync
     def set_chain_state(self, new_state):
@@ -157,10 +158,13 @@ class BlockchainService(Service):
         self.clientdb.update_peer(peer)
 
     def add_tx(self, tx):
+        print("Adding tx: " + str(tx))
         if not isinstance(tx, dict):
             return Response(False, 'Transactions must be dict typed')
 
         txs_in_pool = self.tx_pool()
+
+        print("Txs in pool count: " + str(len(txs_in_pool)))
 
         if tx in txs_in_pool:
             return Response(False, 'no duplicates')
@@ -172,11 +176,13 @@ class BlockchainService(Service):
         self.db.simulate()
         block = {
             'length': self.db.get('length') + 1,
-            'txs': self.tx_pool() + [tx]
+            'txs': txs_in_pool + [tx]
         }
+        print("Txs in pool + tx: " + str(txs_in_pool+[tx]))
         current_state_check = self.statedb.update_database_with_block(block)
         self.db.rollback()
         if not current_state_check:
+            print("Tx failed current state check")
             return Response(False, 'Transaction failed current state check')
 
         self.tx_pool_add(tx)

@@ -45,8 +45,6 @@ class KeyValueStore:
             return None
 
     def put(self, key, value):
-        if threading.current_thread().getName() != 'blockchain_process':
-            print(threading.current_thread().getName())
         try:
             encoded_value = yaml.dump(value).encode()
             self.DB.put(str(key).encode(), encoded_value)
