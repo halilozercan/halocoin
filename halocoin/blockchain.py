@@ -45,6 +45,7 @@ class BlockchainService(Service):
         return True
 
     @threaded
+    @lockit('blockchain')
     def process_blocks(self):
         """
         In this thread we check blocks queue for possible additions to blockchain.
