@@ -1,5 +1,4 @@
 import copy
-import queue
 import threading
 import time
 from cdecimal import Decimal
@@ -67,7 +66,7 @@ class BlockchainService(Service):
                     for block in blocks:
                         if not BlockchainService.block_integrity_check(block) and node_id != 'miner':
                             self.peer_reported_false_blocks(node_id)
-                            raise Exception('Peer {} reported false blocks'.format(node_id))
+                            return
 
                     self.db.simulate()
                     length = self.db.get('length')
@@ -97,16 +96,13 @@ class BlockchainService(Service):
             except Exception as e:
                 tools.log(e)
             self.blocks_queue.task_done()
-        except queue.Empty:
-            pass
 
-        try:
             candidate_tx = self.tx_queue.get(timeout=1)
             result = self.add_tx(candidate_tx)
             api.tx_queue_response['message'] = result
             api.tx_queue_response['event'].set()
             self.tx_queue.task_done()
-        except queue.Empty:
+        except:
             pass
 
         self.set_chain_state(BlockchainService.IDLE)
