@@ -30,6 +30,7 @@ class KeyValueStore:
             tools.log(e)
             sys.stderr.write('Database connection cannot be established!\n')
 
+    @lockit('kvstore')
     def get(self, key):
         db = self.DB
         tname = threading.current_thread().getName()

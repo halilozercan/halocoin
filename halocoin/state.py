@@ -87,9 +87,9 @@ class StateDatabase:
         :return: Whether it was a successfull add operation
         """
 
-        block['txs'] = sorted(block['txs'], key=lambda x: x['count'] if 'count' in x else -1)
+        txs = sorted(block['txs'], key=lambda x: x['count'] if 'count' in x else -1)
 
-        for tx in block['txs']:
+        for tx in txs:
             send_address = tools.tx_owner_address(tx)
             send_account = self.get_account(send_address)
 

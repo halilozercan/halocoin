@@ -47,7 +47,7 @@ class MinerService(Service):
     @threaded
     def worker(self):
         if self.blockchain.get_chain_state() == blockchain.BlockchainService.SYNCING:
-            time.sleep(0.1)
+            time.sleep(1)
             return
 
         candidate_block = self.get_candidate_block()
@@ -58,13 +58,13 @@ class MinerService(Service):
             try:
                 while not self.queue.empty():
                     possible_blocks.append(self.queue.get(timeout=0.01))
+                if len(possible_blocks) > 0:
+                    tools.log('Mined block')
+                    tools.log(possible_blocks)
+                    self.blockchain.blocks_queue.put((possible_blocks[:1], 'miner'))
+                    self.close_workers()
             except queue.Empty:
                 pass
-            if len(possible_blocks) > 0:
-                tools.log('Mined block')
-                tools.log(possible_blocks)
-                self.blockchain.blocks_queue.put((possible_blocks, 'miner'))
-                self.close_workers()
 
             time.sleep(1)
 
@@ -85,8 +85,9 @@ class MinerService(Service):
         leng = int(prev_block['length']) + 1
         target_ = self.blockchain.target(leng)
         diffLength = tools.hex_sum(prev_block['diffLength'], tools.hex_invert(target_))
+        txs = sorted(txs + [self.make_mint(pubkey)], key=lambda x: x['count'] if 'count' in x else -1)
         out = {'version': custom.version,
-               'txs': txs + [self.make_mint(pubkey)],
+               'txs': txs,
                'length': leng,
                'time': time.time(),
                'diffLength': diffLength,
@@ -123,8 +124,10 @@ class MinerService(Service):
         return candidate_block
 
     @staticmethod
-    def target(candidate_block, queue):
+    def target(_candidate_block, queue):
         # Miner registered but no work is sent yet.
+        import copy
+        candidate_block = copy.deepcopy(_candidate_block)
         try:
             if candidate_block is None:
                 return

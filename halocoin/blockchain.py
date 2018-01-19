@@ -96,7 +96,10 @@ class BlockchainService(Service):
             except Exception as e:
                 tools.log(e)
             self.blocks_queue.task_done()
+        except:
+            pass
 
+        try:
             candidate_tx = self.tx_queue.get(timeout=1)
             result = self.add_tx(candidate_tx)
             api.tx_queue_response['message'] = result
