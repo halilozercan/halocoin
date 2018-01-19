@@ -27,7 +27,7 @@ class StateDatabase:
         self.db = self.engine.db
         self.blockchain = self.engine.blockchain
 
-    @lockit('blockchain')
+    @lockit('account')
     def get_account(self, address, apply_tx_pool=False):
         def update_account_with_txs(address, account, txs):
             """
@@ -71,19 +71,18 @@ class StateDatabase:
 
         return account
 
-    @lockit('blockchain')
+    @lockit('account')
     def remove_account(self, address):
         self.db.delete(address)
         return True
 
-    @lockit('blockchain')
+    @lockit('account')
     def update_account(self, address, new_account):
         if new_account['amount'] < 0 or new_account['stake'] < 0:
             return False
         self.db.put(address, new_account)
         return True
 
-    @lockit('blockchain')
     def update_database_with_block(self, block):
         """
         This method should only be called after block passes every check.
@@ -244,7 +243,6 @@ class StateDatabase:
 
         return True
 
-    @lockit('blockchain')
     def rollback_block(self, block):
         # TODO: 0.008c changes
         """
@@ -290,7 +288,7 @@ class StateDatabase:
                         break
                 self.db.update_job(job)
 
-    @lockit('blockchain')
+    @lockit('tx_pool')
     def known_tx_count(self, address, count_pool=True, txs_in_pool=None):
         # Returns the number of transactions that pubkey has broadcast.
         def number_of_unconfirmed_txs(_address):
@@ -360,7 +358,8 @@ class StateDatabase:
                 result[job_id] = self.db.get('job_' + job_id)
         return result
 
-    def add_new_job(self, job, auth, block_number):
+    def add_new_job(self, tx_job, auth, block_number):
+        job = copy.deepcopy(tx_job)
         job['auth'] = auth
         job['status_list'] = [{
             'action': 'add',

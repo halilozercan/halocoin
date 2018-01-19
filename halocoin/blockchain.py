@@ -157,7 +157,6 @@ class BlockchainService(Service):
         peer['rank'] += 0.2 * 30
         self.clientdb.update_peer(peer)
 
-    @lockit('blockchain', timeout=2)
     def add_tx(self, tx):
         if not isinstance(tx, dict):
             return Response(False, 'Transactions must be dict typed')
@@ -184,7 +183,6 @@ class BlockchainService(Service):
         self.tx_pool_add(tx)
         return Response(True, 'Added tx into the pool: ' + str(tx))
 
-    @lockit('blockchain')
     def add_block(self, block):
         """Attempts adding a new block to the blockchain.
          Median is good for weeding out liars, so long as the liars don't have 51%
@@ -293,17 +291,17 @@ class BlockchainService(Service):
 
         return True
 
-    @lockit('state')
+    @lockit('blockcount')
     def get_block(self, length):
         length = str(length).zfill(12)
         return self.db.get('block_' + length)
 
-    @lockit('state')
+    @lockit('blockcount')
     def put_block(self, length, block):
         length = str(length).zfill(12)
         return self.db.put('block_' + length, block)
 
-    @lockit('state')
+    @lockit('blockcount')
     def del_block(self, length):
         length = str(length).zfill(12)
         return self.db.delete('block_' + length)
