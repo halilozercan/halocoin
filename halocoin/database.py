@@ -5,7 +5,7 @@ import threading
 import plyvel
 import yaml
 
-from halocoin import tools, custom
+from halocoin import tools, custom, service
 from halocoin.service import lockit
 
 
@@ -29,10 +29,16 @@ class KeyValueStore:
             tools.log(e)
             sys.stderr.write('Database connection cannot be established!\n')
 
+    @lockit('kvstore')
     def get(self, key):
         """gets the key in args[0] using the salt"""
+        db = self.DB
+        # If there is a simulation going on and we are not inside a blockchain namespace,
+        # then we must use the earlier snapshot for this operation
+        if self.snapshot is not None and not service.check_lock('blockchain'):
+            db = self.snapshot
         try:
-            return yaml.load(self.DB.get(str(key).encode()).decode())
+            return yaml.load(db.get(str(key).encode()).decode())
         except Exception as e:
             return None
 
@@ -71,7 +77,8 @@ class KeyValueStore:
         except:
             return False
 
-    @lockit('simulation')
+    @lockit('blockchain')
+    @lockit('kvstore')
     def simulate(self):
         """
         Database simulations are thread based batch transactions.
@@ -81,16 +88,17 @@ class KeyValueStore:
         Other threads
         :return:
         """
-        self.simLock.acquire()
         if self.snapshot is not None:
             tools.log('There is already an ongoing simulation!')
+            return False
         try:
             self.snapshot = self.DB.snapshot()
             return True
         except:
             return False
 
-    @lockit('simulation')
+    @lockit('blockchain')
+    @lockit('kvstore')
     def commit(self):
         """
         Commit simply erases the earlier snapshot.
@@ -101,10 +109,10 @@ class KeyValueStore:
             return False
         self.snapshot = None
         self.log = set()
-        self.simLock.release()
         return True
 
-    @lockit('simulation')
+    @lockit('blockchain')
+    @lockit('kvstore')
     def rollback(self):
         if self.snapshot is None:
             tools.log('There isn\'t any ongoing simulation')
@@ -117,5 +125,4 @@ class KeyValueStore:
                 self.DB.delete(key)
         self.log = set()
         self.snapshot = None
-        self.simLock.release()
         return True

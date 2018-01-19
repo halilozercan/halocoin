@@ -57,55 +57,49 @@ class BlockchainService(Service):
         """
         try:
             candidate = self.blocks_queue.get(timeout=1)
-        except queue.Empty:
-            return
-        self.set_chain_state(BlockchainService.SYNCING)
-        try:
-            if isinstance(candidate, tuple):
-                blocks = candidate[0]
-                node_id = candidate[1]
-                total_number_of_blocks_added = 0
+            self.set_chain_state(BlockchainService.SYNCING)
+            try:
+                if isinstance(candidate, tuple):
+                    blocks = candidate[0]
+                    node_id = candidate[1]
+                    total_number_of_blocks_added = 0
 
-                for block in blocks:
-                    if not BlockchainService.block_integrity_check(block) and node_id != 'miner':
-                        self.peer_reported_false_blocks(node_id)
-                        raise Exception('Peer {} reported false blocks'.format(node_id))
+                    for block in blocks:
+                        if not BlockchainService.block_integrity_check(block) and node_id != 'miner':
+                            self.peer_reported_false_blocks(node_id)
+                            raise Exception('Peer {} reported false blocks'.format(node_id))
 
-                self.db.simulate()
-                length = self.db.get('length')
-                for i in range(20):
-                    block = self.get_block(length)
-                    if self.fork_check(blocks, length, block):
-                        self.delete_block()
-                        length -= 1
+                    self.db.simulate()
+                    length = self.db.get('length')
+                    for i in range(20):
+                        block = self.get_block(length)
+                        if self.fork_check(blocks, length, block):
+                            self.delete_block()
+                            length -= 1
+                        else:
+                            break
+
+                    for block in blocks:
+                        add_block_result = self.add_block(block)
+                        if add_block_result == 2:  # A block that is ahead of us could not be added. No need to proceed.
+                            break
+                        elif add_block_result == 0:
+                            total_number_of_blocks_added += 1
+
+                    if total_number_of_blocks_added == 0 or self.db.get('length') != blocks[-1]['length']:
+                        # All received blocks failed. Punish the peer by lowering rank.
+                        self.db.rollback()
+                        if node_id != 'miner':
+                            self.peer_reported_false_blocks(node_id)
                     else:
-                        break
-
-                for block in blocks:
-                    add_block_result = self.add_block(block)
-                    if add_block_result == 2:  # A block that is ahead of us could not be added. No need to proceed.
-                        break
-                    elif add_block_result == 0:
-                        total_number_of_blocks_added += 1
-
-                if total_number_of_blocks_added == 0 or self.db.get('length') != blocks[-1]['length']:
-                    # All received blocks failed. Punish the peer by lowering rank.
-                    self.db.rollback()
-                    if node_id != 'miner':
-                        self.peer_reported_false_blocks(node_id)
-                else:
-                    self.db.commit()
-                    api.new_block()
-        except Exception as e:
-            tools.log(e)
-        self.set_chain_state(BlockchainService.IDLE)
-        self.blocks_queue.task_done()
-
-    @threaded
-    def process_txs(self):
-        if self.get_chain_state() == BlockchainService.SYNCING:
-            time.sleep(0.1)
-            return
+                        self.db.commit()
+                        api.new_block()
+            except Exception as e:
+                tools.log(e)
+            self.set_chain_state(BlockchainService.IDLE)
+            self.blocks_queue.task_done()
+        except queue.Empty:
+            pass
 
         try:
             candidate_tx = self.tx_queue.get(timeout=1)

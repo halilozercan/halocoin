@@ -27,7 +27,7 @@ class StateDatabase:
         self.db = self.engine.db
         self.blockchain = self.engine.blockchain
 
-    @lockit('account')
+    @lockit('blockchain')
     def get_account(self, address, apply_tx_pool=False):
         def update_account_with_txs(address, account, txs):
             """
@@ -71,12 +71,12 @@ class StateDatabase:
 
         return account
 
-    @lockit('account')
+    @lockit('blockchain')
     def remove_account(self, address):
         self.db.delete(address)
         return True
 
-    @lockit('account')
+    @lockit('blockchain')
     def update_account(self, address, new_account):
         if new_account['amount'] < 0 or new_account['stake'] < 0:
             return False
@@ -303,11 +303,9 @@ class StateDatabase:
             surplus += number_of_unconfirmed_txs(address)
         return account['count'] + surplus
 
-    @lockit('auth')
     def get_auth(self, auth_name):
         return self.db.get('auth_' + auth_name)
 
-    @lockit('auth')
     def put_auth(self, cert_pem, host, supply):
         if tools.check_certificate_chain(cert_pem):
             common_name = tools.get_commonname_from_certificate(cert_pem)
@@ -318,16 +316,13 @@ class StateDatabase:
             }
             self.db.put('auth_' + common_name, auth)
 
-    @lockit('auth')
     def update_auth(self, auth_name, auth):
         self.db.put('auth_' + auth_name, auth)
 
-    @lockit('auth')
     def delete_auth(self, cert_pem):
         common_name = tools.get_commonname_from_certificate(cert_pem)
         self.db.delete('auth_' + common_name)
 
-    @lockit('stake')
     def get_stake_pool(self):
         result = self.db.get('stake_pool')
         if result is None:
@@ -335,19 +330,16 @@ class StateDatabase:
         else:
             return set(self.db.get('stake_pool'))
 
-    @lockit('stake')
     def put_address_in_stake_pool(self, address):
         stake_pool = self.get_stake_pool()
         stake_pool.add(address)
         self.db.put('stake_pool', stake_pool)
 
-    @lockit('stake')
     def remove_address_from_stake_pool(self, address):
         stake_pool = self.get_stake_pool()
         stake_pool.remove(address)
         self.db.put('stake_pool', stake_pool)
 
-    @lockit('jobs')
     def get_available_jobs(self):
         job_list = self.db.get('job_list')
         result = {}
@@ -358,7 +350,6 @@ class StateDatabase:
                 result[job_id] = self.db.get('job_' + job_id)
         return result
 
-    @lockit('jobs')
     def get_assigned_jobs(self):
         job_list = self.db.get('job_list')
         result = {}
@@ -369,7 +360,6 @@ class StateDatabase:
                 result[job_id] = self.db.get('job_' + job_id)
         return result
 
-    @lockit('jobs')
     def add_new_job(self, job, auth, block_number):
         job['auth'] = auth
         job['status_list'] = [{
@@ -382,7 +372,6 @@ class StateDatabase:
         self.db.put('job_' + job['id'], job)
         return True
 
-    @lockit('jobs')
     def assign_job(self, job_id, address, block_number):
         job = self.db.get('job_' + job_id)
         if job['status_list'][-1]['action'] != 'add' and job['status_list'][-1]['action'] != 'unassign':
@@ -404,7 +393,6 @@ class StateDatabase:
             self.remove_address_from_stake_pool(address)
         return True
 
-    @lockit('jobs')
     def reward_job(self, job_id, address, block_number):
         job = self.db.get('job_' + job_id)
         if job['status_list'][-1]['action'] != 'assign':
@@ -423,7 +411,6 @@ class StateDatabase:
         self.update_account(address, account)
         return True
 
-    @lockit('jobs')
     def unassign_job(self, job_id, block_number):
         job = self.db.get('job_' + job_id)
         if job['status_list'][-1]['action'] != 'assign':
@@ -442,15 +429,12 @@ class StateDatabase:
         self.update_account(last_assigned_address, last_assigned_account)
         return True
 
-    @lockit('jobs')
     def get_job(self, job_id):
         return self.db.get('job_' + job_id)
 
-    @lockit('jobs')
     def update_job(self, job):
         return self.db.put('job_' + job['id'], job)
 
-    @lockit('jobs')
     def delete_job(self, job_id):
         job_list = self.db.get('job_list')
         job_list.remove(job_id)

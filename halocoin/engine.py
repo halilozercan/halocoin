@@ -4,7 +4,7 @@ import time
 
 from halocoin import api
 from halocoin import tools
-from halocoin.account import StateDatabase
+from halocoin.state import StateDatabase
 from halocoin.blockchain import BlockchainService
 from halocoin.client_db import ClientDB
 from halocoin.database import KeyValueStore
@@ -12,9 +12,10 @@ from halocoin.miner import MinerService
 from halocoin.peer_check import PeerCheckService
 from halocoin.peer_listen import PeerListenService
 from halocoin.power import PowerService
-from halocoin.service import Service, async
+from halocoin.service import Service, async, lockit
 
 
+@lockit('blockchain')
 def test_database(db):
     results = [False, False]
     response = db.put('test', 'TEST')
