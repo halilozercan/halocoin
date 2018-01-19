@@ -293,17 +293,17 @@ class BlockchainService(Service):
 
         return True
 
-    @lockit('blockchain')
+    @lockit('state')
     def get_block(self, length):
         length = str(length).zfill(12)
         return self.db.get('block_' + length)
 
-    @lockit('blockchain')
+    @lockit('state')
     def put_block(self, length, block):
         length = str(length).zfill(12)
         return self.db.put('block_' + length, block)
 
-    @lockit('blockchain')
+    @lockit('state')
     def del_block(self, length):
         length = str(length).zfill(12)
         return self.db.delete('block_' + length)
