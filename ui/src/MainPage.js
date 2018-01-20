@@ -77,7 +77,7 @@ class MainPage extends Component {
     return (
       <div>
         <AppBar
-          title="Coinami"
+          title="Halocoin"
           iconClassNameRight="muidocs-icon-navigation-expand-more"
           onLeftIconButtonClick={this.drawerToggle}
         />

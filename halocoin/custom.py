@@ -1,7 +1,7 @@
 import os
 from cdecimal import Decimal
 
-version = "0.0009c"
+version = "0.0010c"
 block_reward = 10 ** 2  # Initial block reward
 miner_core_count = -1  # -1 evaluates to number of cores
 # Lower limits on what the "time" tag in a block can say.
@@ -16,14 +16,14 @@ history_length = 720
 # total weight.
 inflection = Decimal('0.985')
 # How often to generate a block in seconds
-blocktime = 60 * 2
+blocktime = 60
 halve_at = (365 * 24 * 60 * 60 / blocktime)  # Approximately one year
 recalculate_target_at = (12*60*60 // blocktime)  # It's every half day
 
 # Precalculate
 memoized_weights = [inflection ** i for i in range(history_length)]
 
-assignment_period = 50
+assignment_period = 100
 
 first_target = '0' * 4 + 'f' * 60
 

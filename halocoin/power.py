@@ -2,6 +2,7 @@ import os
 import time
 import uuid
 
+import docker
 import requests
 import yaml
 from docker.errors import ImageNotFound
@@ -203,7 +204,6 @@ class PowerService(Service):
 
     @staticmethod
     def system_status(container_name):
-        import docker
         client = docker.from_env()
         if not client.ping():
             return Response(False, "Docker daemon is not responding")

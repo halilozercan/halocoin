@@ -57,7 +57,7 @@ def run():
         socketio.run(app, host=host, port=engine.instance.config['port']['api'])
 
     global listen_thread
-    host = os.environ.get('COINAMI_API_HOST', "localhost")
+    host = os.environ.get('HALOCOIN_API_HOST', "localhost")
     listen_thread = threading.Thread(target=thread_target, daemon=True)
     listen_thread.start()
     print("Started API on {}:{}".format(host, engine.instance.config['port']['api']))

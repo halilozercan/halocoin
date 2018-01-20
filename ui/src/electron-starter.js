@@ -14,7 +14,7 @@ let mainWindow;
 
 function createWindow() {
     // Create the browser window.
-    mainWindow = new BrowserWindow({title: 'Coinami', width: 450, height: 600, 
+    mainWindow = new BrowserWindow({title: 'Halocoin', width: 450, height: 600, 
         webPreferences: {webSecurity: false}});
 
     const startUrl = process.env.ELECTRON_START_URL || url.format({

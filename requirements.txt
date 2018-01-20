@@ -39,5 +39,4 @@ Unidecode==0.4.21
 urllib3==1.22
 Werkzeug==0.12.2
 docker
-ujson
 plyvel
