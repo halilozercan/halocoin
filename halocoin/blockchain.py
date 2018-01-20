@@ -152,9 +152,10 @@ class BlockchainService(Service):
 
     def peer_reported_false_blocks(self, node_id):
         peer = self.clientdb.get_peer(node_id)
-        peer['rank'] *= 0.8
-        peer['rank'] += 0.2 * 30
-        self.clientdb.update_peer(peer)
+        if peer is not None:
+            peer['rank'] *= 0.8
+            peer['rank'] += 0.2 * 30
+            self.clientdb.update_peer(peer)
 
     def add_tx(self, tx):
         if not isinstance(tx, dict):

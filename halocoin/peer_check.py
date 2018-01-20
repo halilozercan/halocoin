@@ -140,7 +140,8 @@ class PeerCheckService(Service):
 
         if not isinstance(txs, list):
             return -1
-        for tx in txs:
+        new_txs = list(filter(lambda t: t not in txs, T))
+        for tx in new_txs:
             self.blockchain.tx_queue.put(tx)
         return 0
 
