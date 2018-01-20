@@ -34,8 +34,7 @@ class StateDatabase:
                 owner = tools.tx_owner_address(tx)
                 if tx['type'] == 'spend':
                     if owner == address:
-                        account['amount'] -= -tx['amount']
-                        account['count'] += 1
+                        account['amount'] -= tx['amount']
                     if tx['to'] == address:
                         account['amount'] += tx['amount']
                 elif tx['type'] == 'reward':
@@ -45,12 +44,10 @@ class StateDatabase:
                     if owner == address:
                         account['amount'] -= tx['amount']
                         account['stake'] += tx['amount']
-                        account['count'] += 1
                 elif tx['type'] == 'withdraw':
                     if owner == address:
                         account['amount'] += tx['amount']
                         account['stake'] -= tx['amount']
-                        account['count'] += 1
 
             return account
 

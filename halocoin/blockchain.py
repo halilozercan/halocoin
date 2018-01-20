@@ -410,8 +410,10 @@ class BlockchainService(Service):
                 return Response(False, 'Reward or spend transactions must be addressed')
             if not BlockchainService.tx_signature_check(tx):
                 return Response(False, 'Transaction is not properly signed')
-            if len(tx['to']) <= 30:
+            if tools.is_address_valid(tx['to']):
                 return Response(False, 'Address is not valid')
+            if tx['to'] == tools.tx_owner_address(tx):
+                return Response(False, 'You cannot transfer money to same account!')
             if 'amount' not in tx or not isinstance(tx['amount'], int):
                 return Response(False, 'Transaction amount is not given or not a proper integer')
             if 'count' not in tx or not isinstance(tx['count'], int):

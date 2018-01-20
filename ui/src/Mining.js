@@ -15,7 +15,7 @@ class Mining extends Component {
         <div className="row">
           <Miner />
           <Power />
-          <Stake wallet={this.props.default_wallet}/>
+          <Stake wallet={this.props.default_wallet} notify={this.props.notify}/>
         </div>
         <div className="row">
           <JobListing notify={this.props.notify}/>
