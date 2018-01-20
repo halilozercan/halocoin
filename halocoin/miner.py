@@ -1,5 +1,4 @@
 import multiprocessing
-import queue
 import random
 import time
 from multiprocessing import Process
@@ -55,18 +54,14 @@ class MinerService(Service):
 
         possible_blocks = []
         while self.threaded_running() and (self.db.get('length')+1) == candidate_block['length']:
-            try:
-                while not self.queue.empty():
-                    possible_blocks.append(self.queue.get(timeout=0.01))
-                if len(possible_blocks) > 0:
-                    tools.log('Mined block')
-                    tools.log(possible_blocks)
-                    self.blockchain.blocks_queue.put((possible_blocks[:1], 'miner'))
-                    self.close_workers()
-            except queue.Empty:
-                pass
-
+            while not self.queue.empty():
+                possible_blocks.append(self.queue.get(timeout=0.01))
             time.sleep(1)
+            if len(possible_blocks) > 0:
+                tools.log('Mined block')
+                tools.log(possible_blocks[:1])
+                self.blockchain.blocks_queue.put((possible_blocks[:1], 'miner'))
+                break
 
     def start_workers(self, candidate_block):
         self.close_workers()
@@ -78,7 +73,6 @@ class MinerService(Service):
     def close_workers(self):
         for p in self.pool:
             p.terminate()
-            p.join()
         self.pool = []
 
     def make_block(self, prev_block, txs, pubkey):
