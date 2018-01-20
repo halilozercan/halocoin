@@ -14,7 +14,6 @@ class Mining extends Component {
       <div className="container-fluid" style={{marginTop:16, marginBottom:64}}>
         <div className="row">
           <Miner />
-          <Power />
           <Stake wallet={this.props.default_wallet} notify={this.props.notify}/>
         </div>
         <div className="row">

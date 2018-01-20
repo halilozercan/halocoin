@@ -88,6 +88,11 @@ class Engine(Service):
             self.unregister_sub_services()
             return False
 
+        if not self.power.register():
+            sys.stderr.write("Power service has failed. Exiting!\n")
+            self.unregister_sub_services()
+            return False
+
         api.run()
 
         return True
@@ -97,6 +102,9 @@ class Engine(Service):
         if self.miner.get_state() == Service.RUNNING:
             self.miner.unregister()
             running_services.add(self.miner)
+        if self.power.get_state() == Service.RUNNING:
+            self.power.unregister()
+            running_services.add(self.power)
         if self.peers_check.get_state() == Service.RUNNING:
             self.peers_check.unregister()
             running_services.add(self.peers_check)

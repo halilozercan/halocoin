@@ -285,7 +285,7 @@ class BlockchainService(Service):
             block = self.get_block(length)
             self.db.put('diffLength', block['diffLength'])
 
-        for orphan in sorted(orphans, key=lambda x: x['count']):
+        for orphan in sorted(orphans, key=lambda x: x['count'] if 'count' in x else -1):
             self.tx_queue.put(orphan)
 
         return True

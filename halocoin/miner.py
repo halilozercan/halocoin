@@ -3,9 +3,9 @@ import random
 import time
 from multiprocessing import Process
 
-from halocoin import blockchain
 from halocoin import custom
 from halocoin import tools
+from halocoin.blockchain import BlockchainService
 from halocoin.service import Service, threaded, lockit
 
 
@@ -45,7 +45,8 @@ class MinerService(Service):
 
     @threaded
     def worker(self):
-        if self.blockchain.get_chain_state() == blockchain.BlockchainService.SYNCING:
+        if not self.blockchain.tx_queue.empty() or not self.blockchain.blocks_queue.empty() or \
+                self.blockchain.get_chain_state() != BlockchainService.IDLE:
             time.sleep(1)
             return
 

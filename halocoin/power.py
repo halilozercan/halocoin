@@ -1,20 +1,14 @@
-import multiprocessing
-import queue
-import random
+import os
 import time
 import uuid
-import docker
-from multiprocessing import Process
 
-import os
-
-import pwd
 import requests
 import yaml
+from docker.errors import ImageNotFound
 
 from halocoin import blockchain
-from halocoin import custom
 from halocoin import tools
+from halocoin.ntwrk import Response
 from halocoin.service import Service, threaded, sync
 
 
@@ -33,20 +27,12 @@ class PowerService(Service):
         self.blockchain = None
         self.clientdb = None
         self.statedb = None
-        self.wallet = None
-
-    def set_wallet(self, wallet):
-        self.wallet = wallet
 
     def on_register(self):
         self.clientdb = self.engine.clientdb
         self.blockchain = self.engine.blockchain
         self.statedb = self.engine.statedb
-
-        if self.wallet is not None and hasattr(self.wallet, 'privkey'):
-            return True
-        else:
-            return False
+        return True
 
     def on_close(self):
         self.wallet = None
@@ -54,7 +40,7 @@ class PowerService(Service):
 
     @sync
     def get_job_status(self, job_id):
-        if self.clientdb.exists('local_job_repo_' + job_id):
+        if self.clientdb.get('local_job_repo_' + job_id) is not None:
             job_directory = os.path.join(self.engine.working_dir, 'jobs', job_id)
             result_file = os.path.join(job_directory, 'output', 'result.zip')
             job_file = os.path.join(job_directory, 'coinami.job.json')
@@ -83,9 +69,6 @@ class PowerService(Service):
     @sync
     def download_job(self, job_id):
         print('Downloading {}'.format(job_id))
-        # TODO: Authorities must have a job endpoint template.
-        # TODO: Add signature verification while requesting jobs to download.
-        # TODO: implementation
         job = self.statedb.get_job(job_id)
         endpoint = "http://139.179.21.17:5000/job_download/{}".format(job_id)
         job_directory = os.path.join(self.engine.working_dir, 'jobs', job_id)
@@ -189,10 +172,15 @@ class PowerService(Service):
             - Remove the downloaded files
         - Repeat
         """
-        if self.blockchain.get_chain_state() == blockchain.BlockchainService.SYNCING:
-            time.sleep(0.1)
+        if self.blockchain.get_chain_state() == blockchain.BlockchainService.SYNCING or \
+                self.clientdb.get_default_wallet() is None:
+            time.sleep(1)
             return
 
+        from halocoin.model.wallet import Wallet
+        default_wallet_info = self.clientdb.get_default_wallet()
+        encrypted_wallet_content = self.clientdb.get_wallet(default_wallet_info['wallet_name'])
+        self.wallet = Wallet.from_string(tools.decrypt(default_wallet_info['password'], encrypted_wallet_content))
         own_address = self.wallet.address
         own_account = self.statedb.get_account(own_address)
         assigned_job = own_account['assigned_job']
@@ -212,3 +200,16 @@ class PowerService(Service):
         elif job_status == 'uploaded':
             self.done_job(assigned_job)
         time.sleep(1)
+
+    @staticmethod
+    def system_status(container_name):
+        import docker
+        client = docker.from_env()
+        if not client.ping():
+            return Response(False, "Docker daemon is not responding")
+        try:
+            client.images.get(container_name)
+        except ImageNotFound:
+            return Response(False, "Image missing")
+
+        return Response(True, "Ready to go!")

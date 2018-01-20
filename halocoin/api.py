@@ -9,6 +9,7 @@ from flask_socketio import SocketIO
 
 from halocoin import tools, engine, custom
 from halocoin.blockchain import BlockchainService
+from halocoin.power import PowerService
 from halocoin.service import Service
 
 tx_queue_response = {
@@ -714,6 +715,15 @@ def status_miner():
     if status['running']:
         status['cpu'] = psutil.cpu_percent()
     return generate_json_response(status)
+
+
+@app.route('/power_available')
+def power_available():
+    status = PowerService.system_status(engine.instance.config['coinami']['container'])
+    return generate_json_response({
+        "success": status.getFlag(),
+        "message": status.getData()
+    })
 
 
 @app.route('/start_power', methods=['GET', 'POST'])

@@ -37,7 +37,10 @@ class Send extends Component {
 
     axiosInstance.post('/send', data)
       .then((response) => {
-        this.props.notify('Your transaction is successfully added to the pool', 'success');
+        if(response.data.success)
+          this.props.notify('Your transaction is successfully added to the pool', 'success');
+        else
+          this.props.notify(response.data.message, 'error');
       })
       .catch((error) => {
         this.props.notify('Something is wrong. Transaction failed!', 'error');

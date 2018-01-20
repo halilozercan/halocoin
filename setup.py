@@ -4,7 +4,7 @@ from distutils.core import setup
 from setuptools import find_packages
 
 setup(
-    name='Coinami',
+    name='Halocoin',
     version='0.0.1',
     description='Read mapping incentivized cryptocurrency. Branch of halilozercan/halocoin',
     author='H. Ibrahim Ozercan',
@@ -12,7 +12,7 @@ setup(
     url='https://github.com/halilozercan/halocoin',
     entry_points={
         'console_scripts': [
-            'coinamid = halocoin.cli:main'
+            'halocoin = halocoin.cli:main'
         ],
     },
     include_package_data=True,
