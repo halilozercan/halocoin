@@ -7,10 +7,10 @@ import requests
 import yaml
 from docker.errors import ImageNotFound
 
-from halocoin import blockchain
+from halocoin import blockchain, api
 from halocoin import tools
 from halocoin.ntwrk import Response
-from halocoin.service import Service, threaded, sync
+from halocoin.service import Service, threaded, sync, lockit
 
 
 class PowerService(Service):
@@ -28,6 +28,7 @@ class PowerService(Service):
         self.blockchain = None
         self.clientdb = None
         self.statedb = None
+        self.status = "Loading"
 
     def on_register(self):
         self.clientdb = self.engine.clientdb
@@ -60,6 +61,15 @@ class PowerService(Service):
         else:
             return "null"
 
+    @lockit('power')
+    def get_status(self):
+        return self.status
+
+    @lockit('power')
+    def set_status(self, status):
+        self.status = status
+        api.power_status()
+
     @sync
     def initiate_job(self, job_id):
         print('Assigned {}'.format(job_id))
@@ -85,13 +95,17 @@ class PowerService(Service):
         r = requests.get(endpoint, stream=True, data={
             'payload': payload
         })
+        downloaded = 0
         with open(job_file, 'wb') as f:
             for chunk in r.iter_content(chunk_size=1024 * 1024):
                 if chunk:  # filter out keep-alive new chunks
                     f.write(chunk)
+                    downloaded += 1024*1024
+                    self.set_status("Downloading... {}".format(tools.readable_bytes(downloaded)))
         if os.path.exists(job_file):
             import zipfile
             zip_ref = zipfile.ZipFile(job_file, 'r')
+            self.set_status("Decompressing...")
             zip_ref.extractall(job_directory)
             zip_ref.close()
             entry = self.clientdb.get('local_job_repo_' + job_id)
@@ -104,6 +118,7 @@ class PowerService(Service):
     @sync
     def execute_job(self, job_id):
         print('Executing {}'.format(job_id))
+        self.set_status("Executing...")
         import docker
         client = docker.from_env()
         job_directory = os.path.join(self.engine.working_dir, 'jobs', job_id)
@@ -118,6 +133,7 @@ class PowerService(Service):
             output_directory: {'bind': '/output', 'mode': 'rw'}
         })
         if os.path.exists(result_file):
+            self.set_status("Executed...")
             entry = self.clientdb.get('local_job_repo_' + job_id)
             entry['status'] = 'executed'
             self.clientdb.put('local_job_repo_' + job_id, entry)
@@ -128,6 +144,7 @@ class PowerService(Service):
     @sync
     def upload_job(self, job_id):
         print('Uploading {}'. format(job_id))
+        self.set_status("Uploading...")
         job = self.statedb.get_job(job_id)
         endpoint = "http://139.179.21.17:5000/job_upload/{}".format(job_id)
         result_directory = os.path.join(self.engine.working_dir, 'jobs', job_id, 'output')
@@ -146,6 +163,7 @@ class PowerService(Service):
         r = requests.post(endpoint, files=files, data=values)
         if r.status_code == 200 and r.json()['success']:
             entry = self.clientdb.get('local_job_repo_' + job_id)
+            self.set_status("Uploaded and Rewarded!")
             entry['status'] = 'uploaded'
             self.clientdb.put('local_job_repo_' + job_id, entry)
 
@@ -154,6 +172,7 @@ class PowerService(Service):
         job = self.statedb.get_job(job_id)
         job_directory = os.path.join(self.engine.working_dir, 'jobs', job_id)
         if os.path.exists(job_directory):
+            self.set_status("Cleaning job...")
             import shutil
             shutil.rmtree(job_directory)
 
@@ -187,13 +206,16 @@ class PowerService(Service):
         own_account = self.statedb.get_account(own_address)
         assigned_job = own_account['assigned_job']
         if assigned_job == '':
+            self.set_status("No assignment!")
             time.sleep(5)
             return
 
         job_status = self.get_job_status(assigned_job)
         if job_status == 'null':
+            self.set_status("Job assigned! Initializing...")
             self.initiate_job(assigned_job)
         elif job_status == 'assigned':
+            self.set_status("Downloading...")
             self.download_job(assigned_job)
         elif job_status == 'downloaded':
             self.execute_job(assigned_job)

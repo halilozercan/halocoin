@@ -14,7 +14,7 @@ let mainWindow;
 
 function createWindow() {
     // Create the browser window.
-    mainWindow = new BrowserWindow({title: 'Halocoin', width: 450, height: 600, 
+    mainWindow = new BrowserWindow({title: 'Halocoin', width: 840, height: 640, 
         webPreferences: {webSecurity: false}});
 
     const startUrl = process.env.ELECTRON_START_URL || url.format({
@@ -54,7 +54,7 @@ app.on('activate', function () {
 let pyProc = null;
 
 const createPyProc = () => {
-  let python_exec = path.join(__dirname, '../coinami');
+  let python_exec = path.join(__dirname, '../halocoin');
   console.log('Executable location: ' + python_exec);
   pyProc = require('child_process').spawn(python_exec, ['start']);
   if (pyProc != null) {
@@ -69,8 +69,8 @@ const exitPyProc = () => {
   pyPort = null
 }
 
-//app.on('ready', createPyProc);
-app.on('ready', createWindow);
+app.on('ready', createPyProc);
+//app.on('ready', createWindow);
 app.on('will-quit', exitPyProc);
 
 // In this file you can include the rest of your app's specific main process

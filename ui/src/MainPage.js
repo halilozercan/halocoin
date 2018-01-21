@@ -72,7 +72,7 @@ class MainPage extends Component {
       currentPage = <WalletManagement notify={this.props.notify} default_wallet={this.state.default_wallet} />;
     }
     else if(this.state.page === 'mining') {
-      currentPage = <Mining notify={this.props.notify} default_wallet={this.state.default_wallet} />
+      currentPage = <Mining notify={this.props.notify} default_wallet={this.state.default_wallet} socket={this.props.socket} />
     }
     return (
       <div>

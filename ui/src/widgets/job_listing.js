@@ -55,7 +55,7 @@ class JobListing extends Component {
         console.log(this.state.data[_row]);
         return <TableRow>
           <TableHeaderColumn>{this.state.data[_row].auth}</TableHeaderColumn>
-          <TableHeaderColumn>{this.state.data[_row].id}</TableHeaderColumn>
+          <TableHeaderColumn>{this.state.data[_row].id.substr(0,8)}</TableHeaderColumn>
           <TableHeaderColumn>{this.state.data[_row].amount}</TableHeaderColumn>
           <TableHeaderColumn>{this.state.data[_row].status_list[0].block}</TableHeaderColumn>
         </TableRow>

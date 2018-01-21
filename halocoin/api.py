@@ -6,6 +6,8 @@ import threading
 import psutil as psutil
 from flask import Flask, request, Response, send_file
 from flask_socketio import SocketIO
+# WARNING! Do not remove below import line. PyInstaller depends on it
+from engineio import async_threading
 
 from halocoin import tools, engine, custom
 from halocoin.blockchain import BlockchainService
@@ -768,19 +770,9 @@ def stop_power():
 
 @app.route('/status_power', methods=['GET', 'POST'])
 def status_power():
-    from halocoin.model.wallet import Wallet
-    status = {
-        'running': engine.instance.power.get_state() == Service.RUNNING,
-        'assigned': ''
-    }
-    default_wallet_props = engine.instance.clientdb.get_default_wallet()
-    default_wallet = engine.instance.clientdb.get_wallet(default_wallet_props['wallet_name'])
-    default_wallet = Wallet.from_string(tools.decrypt(default_wallet_props['password'], default_wallet))
-    own_address = default_wallet.address
-    own_account = engine.instance.statedb.get_account(own_address)
-    assigned_job = own_account['assigned_job']
-    status['assigned'] = assigned_job
-    return generate_json_response(status)
+    return generate_json_response({
+        "status": engine.instance.power.get_status()
+    })
 
 
 def generate_json_response(obj):
@@ -802,3 +794,7 @@ def peer_update():
 
 def new_tx_in_pool():
     socketio.emit('new_tx_in_pool')
+
+
+def power_status():
+    socketio.emit('power_status')

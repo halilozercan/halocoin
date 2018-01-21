@@ -98,7 +98,7 @@ class Stake extends Component {
     ];
 
     return (
-      <div className="col-lg-3 col-md-6 col-sm-6">
+      <div className="col-lg-6 col-md-12 col-sm-12">
         <Card style={{width:"100%"}}>
           <CardHeader
             title="Stake in Pool"

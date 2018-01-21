@@ -66,7 +66,7 @@ class Miner extends Component {
       progressBar = <LinearProgress style={{marginTop:16}} mode="determinate" value={this.state.cpu} max={100} />;
     }
     return (
-      <div className="col-lg-6 col-md-12 col-sm-12">
+      <div className="col-lg-6 col-md-6 col-sm-6">
         <div className="card card-stats">
           <div className="card-header" data-background-color={color}>
             <i className="material-icons">build</i>
