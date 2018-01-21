@@ -154,7 +154,8 @@ class PowerService(Service):
         job = self.statedb.get_job(job_id)
         job_directory = os.path.join(self.engine.working_dir, 'jobs', job_id)
         if os.path.exists(job_directory):
-            os.removedirs(job_directory)
+            import shutil
+            shutil.rmtree(job_directory)
 
         entry = self.clientdb.get('local_job_repo_' + job_id)
         entry['status'] = 'done'

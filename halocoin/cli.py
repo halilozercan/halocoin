@@ -327,14 +327,6 @@ def stop(args):
 
 @action
 def start_miner(args):
-    if args.wallet_name is None:
-        sys.stderr.write("Please provide a wallet which will be rewarded for mining\n")
-        return
-    from getpass import getpass
-    if args.pw is None:
-        wallet_pw = getpass('Wallet password: ')
-    else:
-        wallet_pw = args.pw
     print(make_api_request(args.action, wallet_name=args.wallet_name, password=wallet_pw))
 
 
