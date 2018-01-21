@@ -219,10 +219,13 @@ class StateDatabase:
             for job in assigned_jobs:
                 self.unassign_job(job['id'], block['length'])
 
-            available_jobs = sorted(self.get_available_jobs().values(), key=lambda x: x['amount'], reverse=True)
+            available_jobs = sorted(self.get_available_jobs().values(),
+                                    key=lambda x: (x['amount'], x['id']),
+                                    reverse=True)
+
             accounts = [(self.get_account(address), address) for address in self.get_stake_pool()]
             accounts = sorted(accounts,
-                              key=lambda x: x[0]['stake'],
+                              key=lambda x: (x[0]['stake'], x[1]),
                               reverse=True)
             ji = 0
             ai = 0
