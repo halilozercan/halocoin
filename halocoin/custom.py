@@ -93,7 +93,8 @@ def generate_default_config():
 
     config["coinami"] = {
         "docker": "/usr/bin/docker",
-        "container": "coinami/power"
+        "container": "coinami/power",
+        "cores": -1
     }
     return config
 

@@ -126,7 +126,7 @@ class StateDatabase:
 
             self.reward_job(tx['job_id'], tx['to'], block_length)
 
-            recv_account = self.get_account(tx['to'])
+            recv_account['assigned_job'] = ''
             recv_account['amount'] += job['amount']
             recv_account['tx_blocks'].append(block_length)
             self.update_account(tx['to'], recv_account)
@@ -431,20 +431,13 @@ class StateDatabase:
 
     def reward_job(self, job_id, address, block_number):
         job = self.db.get('job_' + job_id)
-        if job['status_list'][-1]['action'] != 'assign':
-            return False
-        account = self.get_account(address)
-        if account['assigned_job'] != job_id:
-            return False
 
         job['status_list'].append({
             'action': 'reward',
             'block': block_number,
             'address': address
         })
-        account['assigned_job'] = ''
         self.db.put('job_' + job_id, job)
-        self.update_account(address, account)
         return True
 
     def unassign_job(self, job_id, block_number):

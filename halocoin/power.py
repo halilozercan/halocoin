@@ -108,6 +108,12 @@ class PowerService(Service):
             self.set_status("Decompressing...")
             zip_ref.extractall(job_directory)
             zip_ref.close()
+            if os.path.exists(os.path.join(job_directory, 'coinami.job.json')) and \
+                            self.engine.config['coinami']['cores'] > 0:
+                import json
+                job_desc = json.load(open(os.path.join(job_directory, 'coinami.job.json')))
+                job_desc['threads'] = self.engine.config['coinami']['cores']
+                json.dump(job_desc, open(os.path.join(job_directory, 'coinami.job.json'), 'w'))
             entry = self.clientdb.get('local_job_repo_' + job_id)
             entry['status'] = 'downloaded'
             self.clientdb.put('local_job_repo_' + job_id, entry)
