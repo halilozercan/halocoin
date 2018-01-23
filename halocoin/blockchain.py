@@ -171,7 +171,8 @@ class BlockchainService(Service):
         if not integrity_check.getFlag():
             return Response(False, 'Transaction failed integrity check: ' + integrity_check.getData())
         self.db.simulate()
-        current_state_check = self.statedb.update_database_with_tx(tx, self.db.get('length')+1, count_pool=True)
+        _tx = copy.deepcopy(tx)
+        current_state_check = self.statedb.update_database_with_tx(_tx, self.db.get('length')+1, count_pool=True)
         self.db.rollback()
         if not current_state_check:
             return Response(False, 'Transaction failed current state check')
@@ -237,12 +238,10 @@ class BlockchainService(Service):
             tools.log('Received block includes wrong amount of mint txs')
             return 3
 
-        flag = True
         for tx in block['txs']:
-            flag &= BlockchainService.tx_integrity_check(tx).getFlag()
-        if not flag:
-            tools.log('Received block failed special txs check.')
-            return 3
+            if not BlockchainService.tx_integrity_check(tx).getFlag():
+                tools.log('Received block failed special txs check.')
+                return 3
 
         if not self.statedb.update_database_with_block(block):
             return 3

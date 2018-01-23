@@ -528,7 +528,7 @@ def job_dump():
 
     tx['pubkeys'] = [privkey.get_verifying_key().to_string()]  # We use pubkey as string
     tx['signatures'] = [tools.sign(tools.det_hash(tx), privkey)]
-    tx_queue_response['event'] = threading.Event()
+    #tx_queue_response['event'] = threading.Event()
     engine.instance.blockchain.tx_queue.put(tx)
     #tx_queue_response['event'].wait()
     #response["success"] = tx_queue_response['message'].getFlag()

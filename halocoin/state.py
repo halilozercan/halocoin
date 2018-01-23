@@ -77,7 +77,6 @@ class StateDatabase:
         return True
 
     def update_database_with_tx(self, tx, block_length, count_pool=False):
-        tx = copy.deepcopy(tx)
         send_address = tools.tx_owner_address(tx)
         send_account = self.get_account(send_address)
 
