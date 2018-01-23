@@ -74,9 +74,17 @@ def generate_default_config():
                 'rank': 1,
                 'diffLength': '',
                 'length': -1
+            },
+            {
+                'node_id': '52e6eb49-6d59-4bf3-af96-ca3252408a4e',
+                'ip': '139.179.21.17',
+                'port': 7002,
+                'rank': 1,
+                'diffLength': '',
+                'length': -1
             }
         ],
-        "download_limit": 50
+        "download_limit": 190
     }
 
     config["miner"] = {
