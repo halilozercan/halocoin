@@ -1,14 +1,29 @@
 import React, { Component } from 'react';
 import axios from "axios";
 import Paper from 'material-ui/Paper';
+import Chip from 'material-ui/Chip';
+import FontIcon from 'material-ui/FontIcon';
+import Avatar from 'material-ui/Avatar';
+import Snackbar from 'material-ui/Snackbar';
 
 const bottomBarStyle = {
   position: 'fixed', 
+  backgroundColor: '#EEEEEE',
   left: 0, 
   bottom: 0,
-  zIndex: 150,
+  zIndex: 100,
   width: '100%',
   padding: 16
+};
+
+const styles = {
+  chip: {
+    margin: 4,
+  },
+  wrapper: {
+    display: 'flex',
+    flexWrap: 'wrap',
+  },
 };
 
 class Blockcount extends Component {
@@ -54,11 +69,25 @@ class Blockcount extends Component {
 
   render() {
     return (
-      <Paper style={bottomBarStyle}  zDepth={1}>
-        Blockcount: {this.state.length}/{this.state.known_length}
-        <p style={{"float":"right"}}>
-        Waiting Transactions: {this.state.tx_pool_size}
-        </p>
+      <Paper style={bottomBarStyle}  zDepth={5}>
+        <div style={{"float":"left"}}>
+          <Chip
+            onClick={() => {this.props.notify("How many blocks are downloaded / How many exist.");}}
+            style={styles.chip}
+          >
+            <Avatar icon={<FontIcon className="material-icons">view_headline</FontIcon>} />
+            Blockcount: {this.state.length}/{this.state.known_length}
+          </Chip>
+        </div>
+        <div style={{"float":"right"}}>
+          <Chip
+            onClick={() => {this.props.notify("Number of transactions that are waiting in the pool.")}}
+            style={styles.chip}
+          >
+            <Avatar icon={<FontIcon className="material-icons">compare_arrows</FontIcon>} />
+            Waiting Transactions: {this.state.tx_pool_size}
+          </Chip>
+        </div>
       </Paper>
     );
   }

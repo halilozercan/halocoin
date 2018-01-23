@@ -3,6 +3,9 @@ import {axiosInstance} from '../tools.js';
 import {Card, CardActions, CardHeader, CardText} from 'material-ui/Card';
 import RaisedButton from 'material-ui/RaisedButton';
 import TextField from 'material-ui/TextField';
+import Avatar from 'material-ui/Avatar';
+import FontIcon from 'material-ui/FontIcon';
+import {yellow800} from 'material-ui/styles/colors';
 
 class Send extends Component {
 
@@ -56,6 +59,7 @@ class Send extends Component {
     return (
       <Card style={{"margin":16}}>
         <CardHeader
+          avatar={<Avatar backgroundColor={yellow800} icon={<FontIcon className="material-icons">credit_card</FontIcon>} />}
           title="Send coins"
           subtitle="Make a transaction"
         />

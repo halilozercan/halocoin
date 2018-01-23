@@ -6,13 +6,13 @@ import threading
 import psutil as psutil
 from flask import Flask, request, Response, send_file
 from flask_socketio import SocketIO
-# WARNING! Do not remove below import line. PyInstaller depends on it
-from engineio import async_threading
 
 from halocoin import tools, engine, custom
 from halocoin.blockchain import BlockchainService
 from halocoin.power import PowerService
 from halocoin.service import Service
+
+# WARNING! Do not remove below import line. PyInstaller depends on it
 
 tx_queue_response = {
     "result": None,
@@ -721,7 +721,10 @@ def status_miner():
 
 @app.route('/power_available')
 def power_available():
-    status = PowerService.system_status(engine.instance.config['coinami']['container'])
+    try:
+        status = PowerService.system_status(engine.instance.config['coinami']['container'])
+    except:
+        status = Response(False, 'Docker is missing')
     return generate_json_response({
         "success": status.getFlag(),
         "message": status.getData()
@@ -798,3 +801,7 @@ def new_tx_in_pool():
 
 def power_status():
     socketio.emit('power_status')
+
+
+def miner_status():
+    socketio.emit('miner_status')

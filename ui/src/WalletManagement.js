@@ -9,8 +9,12 @@ class WalletManagement extends Component {
     return (
       <div className="container-fluid" style={{marginTop:16, marginBottom:64}}>
         <div className="row">
-          <Balance wallet={this.props.default_wallet} notify={this.props.notify} />
-          <Address wallet={this.props.default_wallet} notify={this.props.notify} />
+          <div className="col-lg-3 col-md-6 col-sm-6">
+            <Balance wallet={this.props.default_wallet} notify={this.props.notify} />
+          </div>
+          <div className="col-lg-3 col-md-6 col-sm-6">
+            <Address wallet={this.props.default_wallet} notify={this.props.notify} />
+          </div>
         </div>
         <div className="row">
           <Send notify={this.props.notify} refresh={this.forceUpdate}/>

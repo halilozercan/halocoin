@@ -2,9 +2,9 @@ import React, { Component } from 'react';
 import MuiThemeProvider from 'material-ui/styles/MuiThemeProvider';
 import MainPage from './MainPage.js';
 import ChooseWallet from './ChooseWallet.js';
-import NotificationSystem from 'react-notification-system';
 import io from 'socket.io-client';
 import axios from 'axios';
+import Snackbar from 'material-ui/Snackbar';
 
 
 class App extends Component {
@@ -28,8 +28,6 @@ class App extends Component {
   }
 
   componentDidMount() {
-    this._notificationSystem = this.refs.notificationSystem;
-
     axios.get('/').then((response) => {
       this.setState((state) => {
         state.status = 'running';
@@ -73,12 +71,26 @@ class App extends Component {
     });
   }
 
-  notify(message, type, pos='bc') {
-    this._notificationSystem.addNotification({
+  sleep = (time) => {
+    return new Promise((resolve) => setTimeout(resolve, time));
+  }
+
+  notify = (message, type, pos='bc') => {
+    /*this._notificationSystem.addNotification({
       message: message,
       level: type,
       position: pos
-    });
+    });*/
+    this.setState({
+      notificationOpen: true,
+      notificationMessage: message
+    })
+  }
+
+  handleRequestClose = () => {
+    this.setState({
+      notificationOpen: false
+    })
   }
 
   render() {
@@ -105,7 +117,12 @@ class App extends Component {
           <div className="content">
             {page}
           </div>
-          <NotificationSystem ref="notificationSystem" />
+          <Snackbar
+            open={this.state.notificationOpen}
+            message={this.state.notificationMessage}
+            autoHideDuration={4000}
+            onRequestClose={this.handleRequestClose}
+          />
         </div>
       </MuiThemeProvider>
     );

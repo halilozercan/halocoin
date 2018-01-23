@@ -14,7 +14,7 @@ let mainWindow;
 
 function createWindow() {
     // Create the browser window.
-    mainWindow = new BrowserWindow({title: 'Halocoin', width: 840, height: 640, 
+    mainWindow = new BrowserWindow({title: 'Halocoin', width: 900, height: 660, 
         webPreferences: {webSecurity: false}});
 
     const startUrl = process.env.ELECTRON_START_URL || url.format({
@@ -69,8 +69,8 @@ const exitPyProc = () => {
   pyPort = null
 }
 
-app.on('ready', createPyProc);
-//app.on('ready', createWindow);
+//app.on('ready', createPyProc);
+app.on('ready', createWindow);
 app.on('will-quit', exitPyProc);
 
 // In this file you can include the rest of your app's specific main process

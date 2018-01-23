@@ -74,10 +74,14 @@ class MainPage extends Component {
     else if(this.state.page === 'mining') {
       currentPage = <Mining notify={this.props.notify} default_wallet={this.state.default_wallet} socket={this.props.socket} />
     }
+    let title = "Halocoin";
+    if(this.state.default_wallet !== null) {
+      title += " - " + this.state.default_wallet.name;
+    }
     return (
       <div>
         <AppBar
-          title="Halocoin"
+          title={title}
           iconClassNameRight="muidocs-icon-navigation-expand-more"
           onLeftIconButtonClick={this.drawerToggle}
         />
@@ -87,7 +91,7 @@ class MainPage extends Component {
           <MenuItem leftIcon={<Lock />} onClick={this.onLogout}>Logout</MenuItem>
         </Drawer>
         {currentPage}
-        <Blockcount socket={this.props.socket}/>
+        <Blockcount socket={this.props.socket} notify={this.props.notify}/>
       </div>
     );
   }

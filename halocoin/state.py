@@ -76,6 +76,118 @@ class StateDatabase:
         self.db.put(address, new_account)
         return True
 
+    def update_database_with_tx(self, tx, block_length):
+        send_address = tools.tx_owner_address(tx)
+        send_account = self.get_account(send_address)
+
+        if tx['type'] == 'mint':
+            send_account['amount'] += tools.block_reward(block_length)
+            self.update_account(send_address, send_account)
+        elif tx['type'] == 'spend':
+            if tx['count'] != self.known_tx_count(send_address, count_pool=False):
+                return False
+
+            recv_address = tx['to']
+            recv_account = self.get_account(recv_address)
+
+            send_account['amount'] -= tx['amount']
+            send_account['count'] += 1
+            send_account['tx_blocks'].append(block_length)
+
+            recv_account['amount'] += tx['amount']
+            recv_account['tx_blocks'].append(block_length)
+
+            if (recv_account['amount'] < 0) or (send_account['amount'] < 0):
+                return False
+
+            self.update_account(send_address, send_account)
+            self.update_account(recv_address, recv_account)
+        elif tx['type'] == 'reward':
+            auth = self.get_auth(tx['auth'])
+            if auth is None:
+                return False
+            if tx['pubkeys'] != [tools.get_pubkey_from_certificate(auth['certificate']).to_string()]:
+                return False
+            job = self.db.get('job_' + tx['job_id'])
+            last_change = job['status_list'][-1]
+            # This job is not assigned to anyone right now.
+            if last_change['action'] != 'assign':
+                return False
+            # Reward address is not currently assigned to the job.
+            if last_change['address'] != tx['to']:
+                return False
+            if job['auth'] != tx['auth']:
+                return False
+
+            recv_account = self.get_account(tx['to'])
+            # Receiving account does not have the same assignment
+            if recv_account['assigned_job'] != tx['job_id']:
+                return False
+
+            self.reward_job(tx['job_id'], tx['to'], block_length)
+
+            recv_account = self.get_account(tx['to'])
+            recv_account['amount'] += job['amount']
+            recv_account['tx_blocks'].append(block_length)
+            self.update_account(tx['to'], recv_account)
+        elif tx['type'] == 'auth_reg':
+            cert_valid = tools.check_certificate_chain(tx['certificate'])
+            common_name = tools.get_commonname_from_certificate(tx['certificate'])
+            early_reg = self.get_auth(common_name) is None
+            if not cert_valid or not early_reg:
+                return False
+
+            self.put_auth(tx['certificate'], tx['host'], tx['supply'])
+        elif tx['type'] == 'job_dump':
+            # Check if auth is known
+            auth = self.get_auth(tx['auth'])
+            if auth is None:
+                return False
+            elif tx['pubkeys'] != [tools.get_pubkey_from_certificate(auth['certificate']).to_string()]:
+                return False
+            # Check if job already exists
+            if self.db.exists('job_' + tx['job']['id']):
+                return False
+
+            # Check if authority has remaining supply
+            if auth['supply'] < tx['job']['amount']:
+                return False
+            auth['supply'] -= tx['job']['amount']
+
+            self.add_new_job(tx['job'], tx['auth'], block_length)
+            self.update_auth(tx['auth'], auth)
+        elif tx['type'] == 'deposit':
+            if tx['count'] != self.known_tx_count(send_address, count_pool=False):
+                return False
+            send_account['amount'] -= tx['amount']
+            send_account['stake'] += tx['amount']
+            send_account['count'] += 1
+            send_account['tx_blocks'].append(block_length)
+
+            if not (send_account['amount'] >= 0) and (send_account['stake'] >= 0):
+                return False
+
+            self.update_account(send_address, send_account)
+            if send_account['stake'] > 0:
+                self.put_address_in_stake_pool(send_address)
+        elif tx['type'] == 'withdraw':
+            if tx['count'] != self.known_tx_count(send_address, count_pool=False):
+                return False
+            send_account['amount'] += tx['amount']
+            send_account['stake'] -= tx['amount']
+            send_account['count'] += 1
+            send_account['tx_blocks'].append(block_length)
+
+            if not (send_account['amount'] >= 0) and (send_account['stake'] >= 0):
+                return False
+
+            self.update_account(send_address, send_account)
+            if send_account['stake'] == 0:
+                self.remove_address_from_stake_pool(send_address)
+        else:
+            return False
+        return True
+
     def update_database_with_block(self, block):
         """
         This method should only be called after block passes every check.
@@ -87,113 +199,9 @@ class StateDatabase:
         txs = sorted(block['txs'], key=lambda x: x['count'] if 'count' in x else -1)
 
         for tx in txs:
-            send_address = tools.tx_owner_address(tx)
-            send_account = self.get_account(send_address)
-
-            if tx['type'] == 'mint':
-                send_account['amount'] += tools.block_reward(block['length'])
-                self.update_account(send_address, send_account)
-            elif tx['type'] == 'spend':
-                if tx['count'] != self.known_tx_count(send_address, count_pool=False):
-                    return False
-
-                recv_address = tx['to']
-                recv_account = self.get_account(recv_address)
-
-                send_account['amount'] -= tx['amount']
-                send_account['count'] += 1
-                send_account['tx_blocks'].append(block['length'])
-
-                recv_account['amount'] += tx['amount']
-                recv_account['tx_blocks'].append(block['length'])
-
-                if (recv_account['amount'] < 0) or (send_account['amount'] < 0):
-                    return False
-
-                self.update_account(send_address, send_account)
-                self.update_account(recv_address, recv_account)
-            elif tx['type'] == 'reward':
-                auth = self.get_auth(tx['auth'])
-                if auth is None:
-                    return False
-                if tx['pubkeys'] != [tools.get_pubkey_from_certificate(auth['certificate']).to_string()]:
-                    return False
-                job = self.db.get('job_' + tx['job_id'])
-                last_change = job['status_list'][-1]
-                # This job is not assigned to anyone right now.
-                if last_change['action'] != 'assign':
-                    return False
-                # Reward address is not currently assigned to the job.
-                if last_change['address'] != tx['to']:
-                    return False
-                if job['auth'] != tx['auth']:
-                    return False
-
-                recv_account = self.get_account(tx['to'])
-                # Receiving account does not have the same assignment
-                if recv_account['assigned_job'] != tx['job_id']:
-                    return False
-
-                self.reward_job(tx['job_id'], tx['to'], block['length'])
-
-                recv_account = self.get_account(tx['to'])
-                recv_account['amount'] += job['amount']
-                recv_account['tx_blocks'].append(block['length'])
-                self.update_account(tx['to'], recv_account)
-            elif tx['type'] == 'auth_reg':
-                cert_valid = tools.check_certificate_chain(tx['certificate'])
-                common_name = tools.get_commonname_from_certificate(tx['certificate'])
-                early_reg = self.get_auth(common_name) is None
-                if not cert_valid or not early_reg:
-                    return False
-
-                self.put_auth(tx['certificate'], tx['host'], tx['supply'])
-            elif tx['type'] == 'job_dump':
-                # Check if auth is known
-                auth = self.get_auth(tx['auth'])
-                if auth is None:
-                    return False
-                elif tx['pubkeys'] != [tools.get_pubkey_from_certificate(auth['certificate']).to_string()]:
-                    return False
-                # Check if job already exists
-                if self.db.exists('job_' + tx['job']['id']):
-                    return False
-
-                # Check if authority has remaining supply
-                if auth['supply'] < tx['job']['amount']:
-                    return False
-                auth['supply'] -= tx['job']['amount']
-
-                self.add_new_job(tx['job'], tx['auth'], block['length'])
-                self.update_auth(tx['auth'], auth)
-            elif tx['type'] == 'deposit':
-                if tx['count'] != self.known_tx_count(send_address, count_pool=False):
-                    return False
-                send_account['amount'] -= tx['amount']
-                send_account['stake'] += tx['amount']
-                send_account['count'] += 1
-                send_account['tx_blocks'].append(block['length'])
-
-                if not (send_account['amount'] >= 0) and (send_account['stake'] >= 0):
-                    return False
-
-                self.update_account(send_address, send_account)
-                if send_account['stake'] > 0:
-                    self.put_address_in_stake_pool(send_address)
-            elif tx['type'] == 'withdraw':
-                if tx['count'] != self.known_tx_count(send_address, count_pool=False):
-                    return False
-                send_account['amount'] += tx['amount']
-                send_account['stake'] -= tx['amount']
-                send_account['count'] += 1
-                send_account['tx_blocks'].append(block['length'])
-
-                if not (send_account['amount'] >= 0) and (send_account['stake'] >= 0):
-                    return False
-
-                self.update_account(send_address, send_account)
-                if send_account['stake'] == 0:
-                    self.remove_address_from_stake_pool(send_address)
+            result = self.update_database_with_tx(tx, block['length'])
+            if not result:
+                return False
         """
         # We go over the list of requested jobs in a deterministic way. Thus,
         # every client will agree on how to evaluate multiple job bidding at the same block.

@@ -84,6 +84,7 @@ class BlockchainService(Service):
                             break
                         elif add_block_result == 0:
                             total_number_of_blocks_added += 1
+                            api.new_block()
 
                     if total_number_of_blocks_added == 0 or self.db.get('length') != blocks[-1]['length']:
                         # All received blocks failed. Punish the peer by lowering rank.
@@ -92,7 +93,6 @@ class BlockchainService(Service):
                             self.peer_reported_false_blocks(node_id)
                     else:
                         self.db.commit()
-                        api.new_block()
             except Exception as e:
                 tools.log(e)
             self.blocks_queue.task_done()
@@ -196,7 +196,7 @@ class BlockchainService(Service):
         elif int(block['length']) > int(length) + 1:
             return 2
 
-        tools.echo('add block')
+        tools.echo('add block: ' + str(block['length']))
 
         if (length >= 0 and block['diffLength'] != tools.hex_sum(block_at_length['diffLength'],
                                                                  tools.hex_invert(block['target']))) \
@@ -260,7 +260,7 @@ class BlockchainService(Service):
         for orphan in sorted(orphans, key=lambda x: x['count'] if 'count' in x else -1):
             self.tx_queue.put(orphan)
 
-        tools.techo('add block')
+        tools.techo('add block: ' + str(block['length']))
         return 0
 
     def delete_block(self):

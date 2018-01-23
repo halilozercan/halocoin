@@ -327,7 +327,7 @@ def stop(args):
 
 @action
 def start_miner(args):
-    print(make_api_request(args.action, wallet_name=args.wallet_name, password=wallet_pw))
+    print(make_api_request(args.action, wallet_name=args.wallet_name, password=args.pw))
 
 
 @action

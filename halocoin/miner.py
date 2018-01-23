@@ -3,7 +3,7 @@ import random
 import time
 from multiprocessing import Process
 
-from halocoin import custom
+from halocoin import custom, api
 from halocoin import tools
 from halocoin.blockchain import BlockchainService
 from halocoin.service import Service, threaded, lockit
@@ -55,6 +55,7 @@ class MinerService(Service):
 
         possible_blocks = []
         while self.threaded_running() and (self.db.get('length')+1) == candidate_block['length']:
+            api.miner_status()
             while not self.queue.empty():
                 possible_blocks.append(self.queue.get(timeout=0.01))
             time.sleep(1)

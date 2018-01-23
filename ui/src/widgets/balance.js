@@ -1,5 +1,9 @@
 import React, { Component } from 'react';
 import {MCardStats} from '../components/card.js';
+import {Card, CardActions, CardHeader, CardMedia, CardTitle, CardText} from 'material-ui/Card';
+import Avatar from 'material-ui/Avatar';
+import FontIcon from 'material-ui/FontIcon';
+import {red500, green500} from 'material-ui/styles/colors';
 
 class Balance extends Component {
 
@@ -8,14 +12,18 @@ class Balance extends Component {
     let name = "";
     if(this.props.wallet !== null){
       balance = this.props.wallet.balance;
+      console.log(balance);
       name = this.props.wallet.name;
     }
-    return (       
-      <div className="col-lg-6 col-md-12 col-sm-12">
-        <MCardStats color="green" header_icon="trending_up" title="Balance"
-         content={balance}
-         footer_icon="local_offer" alt_text={"Belongs to: " + name}/>
-      </div>
+    return (
+      <Card>
+        <CardHeader
+          title="Balance"
+          subtitle={balance}
+          avatar={<Avatar backgroundColor={green500} icon={<FontIcon className="material-icons">trending_up</FontIcon>} />}
+        />
+      </Card>
+      
     );
   }
 }

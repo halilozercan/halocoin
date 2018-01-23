@@ -1,6 +1,7 @@
 import React, { Component } from 'react';
 import WalletList from './widgets/wallet_list.js';
 import NewWalletForm from './widgets/new_wallet_form.js';
+import {Card, CardActions, CardHeader, CardText} from 'material-ui/Card';
 import Blockcount from './widgets/blockcount.js';
 import {axiosInstance} from './tools.js';
 import {Tabs, Tab} from 'material-ui/Tabs';
@@ -52,12 +53,15 @@ class ChooseWallet extends Component {
             <WalletList wallets={this.state.wallets} notify={this.props.notify}/>
           </Tab>
           <Tab label="Restore Wallet">
-            <div>
-              <h2 style={styles.headline}>Restore Wallet</h2>
-              <p>
-                Here will be an upload form to restore an earlier wallet
-              </p>
-            </div>
+            <Card style={{"margin":16}}>
+              <CardHeader
+                title="Restore a Wallet"
+                subtitle="Select a wallet that you backed up earlier"
+              />
+              <CardText>
+                This feature will be available in next releases.
+              </CardText>
+            </Card>
           </Tab>
         </Tabs>
         <Blockcount socket={this.props.socket}/>

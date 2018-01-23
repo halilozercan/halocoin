@@ -1,9 +1,14 @@
 import React, { Component } from 'react';
 import {MCardStats} from '../components/card.js';
+import {Card, CardActions, CardHeader, CardMedia, CardTitle, CardText} from 'material-ui/Card';
+import Avatar from 'material-ui/Avatar';
+import FontIcon from 'material-ui/FontIcon';
+import {red500, green500} from 'material-ui/styles/colors';
+
 
 class Address extends Component {
 
-  copyToClipboard = () => {
+  /*copyToClipboard = () => {
     var textField = document.createElement('textarea');
     textField.innerText = this.props.wallet.address;
     document.body.appendChild(textField);
@@ -11,17 +16,26 @@ class Address extends Component {
     document.execCommand('copy');
     textField.remove();
     this.props.notify('Address is copied to clipboard', 'info', 'tc');
-  }
+  }*/
 
   render() {
     if(this.props.wallet !== null) {
       console.log('not null');
       return (
-        <div className="col-lg-6 col-md-12 col-sm-12" onClick={this.copyToClipboard}>
-          <MCardStats color="blue" header_icon="adjust" title="Address"
-           content={this.props.wallet.address.substring(0,8) + '...'}
-           footer_icon="local_offer" alt_text={"Belongs to: " + this.props.wallet.name}/>
-        </div>
+        <Card>
+          <CardHeader
+            onClick={()=> {this.props.notify("Address of your wallet, share with people!")}}
+            title="Address"
+            subtitle={this.props.wallet.address}
+            avatar={
+              <Avatar 
+                style={{cursor:"pointer"}} 
+                backgroundColor={red500} 
+                icon={<FontIcon className="material-icons">adjust</FontIcon>} 
+              />
+            }
+          />
+        </Card>
       );
     }
     else {

@@ -1,6 +1,6 @@
 import React, { Component } from 'react';
 import {MCardStats} from '../components/card.js';
-import {Card, CardActions, CardHeader, CardText} from 'material-ui/Card';
+import {Card, CardActions, CardHeader, CardText, CardTitle} from 'material-ui/Card';
 import RaisedButton from 'material-ui/RaisedButton';
 import Dialog from 'material-ui/Dialog';
 import TextField from 'material-ui/TextField';
@@ -98,44 +98,28 @@ class Stake extends Component {
     ];
 
     return (
-      <div className="col-lg-6 col-md-12 col-sm-12">
-        <Card style={{width:"100%"}}>
-          <CardHeader
-            title="Stake in Pool"
-            subtitle="Amount of coins you deposited as your stake"
-            actAsExpander={true}
-            showExpandableButton={true}
-          />
-          <CardText expandable={true}>
-            Tasks inside Coinami project are distributed according to stakes of each wallet.
-            More information is available on Coinami web page. You need to be very careful about
-            your deposit amount. When a job is assigned to an address, half of reward is taken from
-            the stake of that address. 
-            To make sure your system is ready to work on jobs, click <a href="#" onClick={this.checkPowerStatus}>here</a> and get your result
-          </CardText>
-          <CardText>
-            <Table selectable={false}>
-              <TableHeader  displaySelectAll={false} adjustForCheckbox={false}>
-                <TableRow selectable={false}>
-                  <TableHeaderColumn style={{fontWeight:"bold"}}>Balance</TableHeaderColumn>
-                  <TableHeaderColumn style={{fontWeight:"bold"}}>Stake</TableHeaderColumn>
-                  <TableHeaderColumn style={{fontWeight:"bold"}}>Job Assignment</TableHeaderColumn>
-                </TableRow>
-              </TableHeader>
-              <TableBody displayRowCheckbox={false}>
-                <TableRow>
-                  <TableHeaderColumn><a>{balance}</a></TableHeaderColumn>
-                  <TableHeaderColumn><a>{deposit}</a></TableHeaderColumn>
-                  <TableHeaderColumn><a>{job_assignment}</a></TableHeaderColumn>
-                </TableRow>
-              </TableBody>
-            </Table>
-          </CardText>
-          <CardActions align='right'>
-            <RaisedButton label="Deposit" primary={true} onClick={() => {this.handleOpen('Deposit')}} />
-            <RaisedButton label="Withdraw" secondary={true} onClick={() => {this.handleOpen('Withdraw')}} />
-          </CardActions>
-        </Card>
+      <Card style={{width:"100%"}}>
+        <CardHeader
+          title="Stake in Pool"
+          subtitle="Amount of coins you deposited as your stake"
+          actAsExpander={true}
+          showExpandableButton={true}
+        />
+        <CardText expandable={true}>
+          Tasks inside Coinami project are distributed according to stakes of each wallet.
+          More information is available on Coinami web page. You need to be very careful about
+          your deposit amount. When a job is assigned to an address, half of reward is taken from
+          the stake of that address. 
+          To make sure your system is ready to work on jobs, you can check the status of Power module.
+        </CardText>
+        <CardTitle 
+          title={"Deposit " + deposit}
+          subtitle={"Balance " + balance}
+        />
+        <CardActions align='right'>
+          <RaisedButton label="Deposit" primary={true} onClick={() => {this.handleOpen('Deposit')}} />
+          <RaisedButton label="Withdraw" secondary={true} onClick={() => {this.handleOpen('Withdraw')}} />
+        </CardActions>
         <Dialog
           title={this.state.dialogTitle}
           actions={actions}
@@ -158,8 +142,7 @@ class Stake extends Component {
               onChange={this.onPasswordChange}
             />
         </Dialog>
-      </div>
-
+      </Card>
     );
   }
 }

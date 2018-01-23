@@ -2,6 +2,12 @@ import React, { Component } from 'react';
 import {MCardStats} from '../components/card.js';
 import {axiosInstance} from '../tools.js';
 import LinearProgress from 'material-ui/LinearProgress';
+import {Card, CardActions, CardHeader, CardMedia, CardTitle, CardText} from 'material-ui/Card';
+import Avatar from 'material-ui/Avatar';
+import FlatButton from 'material-ui/FlatButton';
+import FontIcon from 'material-ui/FontIcon';
+import {red500, green500} from 'material-ui/styles/colors';
+import TouchRipple from 'material-ui/internal/TouchRipple';
 
 class Miner extends Component {
   constructor(props) {
@@ -54,19 +60,42 @@ class Miner extends Component {
     let progressBar = <div />;
     if(this.state.running === false) {
       content = "Closed";
-      color = "red";
+      color = red500;
       button_text = "Start";
       button_type = "success";
     }
     else if(this.state.running) {
       content = "Running";
-      color = "green";
+      color = green500;
       button_text = "Stop";
       button_type = "danger";
-      progressBar = <LinearProgress style={{marginTop:16}} mode="determinate" value={this.state.cpu} max={100} />;
+      progressBar = <LinearProgress style={{padding:32}} mode="determinate" value={this.state.cpu} max={100} />;
     }
     return (
-      <div className="col-lg-6 col-md-6 col-sm-6">
+      <Card containerStyle={{height:"100%"}}>
+        <CardHeader
+          title="Miner"
+          subtitle={content}
+          avatar={
+            <Avatar 
+              style={{cursor:"pointer"}}
+              onClick={()=>{this.props.notify('Miner module tries to generate new blocks.')}} 
+              backgroundColor={color} 
+              icon={<FontIcon className="material-icons">build</FontIcon>} 
+            />
+          }
+        />
+        <CardActions style={{ width: '100%', textAlign: 'right' }}>
+          <FlatButton label={button_text} onClick={this.minerChangeStatus} />
+        </CardActions>
+      </Card>
+    );
+  }
+}
+
+export default Miner;
+/*
+
         <div className="card card-stats">
           <div className="card-header" data-background-color={color}>
             <i className="material-icons">build</i>
@@ -82,9 +111,4 @@ class Miner extends Component {
             </div>
           </div>
         </div>
-      </div>
-    );
-  }
-}
-
-export default Miner;
+*/
