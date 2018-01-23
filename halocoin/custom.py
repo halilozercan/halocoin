@@ -16,17 +16,17 @@ history_length = 720
 # total weight.
 inflection = Decimal('0.985')
 # How often to generate a block in seconds
-blocktime = 10
+blocktime = 60
 halve_at = (365 * 24 * 60 * 60 / blocktime)  # Approximately one year
 recalculate_target_at = (12*60*60 // blocktime)  # It's every half day
 
 # Precalculate
 memoized_weights = [inflection ** i for i in range(history_length)]
 
-assignment_period = 20
+assignment_period = 10
 assignment_stake_burn = 0.2
 
-first_target = '0' * 3 + 'f' * 61
+first_target = '0' * 4 + 'f' * 60
 
 # Coinami root certificate.
 # Everyone will accept any certificate that is signed by the root
@@ -76,7 +76,7 @@ def generate_default_config():
                 'length': -1
             },
             {
-                'node_id': '52e6eb49-6d59-4bf3-af96-ca3252408a4e',
+                'node_id': '52e6eb49-6d59-4bf3-af96-ca3252408a4f',
                 'ip': '139.179.21.17',
                 'port': 7002,
                 'rank': 1,
