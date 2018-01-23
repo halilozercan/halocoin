@@ -81,7 +81,7 @@ class PeerListenService(Service):
                 client_sock.close()
         except Exception as e:
             import time
-            time.sleep(0.5)
+            time.sleep(0.1)
 
     @sync
     def greetings(self, node_id, port, length, diffLength, __remote_ip__):

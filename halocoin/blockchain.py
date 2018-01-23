@@ -30,6 +30,7 @@ class BlockchainService(Service):
         self.engine = engine
         self.blocks_queue = NoExceptionQueue(3)
         self.tx_queue = NoExceptionQueue(100)
+        self.mempool = []
         self.db = None
         self.statedb = None
         self.clientdb = None
@@ -54,8 +55,11 @@ class BlockchainService(Service):
         Miner instead puts one block in candidate block list, node id is 'miner'
         :return:
         """
+        if self.db.is_simulated():
+            time.sleep(0.1)
+            return
         try:
-            candidate = self.blocks_queue.get(timeout=1)
+            candidate = self.blocks_queue.get(timeout=0.1)
             self.set_chain_state(BlockchainService.SYNCING)
             try:
                 if isinstance(candidate, tuple):
@@ -100,7 +104,7 @@ class BlockchainService(Service):
             pass
 
         try:
-            candidate_tx = self.tx_queue.get(timeout=1)
+            candidate_tx = self.tx_queue.get(timeout=0.1)
             result = self.add_tx(candidate_tx)
             api.tx_queue_response['message'] = result
             api.tx_queue_response['event'].set()
@@ -125,7 +129,7 @@ class BlockchainService(Service):
         This method should be used instead of direct access to db
         :return:
         """
-        return self.db.get('txs')
+        return self.mempool
 
     @lockit('kvstore')
     def tx_pool_add(self, tx):
@@ -134,21 +138,19 @@ class BlockchainService(Service):
         :param tx: Transaction to be added
         :return: None
         """
-        txs = self.db.get('txs')
-        txs.append(tx)
-        self.db.put('txs', txs)
+        self.mempool.append(tx)
         api.new_tx_in_pool()
 
     @lockit('kvstore')
     def tx_pool_pop_all(self):
+        #TODO: empty the pool
         """
         Atomic operation to pop everything
         :return: transactions list
         """
-        txs = self.db.get('txs')
-        self.db.put('txs', [])
-        api.new_tx_in_pool()
-        return txs
+        mempool = copy.deepcopy(self.mempool)
+        self.mempool = []
+        return mempool
 
     def peer_reported_false_blocks(self, node_id):
         peer = self.clientdb.get_peer(node_id)
@@ -171,11 +173,7 @@ class BlockchainService(Service):
         if not integrity_check.getFlag():
             return Response(False, 'Transaction failed integrity check: ' + integrity_check.getData())
         self.db.simulate()
-        block = {
-            'length': self.db.get('length') + 1,
-            'txs': txs_in_pool + [tx]
-        }
-        current_state_check = self.statedb.update_database_with_block(block)
+        current_state_check = self.statedb.update_database_with_tx(tx, self.db.get('length')+1)
         self.db.rollback()
         if not current_state_check:
             return Response(False, 'Transaction failed current state check')

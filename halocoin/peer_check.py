@@ -62,7 +62,7 @@ class PeerCheckService(Service):
 
             self.clientdb.update_peer(peer)
 
-        time.sleep(1)
+        time.sleep(0.1)
 
     @sync
     def peer_check(self, peer):

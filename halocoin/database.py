@@ -69,6 +69,10 @@ class KeyValueStore:
             return False
 
     @lockit('kvstore')
+    def is_simulated(self):
+        return self.snapshot is not None
+
+    @lockit('kvstore')
     def simulate(self):
         """
         Database simulations are thread based batch transactions.

@@ -20,6 +20,7 @@ class MinerService(Service):
         self.engine = engine
         self.db = None
         self.blockchain = None
+        self.statedb = None
         self.wallet = None
         config_cores = self.engine.config['miner']['cores']
         self.core_count = multiprocessing.cpu_count() if config_cores == -1 else config_cores
@@ -32,6 +33,7 @@ class MinerService(Service):
     def on_register(self):
         self.db = self.engine.db
         self.blockchain = self.engine.blockchain
+        self.statedb = self.engine.statedb
 
         if self.wallet is not None and hasattr(self.wallet, 'privkey'):
             return True
@@ -47,7 +49,7 @@ class MinerService(Service):
     def worker(self):
         if not self.blockchain.tx_queue.empty() or not self.blockchain.blocks_queue.empty() or \
                 self.blockchain.get_chain_state() != BlockchainService.IDLE:
-            time.sleep(1)
+            time.sleep(0.1)
             return
 
         candidate_block = self.get_candidate_block()
@@ -58,7 +60,7 @@ class MinerService(Service):
             api.miner_status()
             while not self.queue.empty():
                 possible_blocks.append(self.queue.get(timeout=0.01))
-            time.sleep(1)
+            time.sleep(0.1)
             if len(possible_blocks) > 0:
                 tools.log('Mined block')
                 tools.log(possible_blocks[:1])
@@ -78,10 +80,20 @@ class MinerService(Service):
         self.pool = []
 
     def make_block(self, prev_block, txs, pubkey):
+        """
+        After mempool changes at 0.011c version, make block must select valid transactions.
+        Mempool is mixed and not all transactions may be valid at the same time.
+        Miner creates a block by adding transactions that are valid together.
+        :param prev_block:
+        :param txs:
+        :param pubkey:
+        :return:
+        """
         leng = int(prev_block['length']) + 1
         target_ = self.blockchain.target(leng)
         diffLength = tools.hex_sum(prev_block['diffLength'], tools.hex_invert(target_))
-        txs = sorted(txs + [self.make_mint(pubkey)], key=lambda x: x['count'] if 'count' in x else -1)
+        txs = self.statedb.get_valid_txs_for_next_block(txs, leng)
+        txs = [self.make_mint(pubkey)] + txs
         out = {'version': custom.version,
                'txs': txs,
                'length': leng,

@@ -64,7 +64,6 @@ class Engine(Service):
             print("Initializing records")
             self.db.put('init', True)
             self.db.put('length', -1)
-            self.db.put('txs', [])
             self.db.put('peer_list', [])
             self.db.put('targets', {})
             self.db.put('times', {})

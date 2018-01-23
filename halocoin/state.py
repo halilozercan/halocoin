@@ -84,7 +84,7 @@ class StateDatabase:
             send_account['amount'] += tools.block_reward(block_length)
             self.update_account(send_address, send_account)
         elif tx['type'] == 'spend':
-            if tx['count'] != self.known_tx_count(send_address, count_pool=False):
+            if tx['count'] < self.known_tx_count(send_address, count_pool=False):
                 return False
 
             recv_address = tx['to']
@@ -157,7 +157,7 @@ class StateDatabase:
             self.add_new_job(tx['job'], tx['auth'], block_length)
             self.update_auth(tx['auth'], auth)
         elif tx['type'] == 'deposit':
-            if tx['count'] != self.known_tx_count(send_address, count_pool=False):
+            if tx['count'] < self.known_tx_count(send_address, count_pool=False):
                 return False
             send_account['amount'] -= tx['amount']
             send_account['stake'] += tx['amount']
@@ -171,7 +171,7 @@ class StateDatabase:
             if send_account['stake'] > 0:
                 self.put_address_in_stake_pool(send_address)
         elif tx['type'] == 'withdraw':
-            if tx['count'] != self.known_tx_count(send_address, count_pool=False):
+            if tx['count'] < self.known_tx_count(send_address, count_pool=False):
                 return False
             send_account['amount'] += tx['amount']
             send_account['stake'] -= tx['amount']
@@ -246,6 +246,17 @@ class StateDatabase:
                     ai += 1
 
         return True
+
+    def get_valid_txs_for_next_block(self, txs, new_length):
+        txs = sorted(txs, key=lambda x: x['count'] if 'count' in x else -1)
+        valid_txs = []
+        self.db.simulate()
+        for tx in txs:
+            result = self.update_database_with_tx(tx, new_length)
+            if result:
+                valid_txs.append(tx)
+        self.db.rollback()
+        return valid_txs
 
     def rollback_block(self, block):
         # TODO: 0.007-9c changes
@@ -411,7 +422,7 @@ class StateDatabase:
             'address': address
         })
         account['assigned_job'] = job_id
-        account['stake'] -= (job['amount'] // 2)
+        account['stake'] -= int(job['amount'] * custom.assignment_stake_burn)
         self.db.put('job_' + job_id, job)
         self.update_account(address, account)
         if account['stake'] == 0:

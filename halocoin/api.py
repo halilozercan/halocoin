@@ -13,6 +13,8 @@ from halocoin.power import PowerService
 from halocoin.service import Service
 
 # WARNING! Do not remove below import line. PyInstaller depends on it
+from engineio import async_threading
+async_threading  # PyCharm automatically removes unused imports. This prevents it
 
 tx_queue_response = {
     "result": None,
