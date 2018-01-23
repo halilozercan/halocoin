@@ -69,8 +69,8 @@ const exitPyProc = () => {
   pyPort = null
 }
 
-app.on('ready', createPyProc);
-//app.on('ready', createWindow);
+//app.on('ready', createPyProc);
+app.on('ready', createWindow);
 app.on('will-quit', exitPyProc);
 
 // In this file you can include the rest of your app's specific main process

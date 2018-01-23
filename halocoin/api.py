@@ -4,6 +4,8 @@ import tempfile
 import threading
 
 import psutil as psutil
+# WARNING! Do not remove below import line. PyInstaller depends on it
+from engineio import async_threading
 from flask import Flask, request, Response, send_file
 from flask_socketio import SocketIO
 
@@ -12,8 +14,6 @@ from halocoin.blockchain import BlockchainService
 from halocoin.power import PowerService
 from halocoin.service import Service
 
-# WARNING! Do not remove below import line. PyInstaller depends on it
-from engineio import async_threading
 async_threading  # PyCharm automatically removes unused imports. This prevents it
 
 tx_queue_response = {
@@ -335,9 +335,11 @@ def send():
         tx['signatures'] = [tools.sign(tools.det_hash(tx), wallet.privkey)]
     tx_queue_response['event'] = threading.Event()
     engine.instance.blockchain.tx_queue.put(tx)
-    tx_queue_response['event'].wait()
-    response["success"] = tx_queue_response['message'].getFlag()
-    response["message"] = tx_queue_response['message'].getData()
+    #tx_queue_response['event'].wait()
+    #response["success"] = tx_queue_response['message'].getFlag()
+    response["success"] = True
+    response["message"] = "Your transaction is successfully added to the pool"
+    response["tx"] = tx
     return generate_json_response(response)
 
 
@@ -389,9 +391,11 @@ def deposit():
         tx['signatures'] = [tools.sign(tools.det_hash(tx), wallet.privkey)]
     tx_queue_response['event'] = threading.Event()
     engine.instance.blockchain.tx_queue.put(tx)
-    tx_queue_response['event'].wait()
-    response["success"] = tx_queue_response['message'].getFlag()
-    response["message"] = tx_queue_response['message'].getData()
+    #tx_queue_response['event'].wait()
+    #response["success"] = tx_queue_response['message'].getFlag()
+    response["success"] = True
+    response["message"] = "Your transaction is successfully added to the pool"
+    response["tx"] = tx
     return generate_json_response(response)
 
 
@@ -443,9 +447,11 @@ def withdraw():
         tx['signatures'] = [tools.sign(tools.det_hash(tx), wallet.privkey)]
     tx_queue_response['event'] = threading.Event()
     engine.instance.blockchain.tx_queue.put(tx)
-    tx_queue_response['event'].wait()
-    response["success"] = tx_queue_response['message'].getFlag()
-    response["message"] = tx_queue_response['message'].getData()
+    #tx_queue_response['event'].wait()
+    #response["success"] = tx_queue_response['message'].getFlag()
+    response["success"] = True
+    response["message"] = "Your transaction is successfully added to the pool"
+    response["tx"] = tx
     return generate_json_response(response)
 
 
@@ -481,9 +487,11 @@ def reward():
     tx['signatures'] = [tools.sign(tools.det_hash(tx), privkey)]
     tx_queue_response['event'] = threading.Event()
     engine.instance.blockchain.tx_queue.put(tx)
-    tx_queue_response['event'].wait()
-    response["success"] = tx_queue_response['message'].getFlag()
-    response["message"] = tx_queue_response['message'].getData()
+    #tx_queue_response['event'].wait()
+    #response["success"] = tx_queue_response['message'].getFlag()
+    response["success"] = True
+    response["message"] = "Your transaction is successfully added to the pool"
+    response["tx"] = tx
     return generate_json_response(response)
 
 
@@ -522,9 +530,11 @@ def job_dump():
     tx['signatures'] = [tools.sign(tools.det_hash(tx), privkey)]
     tx_queue_response['event'] = threading.Event()
     engine.instance.blockchain.tx_queue.put(tx)
-    tx_queue_response['event'].wait()
-    response["success"] = tx_queue_response['message'].getFlag()
-    response["message"] = tx_queue_response['message'].getData()
+    #tx_queue_response['event'].wait()
+    #response["success"] = tx_queue_response['message'].getFlag()
+    response["success"] = True
+    response["message"] = "Your transaction is successfully added to the pool"
+    response["tx"] = tx
     return generate_json_response(response)
 
 
@@ -568,9 +578,11 @@ def auth_reg():
     tx['signatures'] = [tools.sign(tools.det_hash(tx), privkey)]
     tx_queue_response['event'] = threading.Event()
     engine.instance.blockchain.tx_queue.put(tx)
-    tx_queue_response['event'].wait()
-    response["success"] = tx_queue_response['message'].getFlag()
-    response["message"] = tx_queue_response['message'].getData()
+    #tx_queue_response['event'].wait()
+    #response["success"] = tx_queue_response['message'].getFlag()
+    response["success"] = True
+    response["message"] = "Your transaction is successfully added to the pool"
+    response["tx"] = tx
     return generate_json_response(response)
 
 
