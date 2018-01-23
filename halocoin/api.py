@@ -130,7 +130,7 @@ def info_wallet():
     if encrypted_wallet_content is not None:
         try:
             wallet = Wallet.from_string(tools.decrypt(password, encrypted_wallet_content))
-            account = engine.instance.statedb.get_account(wallet.address, apply_tx_pool=True)
+            account = engine.instance.statedb.get_account(wallet.address, apply_tx_pool=False)
             return generate_json_response({
                 "name": wallet.name,
                 "pubkey": wallet.get_pubkey_str(),
@@ -658,7 +658,7 @@ def balance():
             wallet = Wallet.from_string(tools.decrypt(password, encrypted_wallet_content))
             address = wallet.address
 
-    account = engine.instance.statedb.get_account(address, apply_tx_pool=True)
+    account = engine.instance.statedb.get_account(address, apply_tx_pool=False)
     return generate_json_response({'balance': account['amount']})
 
 

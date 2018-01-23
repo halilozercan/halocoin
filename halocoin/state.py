@@ -76,7 +76,8 @@ class StateDatabase:
         self.db.put(address, new_account)
         return True
 
-    def update_database_with_tx(self, tx, block_length):
+    def update_database_with_tx(self, tx, block_length, count_pool=False):
+        tx = copy.deepcopy(tx)
         send_address = tools.tx_owner_address(tx)
         send_account = self.get_account(send_address)
 
@@ -84,7 +85,7 @@ class StateDatabase:
             send_account['amount'] += tools.block_reward(block_length)
             self.update_account(send_address, send_account)
         elif tx['type'] == 'spend':
-            if tx['count'] < self.known_tx_count(send_address, count_pool=False):
+            if tx['count'] != self.known_tx_count(send_address, count_pool=count_pool):
                 return False
 
             recv_address = tx['to']
@@ -157,7 +158,7 @@ class StateDatabase:
             self.add_new_job(tx['job'], tx['auth'], block_length)
             self.update_auth(tx['auth'], auth)
         elif tx['type'] == 'deposit':
-            if tx['count'] < self.known_tx_count(send_address, count_pool=False):
+            if tx['count'] != self.known_tx_count(send_address, count_pool=count_pool):
                 return False
             send_account['amount'] -= tx['amount']
             send_account['stake'] += tx['amount']
@@ -171,7 +172,7 @@ class StateDatabase:
             if send_account['stake'] > 0:
                 self.put_address_in_stake_pool(send_address)
         elif tx['type'] == 'withdraw':
-            if tx['count'] < self.known_tx_count(send_address, count_pool=False):
+            if tx['count'] != self.known_tx_count(send_address, count_pool=count_pool):
                 return False
             send_account['amount'] += tx['amount']
             send_account['stake'] -= tx['amount']

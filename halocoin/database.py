@@ -16,6 +16,7 @@ class KeyValueStore:
         self.DB = None
         self.iterator = None
         self.snapshot = None
+        self.snapshot_owner = ''
         self.simLock = threading.RLock()
         self.salt = None
         self.req_count = 0
@@ -34,7 +35,7 @@ class KeyValueStore:
     def get(self, key):
         db = self.DB
         tname = threading.current_thread().getName()
-        if tname != "blockchain_process" and tname != "MainThread" and self.snapshot is not None:
+        if tname != self.snapshot_owner and self.snapshot is not None:
             # Request is coming from blockchain process thread.
             # All actions are directed to ongoing database
             # If there is a simulation going on and we are not inside a blockchain namespace,
@@ -55,6 +56,7 @@ class KeyValueStore:
         except Exception as e:
             return False
 
+    @lockit('kvstore')
     def exists(self, key):
         result = self.get(key)
         return result is not None
@@ -87,6 +89,7 @@ class KeyValueStore:
             return False
         try:
             self.snapshot = self.DB.snapshot()
+            self.snapshot_owner = threading.current_thread().getName()
             return True
         except:
             return False

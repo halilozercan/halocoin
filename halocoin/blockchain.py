@@ -45,6 +45,7 @@ class BlockchainService(Service):
         return True
 
     @threaded
+    @lockit('write_kvstore')
     def blockchain_process(self):
         """
         In this thread we check blocks queue for possible additions to blockchain.
@@ -55,9 +56,6 @@ class BlockchainService(Service):
         Miner instead puts one block in candidate block list, node id is 'miner'
         :return:
         """
-        if self.db.is_simulated():
-            time.sleep(0.1)
-            return
         try:
             candidate = self.blocks_queue.get(timeout=0.1)
             self.set_chain_state(BlockchainService.SYNCING)
@@ -173,7 +171,7 @@ class BlockchainService(Service):
         if not integrity_check.getFlag():
             return Response(False, 'Transaction failed integrity check: ' + integrity_check.getData())
         self.db.simulate()
-        current_state_check = self.statedb.update_database_with_tx(tx, self.db.get('length')+1)
+        current_state_check = self.statedb.update_database_with_tx(tx, self.db.get('length')+1, count_pool=True)
         self.db.rollback()
         if not current_state_check:
             return Response(False, 'Transaction failed current state check')

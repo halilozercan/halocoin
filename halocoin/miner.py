@@ -120,7 +120,7 @@ class MinerService(Service):
                'txs': [self.make_mint(pubkey)]}
         return out
 
-    @lockit('kvstore')
+    @lockit('write_kvstore')
     def get_candidate_block(self):
         length = self.db.get('length')
         print('Miner working for block', (length + 1))
