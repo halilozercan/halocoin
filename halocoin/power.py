@@ -233,12 +233,14 @@ class PowerService(Service):
 
     @staticmethod
     def system_status(container_name):
-        client = docker.from_env()
-        if not client.ping():
-            return Response(False, "Docker daemon is not responding")
         try:
+            client = docker.from_env()
+            if not client.ping():
+                return Response(False, "Docker daemon is not responding")
             client.images.get(container_name)
         except ImageNotFound:
             return Response(False, "Image missing")
+        except:
+            return Response(False, "An expection occurred")
 
         return Response(True, "Ready to go!")

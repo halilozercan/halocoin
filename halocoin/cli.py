@@ -1,11 +1,12 @@
 #!/usr/bin/env python
 import argparse
-import datetime
 import os
 import sys
+from functools import wraps
+from inspect import Parameter
+from pprint import pprint
 
 import requests
-from tabulate import tabulate
 
 from halocoin import custom
 from halocoin import engine
@@ -29,6 +30,7 @@ host = os.environ.get('HALOCOIN_API_HOST', 'localhost')
 
 
 def action(func):
+    @wraps(func)
     def wrapper(*args, **kwargs):
         return func(*args, **kwargs)
 
@@ -43,99 +45,30 @@ def make_api_request(method, files=None, **kwargs):
         files = {}
     url = "http://" + str(host) + ":" + str(connection_port) + "/" + method
 
+    kwargs = {k: v for k, v in kwargs.items() if v is not None}
+
     if len(files) > 0:
         fields = {}
         fields.update(kwargs)
         fields.update(files)
         m = MultipartEncoder(fields=fields)
-        response = requests.post(url, data=m, headers={'Content-Type': m.content_type}).json()
+        response = requests.post(url, data=m, headers={'Content-Type': m.content_type})
     else:
-        response = requests.post(url, data=kwargs).json()
-    return response
-
-
-def print_txs(txs):
-    table = []
-    for tx in txs:
-        tx['from'] = tools.tx_owner_address(tx)
-        if tx['type'] == 'mint':
-            tx['to'] = 'N/A'
-            tx['message'] = ''
-        table.append([tx['type'], tx['from'], tx['to'], tx['amount'], tx['message']])
-
-    print(tabulate(table,
-                   headers=[Colors.HEADER + 'Type' + Colors.ENDC,
-                            Colors.HEADER + 'From' + Colors.ENDC,
-                            Colors.HEADER + 'To' + Colors.ENDC,
-                            Colors.HEADER + 'Amount' + Colors.ENDC,
-                            Colors.HEADER + 'Message' + Colors.ENDC],
-                   tablefmt='orgtbl'))
-
-
-def print_peers(peers):
-    table = []
-    for peer in peers:
-        table.append([peer['node_id'], peer['ip'], peer['port'], "{:10.3f}".format(peer['rank']), peer['length']])
-
-    print(tabulate(table,
-                   headers=[Colors.HEADER + 'Node ID' + Colors.ENDC,
-                            Colors.HEADER + 'Address' + Colors.ENDC,
-                            Colors.HEADER + 'Port' + Colors.ENDC,
-                            Colors.HEADER + 'Rank' + Colors.ENDC,
-                            Colors.HEADER + 'Length' + Colors.ENDC],
-                   tablefmt='orgtbl'))
-
-
-def print_blocks(blocks):
-    table = []
-    for block in blocks['blocks']:
-        if block['length'] == 0:
-            block['prevHash'] = "N/A"
-        block['time'] = datetime.datetime.fromtimestamp(
-            int(block['time'])
-        ).strftime('%Y-%m-%d %H:%M:%S')
-        mint_tx = list(filter(lambda t: t['type'] == 'mint', block['txs']))[0]
-        table.append([block['length'], tools.tx_owner_address(mint_tx), block['time']])
-    print(Colors.WARNING + "Blocks:\n" + Colors.ENDC)
-    print(tabulate(table, headers=[Colors.HEADER + 'Length' + Colors.ENDC,
-                                   Colors.HEADER + 'Miner' + Colors.ENDC,
-                                   Colors.HEADER + 'Time' + Colors.ENDC], tablefmt='orgtbl'))
-
-    if len(blocks) == 1:
-        print(Colors.WARNING + "\nTransactions in the Block:\n" + Colors.ENDC)
-        print_txs(blocks[0]['txs'])
-
-
-def print_history(history):
-    if history is None:
-        print("Could not receive history")
-    elif isinstance(history, str):
-        print(history)
+        response = requests.post(url, data=kwargs)
+    if response.status_code != 200:
+        return {
+            'error': response.status_code,
+            'message': response.text
+        }
     else:
-        for tx in history['send']:
-            print("In Block {} {} => {} for amount {}".format(
-                tx['block'],
-                Colors.HEADER + tools.tx_owner_address(tx) + Colors.ENDC,
-                Colors.WARNING + tx['to'] + Colors.ENDC,
-                tx['amount']))
-        for tx in history['recv']:
-            print("In Block {} {} => {} for amount {}".format(
-                tx['block'],
-                Colors.WARNING + tools.tx_owner_address(tx) + Colors.ENDC,
-                Colors.HEADER + tx['to'] + Colors.ENDC,
-                tx['amount']))
-        for tx in history['mine']:
-            print("In Block {} {} mined amount {}".format(
-                tx['block'],
-                Colors.HEADER + tools.tx_owner_address(tx) + Colors.ENDC,
-                tx['amount']))
+        return response.json()
 
 
-def extract_configuration(args):
-    if args.dir is None:
+def extract_configuration(dir, config):
+    if dir is None:
         working_dir = tools.get_default_dir()
     else:
-        working_dir = args.dir
+        working_dir = dir
 
     working_dir = os.path.join(working_dir, str(custom.version))
 
@@ -151,53 +84,53 @@ def extract_configuration(args):
             print("Could not create a directory!")
             exit(1)
 
-    if args.config is not None:
-        config = custom.read_config_file(args.config)
+    if config is not None:
+        config = custom.read_config_file(config)
     elif os.path.exists(os.path.join(working_dir, 'config')):
-        args.config = os.path.join(working_dir, 'config')
-        config = custom.read_config_file(args.config)
+        config = os.path.join(working_dir, 'config')
+        config = custom.read_config_file(config)
     else:
         config = custom.generate_default_config()
         custom.write_config_file(config, os.path.join(working_dir, 'config'))
 
     if config is None:
-        raise ValueError('Couldn\'t parse config file {}'.format(args.config))
+        raise ValueError('Couldn\'t parse config file {}'.format(config))
 
     return config, working_dir
 
 
 @action
-def start(args):
-    config, working_dir = extract_configuration(args)
+def start(dir=None, config=None):
+    config, working_dir = extract_configuration(dir, config)
     tools.init_logging(config['DEBUG'], working_dir, config['logging']['file'])
     engine.main(config, working_dir)
 
 
 @action
-def new_wallet(args):
+def new_wallet(wallet, pw):
     from getpass import getpass
 
-    if args.pw is None:
+    if pw is None:
         wallet_pw = 'w'
         wallet_pw_2 = 'w2'
         while wallet_pw != wallet_pw_2:
             wallet_pw = getpass('New wallet password: ')
             wallet_pw_2 = getpass('New wallet password(again): ')
     else:
-        wallet_pw = args.pw
+        wallet_pw = pw
 
-    print(make_api_request(args.action, wallet_name=args.wallet, password=wallet_pw))
+    print(make_api_request("new_wallet", wallet_name=wallet, password=wallet_pw))
 
 
 @action
-def info_wallet(args):
+def info_wallet(wallet=None, pw=None):
     from getpass import getpass
-    if args.pw is None:
+    if pw is None:
         wallet_pw = getpass('Wallet password: ')
     else:
-        wallet_pw = args.pw
+        wallet_pw = pw
 
-    information = make_api_request(args.action, wallet_name=args.wallet_name, password=wallet_pw)
+    information = make_api_request("info_wallet", wallet_name=wallet, password=wallet_pw)
 
     if isinstance(information, dict):
         print("Address: {}".format(information['address']))
@@ -205,144 +138,131 @@ def info_wallet(args):
         print("Pubkey: {}".format(information['pubkey']))
         print("Privkey: {}".format(information['privkey']))
     else:
-        print(information)
+        pprint(information)
 
 
 @action
-def upload_wallet(args):
+def upload_wallet(file, wallet):
     files = {
-        "wallet_file": ('wallet_file', open(args.wallet_path, 'rb')),
-        "wallet_name": args.wallet_name
+        "wallet_file": ('wallet_file', open(file, 'rb')),
+        "wallet_name": wallet
     }
-    print(make_api_request(args.action, files=files))
+    print(make_api_request("upload_wallet", files=files))
 
 
 @action
-def download_wallet(args):
-    print(make_api_request(args.action, wallet_name=args.wallet))
+def download_wallet(wallet):
+    print(make_api_request("download_wallet", wallet_name=wallet))
 
 
 @action
-def block(args):
-    blocks = make_api_request(args.action, start=args.start, end=args.end)
-    print_blocks(blocks)
+def blocks(start, end=None):
+    _blocks = make_api_request("blocks", start=start, end=end)
+    pprint(_blocks)
 
 
 @action
-def blockcount(args):
-    result = make_api_request(args.action)
+def blockcount():
+    result = make_api_request("blockcount")
     print('We have {} blocks.'.format(result['length']))
     if result['length'] != result['known_length']:
         print('Peers are reporting {} blocks.'.format(result['known_length']))
 
 
 @action
-def balance(args):
-    print(make_api_request(args.action, address=args.address))
+def balance(address=None):
+    print(make_api_request("balance", address=address))
 
 
 @action
-def node_id(args):
-    print(make_api_request(args.action))
+def node_id():
+    print(make_api_request("node_id"))
 
 
 @action
-def send(args):
+def send(address, amount, pw, wallet=None, message=None):
     from getpass import getpass
-    if args.pw is None:
+    if pw is None:
         wallet_pw = getpass('Wallet password: ')
     else:
-        wallet_pw = args.pw
+        wallet_pw = pw
 
-    print(make_api_request(args.action, address=args.address,
-                           amount=args.amount, message=args.message,
-                           wallet_name=args.wallet_name, password=wallet_pw))
+    print(make_api_request(action, address=address,
+                           amount=amount, message=message,
+                           wallet_name=wallet, password=wallet_pw))
 
 
 @action
-def deposit(args):
+def deposit(amount, pw, wallet=None, force=None):
     from getpass import getpass
-    if args.pw is None:
+    if pw is None:
         wallet_pw = getpass('Wallet password: ')
     else:
-        wallet_pw = args.pw
+        wallet_pw = pw
 
-    print(make_api_request(args.action, amount=args.amount,
-                           wallet_name=args.wallet_name, password=wallet_pw))
-
-
-@action
-def job_request(args):
-    from getpass import getpass
-    if args.pw is None:
-        wallet_pw = getpass('Wallet password: ')
-    else:
-        wallet_pw = args.pw
-
-    print(make_api_request(args.action,
-                           job_id=args.job_id, amount=args.amount,
-                           wallet_name=args.wallet_name, password=wallet_pw))
+    print(make_api_request("deposit", amount=amount,
+                           wallet_name=wallet, password=wallet_pw))
 
 
 @action
-def reward(args):
-    cert_pem = open(args.certificate, 'rb').read()
-    privkey_pem = open(args.privkey, 'rb').read()
-    print(make_api_request(args.action, address=args.address, job_id=args.job_id,
+def reward(certificate, privkey, job_id, address):
+    cert_pem = open(certificate, 'rb').read()
+    privkey_pem = open(privkey, 'rb').read()
+    print(make_api_request("reward", address=address, job_id=job_id,
                            cert_pem=cert_pem, privkey_pem=privkey_pem))
 
 
 @action
-def job_dump(args):
+def job_dump(certificate, privkey, job_id, amount):
     import time
-    cert_pem = open(args.certificate, 'rb').read()
-    privkey_pem = open(args.privkey, 'rb').read()
-    print(make_api_request(args.action, job_id=args.job_id, job_timestamp=time.time(), amount=args.amount,
+    cert_pem = open(certificate, 'rb').read()
+    privkey_pem = open(privkey, 'rb').read()
+    print(make_api_request("job_dump", job_id=job_id, job_timestamp=time.time(), amount=amount,
                            cert_pem=cert_pem, privkey_pem=privkey_pem))
 
 
 @action
-def auth_reg(args):
-    cert_pem = open(args.certificate, 'rb').read()
-    privkey_pem = open(args.privkey, 'rb').read()
-    print(make_api_request(args.action, cert_pem=cert_pem, privkey_pem=privkey_pem, host=args.host, supply=args.amount))
+def auth_reg(certificate, privkey, host, amount):
+    cert_pem = open(certificate, 'rb').read()
+    privkey_pem = open(privkey, 'rb').read()
+    print(make_api_request("auth_reg", cert_pem=cert_pem, privkey_pem=privkey_pem, host=host, supply=amount))
 
 
 @action
-def peers(args):
-    peers = make_api_request(args.action)
-    print_peers(peers)
+def peers():
+    peers = make_api_request("peers")
+    pprint(peers)
 
 
 @action
-def history(args):
-    history = make_api_request(args.action, address=args.address)
-    print_history(history)
+def history(address):
+    history = make_api_request("history", address=address)
+    pprint(history)
 
 
 @action
-def stop(args):
-    print(make_api_request(args.action))
+def stop():
+    print(make_api_request("stop"))
 
 
 @action
-def start_miner(args):
-    print(make_api_request(args.action, wallet_name=args.wallet_name, password=args.pw))
+def start_miner(pw, wallet=None):
+    print(make_api_request("start_miner", wallet_name=wallet, password=pw))
 
 
 @action
-def stop_miner(args):
-    print(make_api_request(args.action))
+def stop_miner():
+    print(make_api_request("stop_miner"))
 
 
 @action
-def status_miner(args):
-    print(make_api_request(args.action))
+def status_miner():
+    print(make_api_request("status_miner"))
 
 
 @action
-def difficulty(args):
-    result = make_api_request(args.action)
+def difficulty():
+    result = make_api_request("difficulty")
     if isinstance(result, bytearray):
         print(result.hex())
     else:
@@ -350,20 +270,19 @@ def difficulty(args):
 
 
 @action
-def txs(args):
-    txs = make_api_request(args.action)
-    print("Transactions in pool:")
-    print_txs(txs)
+def mempool():
+    txs = make_api_request("mempool")
+    pprint(txs)
 
 
 @action
-def version(args):
+def version():
     print(custom.version)
 
 
 def run(argv):
     parser = argparse.ArgumentParser(description='CLI for halocoin.')
-    parser.add_argument('action', choices=actions.keys())
+    parser.add_argument('action', choices=sorted(actions.keys()))
     parser.add_argument('--address', action="store", type=str, dest='address',
                         help='Give a valid blockchain address')
     parser.add_argument('--message', action="store", type=str, dest='message',
@@ -374,9 +293,9 @@ def run(argv):
                         help='Starting number while requesting range of blocks')
     parser.add_argument('--end', action="store", type=str, dest='end',
                         help='Ending number while requesting range of blocks')
-    parser.add_argument('--wallet-path', action="store", type=str, dest='wallet_path',
-                        help='Wallet path for uploading')
-    parser.add_argument('--wallet', action="store", type=str, dest='wallet_name',
+    parser.add_argument('--file', action="store", type=str, dest='file',
+                        help='File path for wallet upload')
+    parser.add_argument('--wallet', action="store", type=str, dest='wallet',
                         help='Wallet name')
     parser.add_argument('--certificate', action="store", type=str, dest='certificate',
                         help='Rewarding sub-auth certificate file in pem format')
@@ -394,14 +313,25 @@ def run(argv):
                         help='Override API port defined in config file.')
     parser.add_argument('--host', action="store", type=str, dest='host',
                         help='Define a host address while registering an auth.')
+    parser.add_argument('--force', action="store_true", dest='force',
+                        help='Force something that makes trouble.')
 
     args = parser.parse_args(argv[1:])
 
-    config, working_dir = extract_configuration(args)
+    config, working_dir = extract_configuration(args.dir, args.config)
     global connection_port
     connection_port = config['port']['api']
 
-    actions[args.action](args)
+    from inspect import signature
+    sig = signature(actions[args.action])
+    kwargs = {}
+    for parameter in sig.parameters.keys():
+        if sig.parameters[parameter].default == Parameter.empty and \
+                (not hasattr(args, parameter) or getattr(args, parameter) is None):
+            sys.stderr.write("\"{}\" requires parameter {}\n".format(args.action, parameter))
+            sys.exit(1)
+        kwargs[parameter] = getattr(args, parameter)
+    actions[args.action](**kwargs)
     return
 
 

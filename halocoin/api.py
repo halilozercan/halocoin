@@ -30,7 +30,6 @@ class ComplexEncoder(json.JSONEncoder):
         # Let the base class default method raise the TypeError
         return json.JSONEncoder.default(self, obj)
 
-
 def blockchain_synced(func):
     def wrapper(*args, **kwargs):
         if engine.instance.blockchain.get_chain_state() == BlockchainService.IDLE:
@@ -148,7 +147,7 @@ def info_wallet():
 
 
 @app.route('/remove_wallet', methods=['GET', 'POST'])
-def remove_wallet():
+def remove_wallet(wallet):
     from halocoin.model.wallet import Wallet
     wallet_name = request.values.get('wallet_name', None)
     password = request.values.get('password', None)
@@ -351,6 +350,15 @@ def deposit():
     amount = int(request.values.get('amount', 0))  # Bidding amount
     wallet_name = request.values.get('wallet_name', None)
     password = request.values.get('password', None)
+    force = request.values.get('force', None)
+
+    status = PowerService.system_status(engine.instance.config['coinami']['container'])
+    if not status.getFlag() and force is None:
+        return generate_json_response({
+            'error': 'Power service is unavailable',
+            'message': 'Power service cannot seem to function right now. '
+                       'If you want to make a deposit, specify force parameter'
+        })
 
     if wallet_name is None:
         default_wallet = engine.instance.clientdb.get_default_wallet()
@@ -595,8 +603,8 @@ def blockcount():
     return Response(response=result_text, headers={"Content-Type": "application/json"})
 
 
-@app.route('/txs', methods=['GET', 'POST'])
-def txs():
+@app.route('/mempool', methods=['GET', 'POST'])
+def mempool():
     purge = request.values.get('purge', None)
     if purge is not None:
         engine.instance.blockchain.tx_pool_pop_all()
@@ -621,8 +629,8 @@ def txs():
     return generate_json_response(pool)
 
 
-@app.route('/block', methods=['GET', 'POST'])
-def block():
+@app.route('/blocks', methods=['GET', 'POST'])
+def blocks():
     start = int(request.values.get('start', '-1'))
     end = int(request.values.get('end', '-1'))
     length = engine.instance.db.get('length')
@@ -719,9 +727,9 @@ def start_miner():
 def stop_miner():
     if engine.instance.miner.get_state() == Service.RUNNING:
         engine.instance.miner.unregister()
-        return 'Closed miner'
+        return generate_json_response('Closed miner')
     else:
-        return 'Miner is not running.'
+        return generate_json_response('Miner is not running.')
 
 
 @app.route('/status_miner', methods=['GET', 'POST'])
@@ -736,10 +744,7 @@ def status_miner():
 
 @app.route('/power_available')
 def power_available():
-    try:
-        status = PowerService.system_status(engine.instance.config['coinami']['container'])
-    except:
-        status = Response(False, 'Docker is missing')
+    status = PowerService.system_status(engine.instance.config['coinami']['container'])
     return generate_json_response({
         "success": status.getFlag(),
         "message": status.getData()

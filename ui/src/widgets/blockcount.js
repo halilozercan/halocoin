@@ -58,7 +58,7 @@ class Blockcount extends Component {
       });
     });
 
-    axios.get("/txs").then((response) => {
+    axios.get("/mempool").then((response) => {
       let data = response.data;
       this.setState((state) => {
         state['tx_pool_size'] = data.length;
