@@ -45,7 +45,7 @@ class Message:
         return self.__body
 
     def __str__(self):
-        return pickle.dumps({'headers': self.__headers, 'body': self.__body})
+        return pickle.dumps({'headers': self.__headers, 'body': self.__body}, 0).decode()
 
     def __repr__(self):
         return self.__body
@@ -53,7 +53,7 @@ class Message:
     @staticmethod
     def from_yaml(string):
         try:
-            as_dict = pickle.loads(string)
+            as_dict = pickle.loads(string.encode())
         except:
             raise ValueError('Could not load yaml representation of arrived message')
 
