@@ -1,6 +1,5 @@
+import pickle
 import uuid
-
-import yaml
 
 
 class Order:
@@ -46,8 +45,7 @@ class Message:
         return self.__body
 
     def __str__(self):
-        return yaml.dump({'headers': self.__headers,
-                          'body': self.__body})
+        return pickle.dumps({'headers': self.__headers, 'body': self.__body})
 
     def __repr__(self):
         return self.__body
@@ -55,7 +53,7 @@ class Message:
     @staticmethod
     def from_yaml(string):
         try:
-            as_dict = yaml.load(string)
+            as_dict = pickle.loads(string)
         except:
             raise ValueError('Could not load yaml representation of arrived message')
 
