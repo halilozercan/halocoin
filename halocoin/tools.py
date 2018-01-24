@@ -2,7 +2,6 @@ import copy
 import hashlib
 import logging
 import os
-import pickle
 import random
 import struct
 import time
@@ -69,7 +68,8 @@ def block_reward(length):
 
 def det_hash(x):
     """Deterministically takes sha256 of dict, list, int, or string."""
-    return hashlib.sha384(pickle.dumps(x)).digest()[0:32]
+    import yaml
+    return hashlib.sha384(yaml.dump(x).encode()).digest()[0:32]
 
 
 def hash_without_nonce(block):
