@@ -30,6 +30,7 @@ class ComplexEncoder(json.JSONEncoder):
         # Let the base class default method raise the TypeError
         return json.JSONEncoder.default(self, obj)
 
+
 def blockchain_synced(func):
     def wrapper(*args, **kwargs):
         if engine.instance.blockchain.get_chain_state() == BlockchainService.IDLE:

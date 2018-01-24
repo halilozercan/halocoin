@@ -202,26 +202,10 @@ class StateDatabase:
             result = self.update_database_with_tx(tx, block['length'])
             if not result:
                 return False
-        """
-        # We go over the list of requested jobs in a deterministic way. Thus,
-        # every client will agree on how to evaluate multiple job bidding at the same block.
-        
-        for requested_job_id in sorted(requested_jobs.keys()):
-            for bid in sorted(requested_jobs[requested_job_id], key=lambda x: x[1]):
-                bidder = bid[0]
-                bid_amount = bid[1]
-                if self.assign_job(requested_job_id, bidder, bid_amount, block['length']):
-                    break
 
-        # Now we take a look at back, we unassign jobs that are still not rewarded
-        from halocoin import custom
-        assigned_jobs = self.get_assigned_jobs()
-        for job in assigned_jobs.values():
-            if job['status_list'][-1]['block'] <= (block['length'] - custom.drop_job_block_count):
-                self.unassign_job(job['id'], block['length'])
-        """
-        # Version 0.0007c: Change of job assignment to stakes
-        # Unassign all jobs and redistribute
+        # Version 0.0012c: Job assignment is now dynamic.
+        # Unassign jobs at T, reassign jobs whenever available
+        #
         if block['length'] % custom.assignment_period == 0:
             assigned_jobs = self.get_assigned_jobs().values()
             for job in assigned_jobs:

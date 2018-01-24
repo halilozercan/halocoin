@@ -2,6 +2,7 @@ import copy
 import hashlib
 import logging
 import os
+import pickle
 import random
 import struct
 import time
@@ -68,9 +69,7 @@ def block_reward(length):
 
 def det_hash(x):
     """Deterministically takes sha256 of dict, list, int, or string."""
-    import yaml
-    pack = yaml.dump(x).encode()
-    return hashlib.sha384(pack).digest()[0:32]
+    return hashlib.sha384(pickle.dumps(x)).digest()[0:32]
 
 
 def hash_without_nonce(block):
@@ -151,7 +150,7 @@ def encrypt(key, content, chunksize=64 * 1024):
     import Crypto.Random
     from Crypto.Cipher import AES
     infile = io.BytesIO()
-    infile.write(content.encode())
+    infile.write(content)
     infile.seek(0)
     outfile = io.BytesIO()
     if isinstance(key, str):

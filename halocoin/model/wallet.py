@@ -1,9 +1,9 @@
 import os
-import yaml
+import pickle
 
 from ecdsa import SECP256k1
-from ecdsa.util import randrange_from_seed__trytryagain
 from ecdsa import SigningKey
+from ecdsa.util import randrange_from_seed__trytryagain
 
 from halocoin import tools
 
@@ -30,13 +30,13 @@ class Wallet:
         return self.privkey.to_string()
 
     def to_string(self):
-        return yaml.dump({
+        return pickle.dumps({
             'name': self.name,
             'privkey': self.get_privkey_str()
         })
 
     @staticmethod
     def from_string(wallet_string):
-        wallet_dict = yaml.load(wallet_string)
+        wallet_dict = pickle.loads(wallet_string)
         return Wallet(wallet_dict['name'], SigningKey.from_string(wallet_dict['privkey'], curve=SECP256k1))
 

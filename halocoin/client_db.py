@@ -1,13 +1,11 @@
 import os
+import pickle
 import sys
 
 import plyvel
-import yaml
-from simplekv.db.sql import SQLAlchemyStore
-from sqlalchemy.exc import OperationalError
 
 from halocoin import tools, api, custom
-from halocoin.service import Service, sync, lockit
+from halocoin.service import lockit
 
 
 class ClientDB:
@@ -40,13 +38,13 @@ class ClientDB:
 
     def get(self, key):
         try:
-            return yaml.load(self.DB.get(str(key).encode()).decode())
+            return pickle.loads(self.DB.get(str(key).encode()))
         except Exception as e:
             return None
 
     def put(self, key, value):
         try:
-            self.DB.put(str(key).encode(), yaml.dump(value).encode())
+            self.DB.put(str(key).encode(), pickle.dumps(value))
             return True
         except Exception as e:
             return False

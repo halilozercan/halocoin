@@ -1,9 +1,9 @@
 import os
+import pickle
 import sys
 import threading
 
 import plyvel
-import yaml
 
 from halocoin import tools, custom
 from halocoin.service import lockit
@@ -42,13 +42,13 @@ class KeyValueStore:
             # then we must use the earlier snapshot for this operation
             db = self.snapshot
         try:
-            return yaml.load(db.get(str(key).encode()).decode())
+            return pickle.loads(db.get(str(key).encode()))
         except Exception as e:
             return None
 
     def put(self, key, value):
         try:
-            encoded_value = yaml.dump(value).encode()
+            encoded_value = pickle.dumps(value)
             self.DB.put(str(key).encode(), encoded_value)
             if self.snapshot is not None:
                 self.log.add(str(key).encode())

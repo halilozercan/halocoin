@@ -1,9 +1,8 @@
 import copy
+import pickle
 import threading
 import time
 from cdecimal import Decimal
-
-import yaml
 
 from halocoin import custom, api
 from halocoin import tools
@@ -459,7 +458,7 @@ class BlockchainService(Service):
         stop_key = ('block_' + str(length).zfill(12)).encode()
         blocks = list(self.db.iterator(start=start_key, stop=stop_key, include_stop=False))
         for _key, value in blocks:
-            value = yaml.load(value.decode())
+            value = pickle.loads(value)
             result.append(value[key[:-1]])
         return result
 

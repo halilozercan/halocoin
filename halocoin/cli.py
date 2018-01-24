@@ -275,27 +275,24 @@ def mempool():
     pprint(txs)
 
 
-@action
-def version():
-    print(custom.version)
-
-
 def run(argv):
     parser = argparse.ArgumentParser(description='CLI for halocoin.')
-    parser.add_argument('action', choices=sorted(actions.keys()))
+    parser.add_argument('action', choices=sorted(actions.keys()),
+                        help="Main action to perform by this CLI.")
+    parser.add_argument('--version', action='version', version='%(prog)s ' + custom.version)
     parser.add_argument('--address', action="store", type=str, dest='address',
                         help='Give a valid blockchain address')
     parser.add_argument('--message', action="store", type=str, dest='message',
                         help='Message to send with transaction')
     parser.add_argument('--amount', action="store", type=int, dest='amount',
                         help='Amount of coins that are going to be used')
-    parser.add_argument('--start', action="store", type=str, dest='start',
+    parser.add_argument('--start', metavar='<integer>', action="store", type=str, dest='start',
                         help='Starting number while requesting range of blocks')
-    parser.add_argument('--end', action="store", type=str, dest='end',
+    parser.add_argument('--end', metavar='<integer>', action="store", type=str, dest='end',
                         help='Ending number while requesting range of blocks')
-    parser.add_argument('--file', action="store", type=str, dest='file',
+    parser.add_argument('--file', metavar='/file/path', action="store", type=str, dest='file',
                         help='File path for wallet upload')
-    parser.add_argument('--wallet', action="store", type=str, dest='wallet',
+    parser.add_argument('--wallet', metavar='my_wallet', action="store", type=str, dest='wallet',
                         help='Wallet name')
     parser.add_argument('--certificate', action="store", type=str, dest='certificate',
                         help='Rewarding sub-auth certificate file in pem format')
