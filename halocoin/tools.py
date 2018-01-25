@@ -6,6 +6,9 @@ import random
 import struct
 import time
 
+import yaml
+from yaml import CDumper
+
 from halocoin import custom
 
 alphabet = '123456789abcdefghijkmnopqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ'
@@ -68,8 +71,10 @@ def block_reward(length):
 
 def det_hash(x):
     """Deterministically takes sha256 of dict, list, int, or string."""
-    import yaml
-    return hashlib.sha384(yaml.dump(x).encode()).digest()[0:32]
+    try:
+        return hashlib.sha384(yaml.dump(x, Dumper=CDumper).encode()).digest()[0:32]
+    except Exception as e:
+        print(e.with_traceback())
 
 
 def hash_without_nonce(block):
