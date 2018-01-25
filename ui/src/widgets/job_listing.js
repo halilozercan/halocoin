@@ -1,17 +1,13 @@
 import React, { Component } from 'react';
-import {axiosInstance} from '../tools.js';
+import axios from 'axios';
 import {
   Table,
   TableBody,
   TableHeader,
   TableHeaderColumn,
   TableRow,
-  TableRowColumn,
 } from 'material-ui/Table';
-import {Card, CardActions, CardHeader, CardText} from 'material-ui/Card';
-import RaisedButton from 'material-ui/RaisedButton';
-import Dialog from 'material-ui/Dialog';
-import TextField from 'material-ui/TextField';
+import {Card, CardHeader, CardText} from 'material-ui/Card';
 
 class JobListing extends Component {
 
@@ -21,13 +17,29 @@ class JobListing extends Component {
       data: null,
       dialogOpen: false,
       jobId: '',
-      offer: '0'
+      offer: '0',
+      rowsPerPage: [5,10,15],
+      numberOfRows: 5,
+      page: 1,
+      total: 0
     }
   }
 
   componentDidMount() {
-    axiosInstance.get('/jobs').then((response) => {
-      this.setState({data: response.data.available});
+    this.updateRows();
+  }
+
+  updateRows = (state) => {
+    axios.get('/available_jobs', {
+      params: {
+        page: this.state.page,
+        row_per_page: this.state.numberOfRows
+      }
+    }).then((response) => {
+      this.setState({
+        data: response.data.jobs,
+        total: response.data.total
+      });
     });
   }
 

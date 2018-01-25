@@ -1,10 +1,38 @@
 import React, { Component } from 'react';
+import darkBaseTheme from 'material-ui/styles/baseThemes/darkBaseTheme';
 import MuiThemeProvider from 'material-ui/styles/MuiThemeProvider';
+import getMuiTheme from 'material-ui/styles/getMuiTheme';
+import {
+  green500, green700,
+  pinkA200,
+  grey100, grey300, grey400, grey500,
+  white, darkBlack, fullBlack,
+} from 'material-ui/styles/colors';
 import MainPage from './MainPage.js';
 import ChooseWallet from './ChooseWallet.js';
 import io from 'socket.io-client';
 import axios from 'axios';
 import Snackbar from 'material-ui/Snackbar';
+
+const muiTheme = getMuiTheme({
+  palette: {
+    primary1Color: green500,
+    primary2Color: green700,
+    primary3Color: grey400,
+    accent1Color: pinkA200,
+    accent2Color: grey100,
+    accent3Color: grey500,
+    textColor: darkBlack,
+    alternateTextColor: white,
+    canvasColor: white,
+    borderColor: grey300,
+    pickerHeaderColor: green500,
+    shadowColor: fullBlack,
+  },
+  appBar: {
+    height: 60,
+  },
+});
 
 
 class App extends Component {
@@ -112,7 +140,7 @@ class App extends Component {
     }
 
     return (
-      <MuiThemeProvider>
+      <MuiThemeProvider muiTheme={muiTheme}>
         <div className="wrapper">
           <div className="content">
             {page}
@@ -122,6 +150,7 @@ class App extends Component {
             message={this.state.notificationMessage}
             autoHideDuration={4000}
             onRequestClose={this.handleRequestClose}
+            bodyStyle={{ height: 'auto', lineHeight: '28px', padding: 12, whiteSpace: 'pre-line' }}
           />
         </div>
       </MuiThemeProvider>

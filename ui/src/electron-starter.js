@@ -14,8 +14,13 @@ let mainWindow;
 
 function createWindow() {
     // Create the browser window.
-    mainWindow = new BrowserWindow({title: 'Halocoin', width: 900, height: 660, 
-        webPreferences: {webSecurity: false}});
+    mainWindow = new BrowserWindow({
+      title: 'Halocoin', 
+      width: 900, 
+      height: 660, 
+      webPreferences: {webSecurity: false},
+      icon: path.join(__dirname, '/../public/coins.png')
+    });
 
     const startUrl = process.env.ELECTRON_START_URL || url.format({
             pathname: path.join(__dirname, '/../build/index.html'),

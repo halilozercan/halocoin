@@ -1,19 +1,10 @@
 import React, { Component } from 'react';
 import WalletList from './widgets/wallet_list.js';
 import NewWalletForm from './widgets/new_wallet_form.js';
-import {Card, CardActions, CardHeader, CardText} from 'material-ui/Card';
+import {Card, CardHeader, CardText} from 'material-ui/Card';
 import Blockcount from './widgets/blockcount.js';
 import {axiosInstance} from './tools.js';
 import {Tabs, Tab} from 'material-ui/Tabs';
-
-const styles = {
-  headline: {
-    fontSize: 24,
-    paddingTop: 16,
-    marginBottom: 12,
-    fontWeight: 400,
-  },
-};
 
 class ChooseWallet extends Component {
 

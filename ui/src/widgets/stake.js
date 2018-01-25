@@ -64,10 +64,10 @@ class Stake extends Component {
     axios.post(address, data).then((response) => {
       let success = response.data.success;
       if(success) {
-        this.props.notify('Successfully updated your default wallet', 'success');
+        this.props.notify(response.data.message, 'success');
       }
       else {
-        this.props.notify('Failed to update your default wallet', 'error');
+        this.props.notify(response.data.message, 'error');
       }
     })
 

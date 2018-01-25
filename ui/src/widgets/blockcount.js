@@ -4,7 +4,6 @@ import Paper from 'material-ui/Paper';
 import Chip from 'material-ui/Chip';
 import FontIcon from 'material-ui/FontIcon';
 import Avatar from 'material-ui/Avatar';
-import Snackbar from 'material-ui/Snackbar';
 
 const bottomBarStyle = {
   position: 'fixed', 
