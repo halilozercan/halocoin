@@ -103,6 +103,8 @@ class PeerListenService(Service):
             diffLength=diffLength,
             rank=0.75
         )
+        if length > self.clientdb.get('known_length'):
+            self.clientdb.put('known_length', length)
         self.clientdb.add_peer(peer, 'greetings')
         return {
             'node_id': self.node_id,

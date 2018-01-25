@@ -272,12 +272,25 @@ def history():
 @app.route('/jobs')
 def jobs():
     type = request.values.get('type', 'all')
+    page = request.values.get('page', 1)
     result = {'available': None, 'assigned': None}
     if type == 'available' or type == 'all':
         result['available'] = engine.instance.statedb.get_available_jobs()
 
     if type == 'assigned' or type == 'all':
         result['assigned'] = engine.instance.statedb.get_assigned_jobs()
+
+    return generate_json_response(result)
+
+
+@app.route('/available_jobs')
+def available_jobs():
+    page = int(request.values.get('page', 1))
+    rows_per_page = int(request.values.get('rows_per_page', 5))
+    result = {'total': 0, 'page': page, 'rows_per_page': rows_per_page, 'jobs': []}
+    jobs = list(engine.instance.statedb.get_available_jobs().values())
+    result['total'] = len(jobs)
+    result['jobs'] = jobs[((page-1)*rows_per_page):(page*rows_per_page)]
 
     return generate_json_response(result)
 
