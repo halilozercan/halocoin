@@ -7,7 +7,6 @@ import struct
 import time
 
 import yaml
-from yaml import CDumper
 
 from halocoin import custom
 
