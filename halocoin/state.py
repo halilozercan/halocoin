@@ -209,7 +209,9 @@ class StateDatabase:
         if block['length'] % custom.assignment_period == 0:
             assigned_jobs = self.get_assigned_jobs().values()
             for job in assigned_jobs:
-                self.unassign_job(job['id'], block['length'])
+                assigned_block = job['status_list'][-1]['block']
+                if assigned_block <= (block['length'] - custom.unassignment_after*custom.assignment_period):
+                    self.unassign_job(job['id'], block['length'])
 
             available_jobs = sorted(self.get_available_jobs().values(),
                                     key=lambda x: (x['amount'], x['id']),
@@ -243,7 +245,7 @@ class StateDatabase:
         return valid_txs
 
     def rollback_block(self, block):
-        # TODO: 0.007-9c changes
+        # TODO: 0.007-12c changes
         """
         A block rollback means removing the block from chain.
         A block is defined by its transactions. Here we rollback every object in database to the version

@@ -23,9 +23,9 @@ recalculate_target_at = (4*60*60 // blocktime)  # It's every half day
 # Precalculate
 memoized_weights = [inflection ** i for i in range(history_length)]
 
-assignment_period = 1
-unassignment_period = 30
-assignment_stake_burn = 0.01
+assignment_period = 10  # Assign jobs at each T rounds
+unassignment_after = 4   # Unassign jobs after T*M rounds
+assignment_stake_burn = 0.1
 
 first_target = '0' * 4 + 'f' * 60
 
