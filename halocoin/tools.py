@@ -71,10 +71,7 @@ def block_reward(length):
 
 def det_hash(x):
     """Deterministically takes sha256 of dict, list, int, or string."""
-    try:
-        return hashlib.sha384(yaml.dump(x, Dumper=CDumper).encode()).digest()[0:32]
-    except Exception as e:
-        print(e.with_traceback())
+    return hashlib.sha384(yaml.dump(x).encode()).digest()[0:32]
 
 
 def hash_without_nonce(block):
