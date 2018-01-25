@@ -16,8 +16,8 @@ setup(
         ],
     },
     include_package_data=True,
-    install_requires=['requests', 'wheel', 'Cython', 'flask', 'flask-socketio',
+    install_requires=['requests', 'wheel', 'pyyaml', 'flask', 'flask-socketio',
                       'pycrypto', 'm3-cdecimal', 'simplekv', 'pyopenssl',
                       'werkzeug', 'tabulate', 'SQLAlchemy', 'ecdsa', 'plyvel', 'docker'],
-    packages=find_packages('pyyaml', exclude=("tests", "tests.*")),
+    packages=find_packages(exclude=("tests", "tests.*")),
 )
