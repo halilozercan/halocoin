@@ -213,7 +213,7 @@ class PowerService(Service):
         assigned_job = own_account['assigned_job']
         if assigned_job == '':
             self.set_status("No assignment!")
-            time.sleep(5)
+            time.sleep(1)
             return
 
         job_status = self.get_job_status(assigned_job)
@@ -229,7 +229,7 @@ class PowerService(Service):
             self.upload_job(assigned_job)
         elif job_status == 'uploaded':
             self.done_job(assigned_job)
-        time.sleep(1)
+        time.sleep(0.1)
 
     @staticmethod
     def system_status(container_name):
