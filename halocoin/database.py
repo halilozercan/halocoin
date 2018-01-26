@@ -15,13 +15,11 @@ class KeyValueStore:
         self.dbname = dbname
         self.DB = None
         self.iterator = None
-        self.snapshot = None
-        self.snapshot_owner = ''
-        self.simLock = threading.RLock()
+        self.simulating = False
+        self.simulation_owner = ''
         self.salt = None
         self.req_count = 0
-        self.log = set()
-        self.snapshots = {}
+        self.log = dict()
         try:
             db_location = os.path.join(self.engine.working_dir, self.dbname)
             DB = plyvel.DB(db_location, create_if_missing=True)
@@ -33,25 +31,29 @@ class KeyValueStore:
 
     @lockit('kvstore')
     def get(self, key):
-        db = self.DB
+        def from_database(key):
+            try:
+                return pickle.loads(self.DB.get(str(key).encode()))
+            except Exception as e:
+                return None
+
         tname = threading.current_thread().getName()
-        if tname != self.snapshot_owner and self.snapshot is not None:
-            # Request is coming from blockchain process thread.
-            # All actions are directed to ongoing database
-            # If there is a simulation going on and we are not inside a blockchain namespace,
-            # then we must use the earlier snapshot for this operation
-            db = self.snapshot
-        try:
-            return pickle.loads(db.get(str(key).encode()))
-        except Exception as e:
-            return None
+        if (not self.simulating) or (tname != self.simulation_owner and self.simulating) or \
+                (tname == self.simulation_owner and self.simulating and str(key) not in self.log):
+            return from_database(key)
+        else:
+            return self.log[str(key)]
 
     def put(self, key, value):
         try:
-            encoded_value = pickle.dumps(value)
-            self.DB.put(str(key).encode(), encoded_value)
-            if self.snapshot is not None:
-                self.log.add(str(key).encode())
+            tname = threading.current_thread().getName()
+            if tname != self.simulation_owner and self.simulating:
+                raise EnvironmentError('There is a simulation going on! You cannot write to database from {}'
+                                       .format(tname))
+            elif tname == self.simulation_owner and self.simulating:
+                self.log[str(key)] = value
+            elif not self.simulating:
+                self.DB.put(str(key).encode(), pickle.dumps(value))
             return True
         except Exception as e:
             return False
@@ -62,17 +64,7 @@ class KeyValueStore:
         return result is not None
 
     def delete(self, key):
-        try:
-            self.DB.delete(str(key).encode())
-            if self.snapshot is not None:
-                self.log.add(str(key).encode())
-            return True
-        except:
-            return False
-
-    @lockit('kvstore')
-    def is_simulated(self):
-        return self.snapshot is not None
+        return self.put(key, None)
 
     @lockit('kvstore')
     def simulate(self):
@@ -84,12 +76,12 @@ class KeyValueStore:
         Other threads
         :return:
         """
-        if self.snapshot is not None:
-            tools.log('There is already an ongoing simulation!')
+        if self.simulating:
+            tools.log('There is already an ongoing simulation! {}'.format(threading.current_thread().getName()))
             return False
         try:
-            self.snapshot = self.DB.snapshot()
-            self.snapshot_owner = threading.current_thread().getName()
+            self.simulating = True
+            self.simulation_owner = threading.current_thread().getName()
             return True
         except:
             return False
@@ -100,24 +92,20 @@ class KeyValueStore:
         Commit simply erases the earlier snapshot.
         :return:
         """
-        if self.snapshot is None:
+        if not self.simulating:
             tools.log('There isn\'t any ongoing simulation')
             return False
-        self.snapshot = None
-        self.log = set()
+        for key, value in self.log.items():
+            self.DB.put(str(key).encode(), pickle.dumps(value))
+        self.log = dict()
+        self.simulating = False
         return True
 
     @lockit('kvstore')
     def rollback(self):
-        if self.snapshot is None:
+        if not self.simulating:
             tools.log('There isn\'t any ongoing simulation')
             return False
-        for key in self.log:
-            value = self.snapshot.get(key)
-            if value is not None:
-                self.DB.put(key, value)
-            else:
-                self.DB.delete(key)
-        self.log = set()
-        self.snapshot = None
+        self.log = dict()
+        self.simulating = False
         return True

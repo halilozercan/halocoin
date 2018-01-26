@@ -42,7 +42,7 @@ class PeerCheckService(Service):
 
         peers = self.clientdb.get_peers()
         if len(peers) > 0:
-            i = tools.exponential_random(1.0 / 2) % len(peers)
+            i = tools.exponential_random(3.0 / 4) % len(peers)
             peer = peers[i]
             t1 = time.time()
             peer_result = self.peer_check(peer)
