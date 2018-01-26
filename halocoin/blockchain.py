@@ -70,22 +70,25 @@ class BlockchainService(Service):
                             return
 
                     self.db.simulate()
-                    length = self.db.get('length')
-                    for i in range(20):
-                        block = self.get_block(length)
-                        if self.fork_check(blocks, length, block):
-                            self.delete_block()
-                            length -= 1
-                        else:
-                            break
+                    try:
+                        length = self.db.get('length')
+                        for i in range(20):
+                            block = self.get_block(length)
+                            if self.fork_check(blocks, length, block):
+                                self.delete_block()
+                                length -= 1
+                            else:
+                                break
 
-                    for block in blocks:
-                        add_block_result = self.add_block(block)
-                        if add_block_result == 2:  # A block that is ahead of us could not be added. No need to proceed.
-                            break
-                        elif add_block_result == 0:
-                            total_number_of_blocks_added += 1
-                            api.new_block()
+                        for block in blocks:
+                            add_block_result = self.add_block(block)
+                            if add_block_result == 2:  # A block that is ahead of us could not be added. No need to proceed.
+                                break
+                            elif add_block_result == 0:
+                                total_number_of_blocks_added += 1
+                                api.new_block()
+                    except Exception as e:
+                        print("halo")
 
                     if total_number_of_blocks_added == 0 or self.db.get('length') != blocks[-1]['length']:
                         # All received blocks failed. Punish the peer by lowering rank.
@@ -454,12 +457,11 @@ class BlockchainService(Service):
         length = self.db.get('length')
         start = max((length - size), 0)
         result = []
-        start_key = ('block_' + str(start).zfill(12)).encode()
-        stop_key = ('block_' + str(length).zfill(12)).encode()
-        blocks = list(self.db.iterator(start=start_key, stop=stop_key, include_stop=False))
-        for _key, value in blocks:
-            value = pickle.loads(value)
-            result.append(value[key[:-1]])
+        for i in range(start, length):
+            result.append(self.get_block(i)[key[:-1]])
+        # start_key = ('block_' + str(start).zfill(12)).encode()
+        # stop_key = ('block_' + str(length).zfill(12)).encode()
+        # blocks = list(self.db.iterator(start=start_key, stop=stop_key, include_stop=False))
         return result
 
     @lockit('kvstore')
