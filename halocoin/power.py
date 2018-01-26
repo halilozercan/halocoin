@@ -85,7 +85,7 @@ class PowerService(Service):
         job_directory = os.path.join(self.engine.working_dir, 'jobs', job_id)
         if not os.path.exists(job_directory):
             os.makedirs(job_directory)
-        job_file = os.path.join(job_directory, 'job.zip')
+        job_file = os.path.join(job_directory, 'job.tar.gz')
         secret_message = str(uuid.uuid4())
         payload = yaml.dump({
             "message": tools.det_hash(secret_message),
@@ -103,11 +103,11 @@ class PowerService(Service):
                     downloaded += 1024*1024
                     self.set_status("Downloading... {}".format(tools.readable_bytes(downloaded)))
         if os.path.exists(job_file):
-            import zipfile
-            zip_ref = zipfile.ZipFile(job_file, 'r')
+            import tarfile
+            tar_ref = tarfile.TarFile(job_file, mode='r:gz')
             self.set_status("Decompressing...")
-            zip_ref.extractall(job_directory)
-            zip_ref.close()
+            tar_ref.extractall(job_directory)
+            tar_ref.close()
             if os.path.exists(os.path.join(job_directory, 'coinami.job.json')) and \
                             self.engine.config['coinami']['cores'] > 0:
                 import json
