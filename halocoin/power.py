@@ -229,6 +229,9 @@ class PowerService(Service):
             self.upload_job(assigned_job)
         elif job_status == 'uploaded':
             self.done_job(assigned_job)
+        elif job_status == 'done':
+            self.set_status("Done!")
+
         time.sleep(0.1)
 
     @staticmethod

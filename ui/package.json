@@ -6,10 +6,8 @@
   "dependencies": {
     "axios": "^0.17.1",
     "material-ui": "^0.20.0",
-    "materialui-pagination": "0.0.6",
     "react": "^16.2.0",
     "react-dom": "^16.2.0",
-    "react-notification-system": "^0.2.16",
     "socket.io-client": "^2.0.4"
   },
   "main": "src/electron-starter.js",
