@@ -104,7 +104,7 @@ class PowerService(Service):
                     self.set_status("Downloading... {}".format(tools.readable_bytes(downloaded)))
         if os.path.exists(job_file):
             import tarfile
-            tar_ref = tarfile.TarFile(job_file, mode='r:gz')
+            tar_ref = tarfile.open(job_file, mode='r:gz')
             self.set_status("Decompressing...")
             tar_ref.extractall(job_directory)
             tar_ref.close()
