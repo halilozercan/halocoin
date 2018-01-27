@@ -342,19 +342,3 @@ def lockit(lock_name, timeout=-1):
         wrapper.__name__ = func.__name__
         return wrapper
     return _lockit
-
-
-def check_lock(lock_name):
-    """
-    Return true if we can acquire the lock
-    :param lock_name:
-    :return:
-    """
-    global locks
-    if '__lock_{}__'.format(lock_name) in locks:
-        mylock = locks['__lock_{}__'.format(lock_name)]
-        result = mylock.acquire(timeout=0.0000001)
-        if result:
-            mylock.release()
-        return result
-    return False

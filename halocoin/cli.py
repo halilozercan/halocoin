@@ -193,42 +193,6 @@ def send(address, amount, pw, wallet=None, message=None):
 
 
 @action
-def deposit(amount, pw, wallet=None, force=None):
-    from getpass import getpass
-    if pw is None:
-        wallet_pw = getpass('Wallet password: ')
-    else:
-        wallet_pw = pw
-
-    print(make_api_request("deposit", amount=amount,
-                           wallet_name=wallet, password=wallet_pw))
-
-
-@action
-def reward(certificate, privkey, job_id, address):
-    cert_pem = open(certificate, 'rb').read()
-    privkey_pem = open(privkey, 'rb').read()
-    print(make_api_request("reward", address=address, job_id=job_id,
-                           cert_pem=cert_pem, privkey_pem=privkey_pem))
-
-
-@action
-def job_dump(certificate, privkey, job_id, amount):
-    import time
-    cert_pem = open(certificate, 'rb').read()
-    privkey_pem = open(privkey, 'rb').read()
-    print(make_api_request("job_dump", job_id=job_id, job_timestamp=time.time(), amount=amount,
-                           cert_pem=cert_pem, privkey_pem=privkey_pem))
-
-
-@action
-def auth_reg(certificate, privkey, host, amount):
-    cert_pem = open(certificate, 'rb').read()
-    privkey_pem = open(privkey, 'rb').read()
-    print(make_api_request("auth_reg", cert_pem=cert_pem, privkey_pem=privkey_pem, host=host, supply=amount))
-
-
-@action
 def peers():
     peers = make_api_request("peers")
     pprint(peers)
@@ -294,12 +258,6 @@ def run(argv):
                         help='File path for wallet upload')
     parser.add_argument('--wallet', metavar='my_wallet', action="store", type=str, dest='wallet',
                         help='Wallet name')
-    parser.add_argument('--certificate', action="store", type=str, dest='certificate',
-                        help='Rewarding sub-auth certificate file in pem format')
-    parser.add_argument('--job-id', action="store", type=str, dest='job_id',
-                        help='While dumping, requesting, or rewarding, necessary job id.')
-    parser.add_argument('--privkey', action="store", type=str, dest='privkey',
-                        help='Rewarding sub-auth private key file in pem format')
     parser.add_argument('--config', action="store", type=str, dest='config',
                         help='Config file address. Use with start command.')
     parser.add_argument('--pw', action="store", type=str, dest='pw',
@@ -308,8 +266,6 @@ def run(argv):
                         help='Directory for halocoin to use.')
     parser.add_argument('--port', action="store", type=int, dest='port',
                         help='Override API port defined in config file.')
-    parser.add_argument('--host', action="store", type=str, dest='host',
-                        help='Define a host address while registering an auth.')
     parser.add_argument('--force', action="store_true", dest='force',
                         help='Force something that makes trouble.')
 

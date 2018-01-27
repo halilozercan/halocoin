@@ -18,14 +18,17 @@
     "test": "react-scripts test --env=jsdom",
     "eject": "react-scripts eject",
     "electron": "electron .",
+    "electron-dev": "concurrently \"BROWSER=none yarn start\" \"wait-on http://localhost:3000 && ELECTRON_START_URL=http://localhost:3000 electron .\"",
     "dev": "nf start"
   },
   "devDependencies": {
-    "npm": "^5.6.0",
+    "concurrently": "^3.5.1",
     "electron": "^1.7.10",
-    "react-scripts": "1.0.17",
     "electron-installer-debian": "^0.7.1",
     "electron-packager": "^10.1.0",
-    "foreman": "^2.0.0"
+    "foreman": "^2.0.0",
+    "npm": "^5.6.0",
+    "react-scripts": "1.0.17",
+    "wait-on": "^2.1.0"
   }
 }

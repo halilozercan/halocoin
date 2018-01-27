@@ -1,9 +1,8 @@
-import shutil
 import signal
 import sys
+import time
 
 import psutil
-import time
 
 from halocoin import api
 from halocoin import tools
@@ -13,7 +12,6 @@ from halocoin.database import KeyValueStore
 from halocoin.miner import MinerService
 from halocoin.peer_check import PeerCheckService
 from halocoin.peer_listen import PeerListenService
-from halocoin.power import PowerService
 from halocoin.service import Service, async, threaded
 from halocoin.state import StateDatabase
 
@@ -54,7 +52,6 @@ class Engine(Service):
         self.clientdb = ClientDB(self)
         self.statedb = StateDatabase(self)
         self.miner = MinerService(self)
-        self.power = PowerService(self)
 
     def on_register(self):
         print('Starting halocoin')
@@ -91,11 +88,6 @@ class Engine(Service):
             self.unregister_sub_services()
             return False
 
-        if not self.power.register():
-            sys.stderr.write("Power service has failed. Exiting!\n")
-            self.unregister_sub_services()
-            return False
-
         api.run()
 
         return True
@@ -105,9 +97,6 @@ class Engine(Service):
         if self.miner.get_state() == Service.RUNNING:
             self.miner.unregister()
             running_services.add(self.miner)
-        if self.power.get_state() == Service.RUNNING:
-            self.power.unregister()
-            running_services.add(self.power)
         if self.peers_check.get_state() == Service.RUNNING:
             self.peers_check.unregister()
             running_services.add(self.peers_check)

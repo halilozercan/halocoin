@@ -1,6 +1,6 @@
 import copy
 
-from halocoin import tools, custom
+from halocoin import tools
 from halocoin.service import lockit
 
 
@@ -17,9 +17,7 @@ class StateDatabase:
         'amount': 0,
         'count': 0,
         'cache-length': -1,
-        'tx_blocks': [],
-        'assigned_job': '',
-        'stake': 0
+        'tx_blocks': []
     }
 
     def __init__(self, engine):
@@ -37,17 +35,6 @@ class StateDatabase:
                         account['amount'] -= tx['amount']
                     if tx['to'] == address:
                         account['amount'] += tx['amount']
-                elif tx['type'] == 'reward':
-                    # TODO: implement if reward is for this account
-                    pass
-                elif tx['type'] == 'deposit':
-                    if owner == address:
-                        account['amount'] -= tx['amount']
-                        account['stake'] += tx['amount']
-                elif tx['type'] == 'withdraw':
-                    if owner == address:
-                        account['amount'] += tx['amount']
-                        account['stake'] -= tx['amount']
 
             return account
 
@@ -71,7 +58,7 @@ class StateDatabase:
         return True
 
     def update_account(self, address, new_account):
-        if new_account['amount'] < 0 or new_account['stake'] < 0:
+        if new_account['amount'] < 0:
             return False
         self.db.put(address, new_account)
         return True
@@ -102,88 +89,6 @@ class StateDatabase:
 
             self.update_account(send_address, send_account)
             self.update_account(recv_address, recv_account)
-        elif tx['type'] == 'reward':
-            auth = self.get_auth(tx['auth'])
-            if auth is None:
-                return False
-            if tx['pubkeys'] != [tools.get_pubkey_from_certificate(auth['certificate']).to_string()]:
-                return False
-            job = self.db.get('job_' + tx['job_id'])
-            last_change = job['status_list'][-1]
-            # This job is not assigned to anyone right now.
-            if last_change['action'] != 'assign':
-                return False
-            # Reward address is not currently assigned to the job.
-            if last_change['address'] != tx['to']:
-                return False
-            if job['auth'] != tx['auth']:
-                return False
-
-            recv_account = self.get_account(tx['to'])
-            # Receiving account does not have the same assignment
-            if recv_account['assigned_job'] != tx['job_id']:
-                return False
-
-            self.reward_job(tx['job_id'], tx['to'], block_length)
-
-            recv_account['assigned_job'] = ''
-            recv_account['amount'] += job['amount']
-            recv_account['tx_blocks'].append(block_length)
-            self.update_account(tx['to'], recv_account)
-        elif tx['type'] == 'auth_reg':
-            cert_valid = tools.check_certificate_chain(tx['certificate'])
-            common_name = tools.get_commonname_from_certificate(tx['certificate'])
-            early_reg = self.get_auth(common_name) is None
-            if not cert_valid or not early_reg:
-                return False
-
-            self.put_auth(tx['certificate'], tx['host'], tx['supply'])
-        elif tx['type'] == 'job_dump':
-            # Check if auth is known
-            auth = self.get_auth(tx['auth'])
-            if auth is None:
-                return False
-            elif tx['pubkeys'] != [tools.get_pubkey_from_certificate(auth['certificate']).to_string()]:
-                return False
-            # Check if job already exists
-            if self.db.exists('job_' + tx['job']['id']):
-                return False
-
-            # Check if authority has remaining supply
-            if auth['supply'] < tx['job']['amount']:
-                return False
-            auth['supply'] -= tx['job']['amount']
-
-            self.add_new_job(tx['job'], tx['auth'], block_length)
-            self.update_auth(tx['auth'], auth)
-        elif tx['type'] == 'deposit':
-            if tx['count'] != self.known_tx_count(send_address, count_pool=count_pool):
-                return False
-            send_account['amount'] -= tx['amount']
-            send_account['stake'] += tx['amount']
-            send_account['count'] += 1
-            send_account['tx_blocks'].append(block_length)
-
-            if not (send_account['amount'] >= 0) and (send_account['stake'] >= 0):
-                return False
-
-            self.update_account(send_address, send_account)
-            if send_account['stake'] > 0:
-                self.put_address_in_stake_pool(send_address)
-        elif tx['type'] == 'withdraw':
-            if tx['count'] != self.known_tx_count(send_address, count_pool=count_pool):
-                return False
-            send_account['amount'] += tx['amount']
-            send_account['stake'] -= tx['amount']
-            send_account['count'] += 1
-            send_account['tx_blocks'].append(block_length)
-
-            if not (send_account['amount'] >= 0) and (send_account['stake'] >= 0):
-                return False
-
-            self.update_account(send_address, send_account)
-            if send_account['stake'] == 0:
-                self.remove_address_from_stake_pool(send_address)
         else:
             return False
         return True
@@ -202,34 +107,6 @@ class StateDatabase:
             result = self.update_database_with_tx(tx, block['length'])
             if not result:
                 return False
-
-        # Version 0.0012c: Job assignment is now dynamic.
-        # Unassign jobs at T, reassign jobs whenever available
-        #
-        if block['length'] % custom.assignment_period == 0:
-            assigned_jobs = self.get_assigned_jobs().values()
-            for job in assigned_jobs:
-                assigned_block = job['status_list'][-1]['block']
-                if assigned_block <= (block['length'] - custom.unassignment_after*custom.assignment_period):
-                    self.unassign_job(job['id'], block['length'])
-
-            available_jobs = sorted(self.get_available_jobs().values(),
-                                    key=lambda x: (x['amount'], x['id']),
-                                    reverse=True)
-
-            accounts = [(self.get_account(address), address) for address in self.get_stake_pool()]
-            accounts = sorted(accounts,
-                              key=lambda x: (x[0]['stake'], x[1]),
-                              reverse=True)
-            ji = 0
-            ai = 0
-            while ji < len(available_jobs) and ai < len(accounts):
-                if available_jobs[ji]['amount'] > accounts[ai][0]['stake']:
-                    ji += 1
-                else:
-                    self.assign_job(available_jobs[ji]['id'], accounts[ai][1], block['length'])
-                    ji += 1
-                    ai += 1
 
         return True
 
@@ -276,36 +153,6 @@ class StateDatabase:
 
                 self.db.put(tx_owner_address, owner_account)
                 self.db.put(tx['to'], receiver_account)
-            elif tx['type'] == 'deposit':
-                owner_account['amount'] += tx['amount']
-                owner_account['stake'] -= tx['amount']
-                owner_account['count'] -= 1
-                owner_account['tx_blocks'].remove(block['length'])
-
-                self.update_account(tx_owner_address, owner_account)
-                if owner_account['stake'] == 0:
-                    self.remove_address_from_stake_pool(tx_owner_address)
-            elif tx['type'] == 'withdraw':
-                owner_account['amount'] -= tx['amount']
-                owner_account['stake'] += tx['amount']
-                owner_account['count'] -= 1
-                owner_account['tx_blocks'].remove(block['length'])
-
-                self.update_account(tx_owner_address, owner_account)
-                if owner_account['stake'] > 0:
-                    self.put_address_in_stake_pool(tx_owner_address)
-            elif tx['type'] == 'auth_reg':
-                self.delete_auth(tx['certificate'])
-            elif tx['type'] == 'job_dump':
-                self.delete_job(tx['job']['id'])
-            elif tx['type'] == 'reward':
-                job = self.get_job(tx['request']['job_id'])
-                for status in reversed(job['status_list']):
-                    if status['block'] == block['length']:
-                        job['status_list'].remove(status)
-                    else:
-                        break
-                self.db.update_job(job)
 
     @lockit('kvstore')
     def known_tx_count(self, address, count_pool=True, txs_in_pool=None):
@@ -319,141 +166,3 @@ class StateDatabase:
             txs_in_pool = self.blockchain.tx_pool()
             surplus += number_of_unconfirmed_txs(address)
         return account['count'] + surplus
-
-    @lockit('kvstore')
-    def get_auth(self, auth_name):
-        return self.db.get('auth_' + auth_name)
-
-    def put_auth(self, cert_pem, host, supply):
-        if tools.check_certificate_chain(cert_pem):
-            common_name = tools.get_commonname_from_certificate(cert_pem)
-            auth = {
-                'certificate': cert_pem,
-                'host': host,
-                'supply': supply
-            }
-            self.db.put('auth_' + common_name, auth)
-
-    def update_auth(self, auth_name, auth):
-        self.db.put('auth_' + auth_name, auth)
-
-    def delete_auth(self, cert_pem):
-        common_name = tools.get_commonname_from_certificate(cert_pem)
-        self.db.delete('auth_' + common_name)
-
-    @lockit('kvstore')
-    def get_stake_pool(self):
-        result = self.db.get('stake_pool')
-        if result is None:
-            return set()
-        else:
-            return set(self.db.get('stake_pool'))
-
-    def put_address_in_stake_pool(self, address):
-        stake_pool = self.get_stake_pool()
-        stake_pool.add(address)
-        self.db.put('stake_pool', stake_pool)
-
-    def remove_address_from_stake_pool(self, address):
-        stake_pool = self.get_stake_pool()
-        stake_pool.remove(address)
-        self.db.put('stake_pool', stake_pool)
-
-    @lockit('kvstore')
-    def get_available_jobs(self):
-        job_list = self.db.get('job_list')
-        result = {}
-        for job_id in job_list:
-            job = self.get_job(job_id)
-            # Here we check last transaction made on the job.
-            if job['status_list'][-1]['action'] == 'add' or job['status_list'][-1]['action'] == 'unassign':
-                result[job_id] = self.db.get('job_' + job_id)
-        return result
-
-    @lockit('kvstore')
-    def get_assigned_jobs(self):
-        job_list = self.db.get('job_list')
-        result = {}
-        for job_id in job_list:
-            job = self.get_job(job_id)
-            # Here we check last transaction made on the job.
-            if job['status_list'][-1]['action'] == 'assign':
-                result[job_id] = self.db.get('job_' + job_id)
-        return result
-
-    def add_new_job(self, tx_job, auth, block_number):
-        job = copy.deepcopy(tx_job)
-        job['auth'] = auth
-        job['status_list'] = [{
-            'action': 'add',
-            'block': block_number
-        }]
-        job_list = self.db.get('job_list')
-        job_list.append(job['id'])
-        self.db.put('job_list', job_list)
-        self.db.put('job_' + job['id'], job)
-        return True
-
-    def assign_job(self, job_id, address, block_number):
-        job = self.db.get('job_' + job_id)
-        if job['status_list'][-1]['action'] != 'add' and job['status_list'][-1]['action'] != 'unassign':
-            return False
-        account = self.get_account(address)
-        if account['assigned_job'] != '':
-            return False
-
-        job['status_list'].append({
-            'action': 'assign',
-            'block': block_number,
-            'address': address
-        })
-        account['assigned_job'] = job_id
-        account['stake'] -= int(job['amount'] * custom.assignment_stake_burn)
-        self.db.put('job_' + job_id, job)
-        self.update_account(address, account)
-        if account['stake'] == 0:
-            self.remove_address_from_stake_pool(address)
-        return True
-
-    def reward_job(self, job_id, address, block_number):
-        job = self.db.get('job_' + job_id)
-
-        job['status_list'].append({
-            'action': 'reward',
-            'block': block_number,
-            'address': address
-        })
-        self.db.put('job_' + job_id, job)
-        return True
-
-    def unassign_job(self, job_id, block_number):
-        job = self.db.get('job_' + job_id)
-        if job['status_list'][-1]['action'] != 'assign':
-            return False
-
-        last_assigned_address = job['status_list'][-1]['address']
-        last_assigned_account = self.get_account(last_assigned_address)
-
-        job = self.db.get('job_' + job_id)
-        job['status_list'].append({
-            'action': 'unassign',
-            'block': block_number
-        })
-        last_assigned_account['assigned_job'] = ''
-        self.db.put('job_' + job_id, job)
-        self.update_account(last_assigned_address, last_assigned_account)
-        return True
-
-    @lockit('kvstore')
-    def get_job(self, job_id):
-        return self.db.get('job_' + job_id)
-
-    def update_job(self, job):
-        return self.db.put('job_' + job['id'], job)
-
-    def delete_job(self, job_id):
-        job_list = self.db.get('job_list')
-        job_list.remove(job_id)
-        self.db.put('job_list', job_list)
-        self.db.delete('job_' + job_id)
-        return True

@@ -5,8 +5,8 @@ from setuptools import find_packages
 
 setup(
     name='Halocoin',
-    version='0.0.1',
-    description='Read mapping incentivized cryptocurrency. Branch of halilozercan/halocoin',
+    version='0.0.2',
+    description='Experimental blockchain',
     author='H. Ibrahim Ozercan',
     author_email='halilozercan@gmail.com',
     url='https://github.com/halilozercan/halocoin',
@@ -17,7 +17,7 @@ setup(
     },
     include_package_data=True,
     install_requires=['requests', 'wheel', 'pyyaml', 'flask', 'flask-socketio',
-                      'pycrypto', 'm3-cdecimal', 'simplekv', 'pyopenssl',
-                      'werkzeug', 'tabulate', 'SQLAlchemy', 'ecdsa', 'plyvel', 'docker'],
+                      'pycrypto', 'm3-cdecimal', 'pyopenssl',
+                      'werkzeug', 'tabulate', 'ecdsa', 'plyvel'],
     packages=find_packages(exclude=("tests", "tests.*")),
 )

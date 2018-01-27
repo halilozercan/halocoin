@@ -32,15 +32,17 @@ It is important that account, blockchain, api and peers check services are worki
 
 ## Getting started
 
-Halocoin is packaged by easy_install that is supported by PyPI. As like any other python project,
+Halocoin is packaged according to distutils guidelines that is supported by PyPI. As like any other python project,
 I recommend you to install this on a virtualenv.
+
+Also, Halocoin only works and tested on Python 3 and above.
 
 ```
 git clone https://github.com/halilozercan/halocoin
 cd halocoin
-virtualenv venv
+virtualenv venv -p python3
 source venv/bin/activate
-python setup.py install
+python3 setup.py install
 ```
 
 or
@@ -63,9 +65,12 @@ halocoin start
 
 Every service associated with blockchain runs at startup. This implies that your client will immediately start synchronizing with p2p network.
 Initial peer list is hard-coded into client but you can update this list by updating your config file. Config file can be specified at startup or can be edited manually after first start.
-Default data folder is inside your home directory and named ```.halocoin```.
+Default data folder is inside your home directory and named ```.halocoin```. You can defined another data folder by ```--dir``` option. Details of CLI are given above.
 
 ## How to use
+
+As mentioned, halocoin comes with a minimalistic CLI but all it does is converting your command lines request into HTTP requests. Then, it sends these requests
+to the running Restful API. If you prefer, you can use this API with another client.
 
 To interact with blockchain, you need to have an account, a wallet. You can create a wallet by running
 ```
@@ -80,3 +85,5 @@ Necessary parameters: wallet_name, password
 ```
 
 If you prefer CLI, you will be prompted to enter the password that is going to be used for encryption of the wallet. This password prompt will always pop up when you use your wallet if you do not set a default wallet.
+
+## More documentation coming soon!!

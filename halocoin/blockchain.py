@@ -1,5 +1,4 @@
 import copy
-import pickle
 import threading
 import time
 from cdecimal import Decimal
@@ -20,7 +19,7 @@ class BlockchainService(Service):
     job_dump: Announcing jobs that are prepared and ready to be downloaded
     job_request: Entering a pool for a job request.
     """
-    tx_types = ['spend', 'mint', 'reward', 'auth_reg', 'job_dump', 'deposit', 'withdraw']
+    tx_types = ['spend', 'mint']
     IDLE = 1
     SYNCING = 2
 
@@ -106,8 +105,6 @@ class BlockchainService(Service):
         try:
             candidate_tx = self.tx_queue.get(timeout=0.1)
             result = self.add_tx(candidate_tx)
-            api.tx_queue_response['message'] = result
-            api.tx_queue_response['event'].set()
             self.tx_queue.task_done()
         except:
             pass
@@ -412,40 +409,6 @@ class BlockchainService(Service):
                 return Response(False, 'Address is not valid')
             if tx['to'] == tools.tx_owner_address(tx):
                 return Response(False, 'You cannot transfer money to same account!')
-            if 'amount' not in tx or not isinstance(tx['amount'], int):
-                return Response(False, 'Transaction amount is not given or not a proper integer')
-            if 'count' not in tx or not isinstance(tx['count'], int):
-                return Response(False, 'transaction count is missing')
-        elif tx['type'] == 'reward':
-            if not BlockchainService.tx_signature_check(tx):
-                return Response(False, 'Transaction is not properly signed')
-            if 'auth' not in tx:
-                return Response(False, 'Reward transactions must include auth name')
-            if 'job_id' not in tx:
-                return Response(False, 'Reward must be addressed to a job id')
-            if 'to' not in tx or not tools.is_address_valid(tx['to']):
-                return Response(False, 'There must be a receiver of the reward.')
-        # TODO: Add signature check for authority transactions
-        elif tx['type'] == 'auth_reg':
-            if 'certificate' not in tx:
-                return Response(False, 'Auth must register with a valid certificate')
-            elif tx['pubkeys'] != [tools.get_pubkey_from_certificate(tx['certificate']).to_string()]:
-                return Response(False, 'pubkeys do not match with certificate')
-            elif 'host' not in tx or not isinstance(tx['host'], str):
-                return Response(False, 'Authorities require to provide a hosting address')
-            elif 'supply' not in tx or not isinstance(tx['supply'], int):
-                return Response(False, 'Initial supply is not found')
-        elif tx['type'] == 'job_dump':
-            if 'auth' not in tx:
-                return Response(False, 'Job dump transactions must include auth name')
-            if 'job' not in tx or not isinstance(tx['job'], dict) or \
-                            'id' not in tx['job'] or 'timestamp' not in tx['job']:
-                return Response(False, 'Job dump transactions must include a job in it. Makes sense right?')
-            if 'amount' not in tx['job']:
-                return Response(False, 'Job dump transactions must specify the reward')
-        elif tx['type'] == 'deposit' or tx['type'] == 'withdraw':
-            if not BlockchainService.tx_signature_check(tx):
-                return Response(False, 'Transaction is not properly signed')
             if 'amount' not in tx or not isinstance(tx['amount'], int):
                 return Response(False, 'Transaction amount is not given or not a proper integer')
             if 'count' not in tx or not isinstance(tx['count'], int):

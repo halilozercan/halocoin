@@ -12,15 +12,9 @@ from flask_socketio import SocketIO
 
 from halocoin import tools, engine, custom
 from halocoin.blockchain import BlockchainService
-from halocoin.power import PowerService
 from halocoin.service import Service
 
 async_threading  # PyCharm automatically removes unused imports. This prevents it
-
-tx_queue_response = {
-    "result": None,
-    "event": threading.Event()
-}
 
 
 class ComplexEncoder(json.JSONEncoder):
@@ -137,9 +131,7 @@ def info_wallet():
                 "pubkey": wallet.get_pubkey_str(),
                 "privkey": wallet.get_privkey_str(),
                 "address": wallet.address,
-                "balance": account['amount'],
-                "deposit": account['stake'],
-                "assigned_job": account['assigned_job'],
+                "balance": account['amount']
             })
         except:
             return generate_json_response("Password incorrect")
@@ -264,39 +256,10 @@ def history():
                 txs['send'].append(tx)
             elif tx['type'] == 'spend' and tx['to'] == address:
                 txs['recv'].append(tx)
-            elif tx['type'] == 'reward' and tx['to'] == address:
-                txs['recv'].append(tx)
     return generate_json_response(txs)
 
 
-@app.route('/jobs')
-def jobs():
-    type = request.values.get('type', 'all')
-    page = request.values.get('page', 1)
-    result = {'available': None, 'assigned': None}
-    if type == 'available' or type == 'all':
-        result['available'] = engine.instance.statedb.get_available_jobs()
-
-    if type == 'assigned' or type == 'all':
-        result['assigned'] = engine.instance.statedb.get_assigned_jobs()
-
-    return generate_json_response(result)
-
-
-@app.route('/available_jobs')
-def available_jobs():
-    page = int(request.values.get('page', 1))
-    rows_per_page = int(request.values.get('rows_per_page', 5))
-    result = {'total': 0, 'page': page, 'rows_per_page': rows_per_page, 'jobs': []}
-    jobs = list(engine.instance.statedb.get_available_jobs().values())
-    result['total'] = len(jobs)
-    result['jobs'] = jobs[((page - 1) * rows_per_page):(page * rows_per_page)]
-
-    return generate_json_response(result)
-
-
 @app.route('/send', methods=['GET', 'POST'])
-# @blockchain_synced
 def send():
     from halocoin.model.wallet import Wallet
     amount = int(request.values.get('amount', 0))
@@ -347,262 +310,7 @@ def send():
         tx['pubkeys'] = [wallet.get_pubkey_str()]  # We use pubkey as string
     if 'signatures' not in tx:
         tx['signatures'] = [tools.sign(tools.det_hash(tx), wallet.privkey)]
-    tx_queue_response['event'] = threading.Event()
     engine.instance.blockchain.tx_queue.put(tx)
-    # tx_queue_response['event'].wait()
-    # response["success"] = tx_queue_response['message'].getFlag()
-    response["success"] = True
-    response["message"] = "Your transaction is successfully added to the pool"
-    response["tx"] = tx
-    return generate_json_response(response)
-
-
-@app.route('/deposit', methods=['GET', 'POST'])
-# @blockchain_synced
-def deposit():
-    from halocoin.model.wallet import Wallet
-    amount = int(request.values.get('amount', 0))  # Bidding amount
-    wallet_name = request.values.get('wallet_name', None)
-    password = request.values.get('password', None)
-    force = request.values.get('force', None)
-
-    status = PowerService.system_status(engine.instance.config['coinami']['container'])
-    if not status.getFlag() and force is None:
-        return generate_json_response({
-            'error': 'Power service is unavailable',
-            'message': 'Power service cannot seem to function right now. '
-                       'If you want to make a deposit, specify force parameter'
-        })
-
-    if wallet_name is None:
-        default_wallet = engine.instance.clientdb.get_default_wallet()
-        if default_wallet is not None:
-            wallet_name = default_wallet['wallet_name']
-
-    response = {"success": False}
-    if amount <= 0:
-        response['error'] = "Amount cannot be lower than or equal to 0"
-        return generate_json_response(response)
-    elif wallet_name is None:
-        response['error'] = "Wallet name is not given and there is no default wallet"
-        return generate_json_response(response)
-    elif password is None:
-        response['error'] = "Password missing!"
-        return generate_json_response(response)
-
-    tx = {'type': 'deposit', 'amount': int(amount), 'version': custom.version}
-
-    encrypted_wallet_content = engine.instance.clientdb.get_wallet(wallet_name)
-    if encrypted_wallet_content is not None:
-        try:
-            wallet = Wallet.from_string(tools.decrypt(password, encrypted_wallet_content))
-        except:
-            response['error'] = "Wallet password incorrect"
-            return generate_json_response(response)
-    else:
-        response['error'] = "Error occurred"
-        return generate_json_response(response)
-
-    if 'count' not in tx:
-        try:
-            tx['count'] = engine.instance.statedb.known_tx_count(wallet.address)
-        except:
-            tx['count'] = 0
-    if 'pubkeys' not in tx:
-        tx['pubkeys'] = [wallet.get_pubkey_str()]  # We use pubkey as string
-    if 'signatures' not in tx:
-        tx['signatures'] = [tools.sign(tools.det_hash(tx), wallet.privkey)]
-    tx_queue_response['event'] = threading.Event()
-    engine.instance.blockchain.tx_queue.put(tx)
-    # tx_queue_response['event'].wait()
-    # response["success"] = tx_queue_response['message'].getFlag()
-    response["success"] = True
-    response["message"] = "Your transaction is successfully added to the pool"
-    response["tx"] = tx
-    return generate_json_response(response)
-
-
-@app.route('/withdraw', methods=['GET', 'POST'])
-# @blockchain_synced
-def withdraw():
-    from halocoin.model.wallet import Wallet
-    amount = int(request.values.get('amount', 0))  # Bidding amount
-    wallet_name = request.values.get('wallet_name', None)
-    password = request.values.get('password', None)
-
-    if wallet_name is None:
-        default_wallet = engine.instance.clientdb.get_default_wallet()
-        if default_wallet is not None:
-            wallet_name = default_wallet['wallet_name']
-
-    response = {"success": False}
-    if amount <= 0:
-        response['error'] = "Amount cannot be lower than or equal to 0"
-        return generate_json_response(response)
-    elif wallet_name is None:
-        response['error'] = "Wallet name is not given and there is no default wallet"
-        return generate_json_response(response)
-    elif password is None:
-        response['error'] = "Password missing!"
-        return generate_json_response(response)
-
-    tx = {'type': 'withdraw', 'amount': int(amount), 'version': custom.version}
-
-    encrypted_wallet_content = engine.instance.clientdb.get_wallet(wallet_name)
-    if encrypted_wallet_content is not None:
-        try:
-            wallet = Wallet.from_string(tools.decrypt(password, encrypted_wallet_content))
-        except:
-            response['error'] = "Wallet password incorrect"
-            return generate_json_response(response)
-    else:
-        response['error'] = "Error occurred"
-        return generate_json_response(response)
-
-    if 'count' not in tx:
-        try:
-            tx['count'] = engine.instance.statedb.known_tx_count(wallet.address)
-        except:
-            tx['count'] = 0
-    if 'pubkeys' not in tx:
-        tx['pubkeys'] = [wallet.get_pubkey_str()]  # We use pubkey as string
-    if 'signatures' not in tx:
-        tx['signatures'] = [tools.sign(tools.det_hash(tx), wallet.privkey)]
-    tx_queue_response['event'] = threading.Event()
-    engine.instance.blockchain.tx_queue.put(tx)
-    # tx_queue_response['event'].wait()
-    # response["success"] = tx_queue_response['message'].getFlag()
-    response["success"] = True
-    response["message"] = "Your transaction is successfully added to the pool"
-    response["tx"] = tx
-    return generate_json_response(response)
-
-
-@app.route('/reward', methods=['GET', 'POST'])
-def reward():
-    from ecdsa import SigningKey
-    job_id = request.values.get('job_id', None)
-    address = request.values.get('address', None)
-    cert_pem = request.values.get('cert_pem', None)
-    priv_key_pem = request.values.get('privkey_pem', None)
-
-    response = {"success": False}
-    if job_id is None:
-        response['error'] = "You need to specify a job id for the reward"
-        return generate_json_response(response)
-    elif address is None:
-        response['error'] = "You need to specify a receiving address for the reward"
-        return generate_json_response(response)
-    elif priv_key_pem is None:
-        response['error'] = "Reward transactions need to be signed by private key belonging to certificate"
-        return generate_json_response(response)
-    elif cert_pem is None:
-        response['error'] = "To reward, you must specify a common name or certificate that is granted by root"
-        return generate_json_response(response)
-
-    tx = {'type': 'reward', 'job_id': job_id, 'to': address, 'version': custom.version}
-
-    privkey = SigningKey.from_pem(priv_key_pem)
-    common_name = tools.get_commonname_from_certificate(cert_pem)
-    tx['auth'] = common_name
-
-    tx['pubkeys'] = [privkey.get_verifying_key().to_string()]  # We use pubkey as string
-    tx['signatures'] = [tools.sign(tools.det_hash(tx), privkey)]
-    tx_queue_response['event'] = threading.Event()
-    engine.instance.blockchain.tx_queue.put(tx)
-    # tx_queue_response['event'].wait()
-    # response["success"] = tx_queue_response['message'].getFlag()
-    response["success"] = True
-    response["message"] = "Your transaction is successfully added to the pool"
-    response["tx"] = tx
-    return generate_json_response(response)
-
-
-@app.route('/job_dump', methods=['GET', 'POST'])
-def job_dump():
-    from ecdsa import SigningKey
-    job = {
-        'id': request.values.get('job_id', None),
-        'timestamp': request.values.get('job_timestamp', None),
-        'amount': int(request.values.get('amount', 0))
-    }
-    cert_pem = request.values.get('cert_pem', None)
-    priv_key_pem = request.values.get('privkey_pem', None)
-
-    response = {"success": False}
-    if job['id'] is None:
-        response['error'] = "Job id missing"
-        return generate_json_response(response)
-    elif priv_key_pem is None:
-        response['error'] = "Job dumps need to be signed by private key belonging to certificate"
-        return generate_json_response(response)
-    elif cert_pem is None:
-        response['error'] = "To give jobs, you must specify a certificate that is granted by root"
-        return generate_json_response(response)
-    elif job['amount'] == 0:
-        response['error'] = "Reward amount is missing"
-        return generate_json_response(response)
-
-    tx = {'type': 'job_dump', 'job': job, 'version': custom.version}
-
-    privkey = SigningKey.from_pem(priv_key_pem)
-    common_name = tools.get_commonname_from_certificate(cert_pem)
-    tx['auth'] = common_name
-
-    tx['pubkeys'] = [privkey.get_verifying_key().to_string()]  # We use pubkey as string
-    tx['signatures'] = [tools.sign(tools.det_hash(tx), privkey)]
-    # tx_queue_response['event'] = threading.Event()
-    engine.instance.blockchain.tx_queue.put(tx)
-    # tx_queue_response['event'].wait()
-    # response["success"] = tx_queue_response['message'].getFlag()
-    response["success"] = True
-    response["message"] = "Your transaction is successfully added to the pool"
-    response["tx"] = tx
-    return generate_json_response(response)
-
-
-@app.route('/auth_reg', methods=['GET', 'POST'])
-def auth_reg():
-    from ecdsa import SigningKey
-    cert_pem = request.values.get('cert_pem', None)
-    priv_key_pem = request.values.get('privkey_pem', None)
-    host = request.values.get('host', None)
-    supply = int(request.values.get('supply', 0))
-
-    response = {"success": False}
-    if priv_key_pem is None:
-        response['error'] = "Auth registration transactions need to be signed by private key belonging to certificate"
-        return generate_json_response(response)
-    elif cert_pem is None:
-        response['error'] = "Certificate is required for registration"
-        return generate_json_response(response)
-    elif host is None:
-        response['error'] = "Authorities must provide a hosting address"
-        return generate_json_response(response)
-    elif supply == 0:
-        response['error'] = "Authorities must register with an initial supply"
-        return generate_json_response(response)
-
-    tx = {'type': 'auth_reg', 'version': custom.version, 'host': host, 'supply': supply}
-
-    privkey = SigningKey.from_pem(priv_key_pem)
-
-    common_name = tools.get_commonname_from_certificate(cert_pem)
-    if engine.instance.statedb.get_auth(common_name) is not None:
-        response['error'] = "An authority with common name {} is already registered.".format(common_name)
-        return generate_json_response(response)
-    if not tools.check_certificate_chain(cert_pem):
-        response['error'] = "Given certificate is not granted by root"
-        return generate_json_response(response)
-
-    tx['certificate'] = cert_pem
-
-    tx['pubkeys'] = [privkey.get_verifying_key().to_string()]  # We use pubkey as string
-    tx['signatures'] = [tools.sign(tools.det_hash(tx), privkey)]
-    tx_queue_response['event'] = threading.Event()
-    engine.instance.blockchain.tx_queue.put(tx)
-    # tx_queue_response['event'].wait()
-    # response["success"] = tx_queue_response['message'].getFlag()
     response["success"] = True
     response["message"] = "Your transaction is successfully added to the pool"
     response["tx"] = tx
@@ -624,21 +332,7 @@ def mempool():
         engine.instance.blockchain.tx_pool_pop_all()
     pool = copy.deepcopy(engine.instance.blockchain.tx_pool())
     for i, tx in enumerate(pool):
-        if tx['type'] == 'spend':
-            pool[i]['from'] = tools.tx_owner_address(tx)
-        elif tx['type'] == 'reward':
-            pool[i]['from'] = tools.reward_owner_name(tx)
-        elif tx['type'] == 'job_request':
-            pool[i]['from'] = tools.tx_owner_address(tx)
-            pool[i]['to'] = tx['job_id']
-        elif tx['type'] == 'job_dump':
-            pool[i]['from'] = tools.reward_owner_name(tx)
-            pool[i]['to'] = tx['job']['id']
-            pool[i]['amount'] = 0
-        elif tx['type'] == 'auth_reg':
-            pool[i]['from'] = tools.reward_owner_name(tx)
-            pool[i]['to'] = 'Network'
-            pool[i]['amount'] = 0
+        pool[i]['from'] = tools.tx_owner_address(tx)
 
     return generate_json_response(pool)
 
@@ -756,62 +450,6 @@ def status_miner():
     return generate_json_response(status)
 
 
-@app.route('/power_available')
-def power_available():
-    status = PowerService.system_status(engine.instance.config['coinami']['container'])
-    return generate_json_response({
-        "success": status.getFlag(),
-        "message": status.getData()
-    })
-
-
-@app.route('/start_power', methods=['GET', 'POST'])
-def start_power():
-    from halocoin.model.wallet import Wallet
-    wallet_name = request.values.get('wallet_name', None)
-    password = request.values.get('password', None)
-
-    if wallet_name is None:
-        default_wallet = engine.instance.clientdb.get_default_wallet()
-        if default_wallet is not None:
-            wallet_name = default_wallet['wallet_name']
-            password = default_wallet['password']
-
-    encrypted_wallet_content = engine.instance.clientdb.get_wallet(wallet_name)
-    if encrypted_wallet_content is not None:
-        try:
-            wallet = Wallet.from_string(tools.decrypt(password, encrypted_wallet_content))
-        except:
-            return generate_json_response("Wallet password incorrect")
-    else:
-        return generate_json_response("Error occurred")
-
-    if engine.instance.power.get_state() == Service.RUNNING:
-        return generate_json_response('Power is already running.')
-    elif wallet is None:
-        return generate_json_response('Given wallet is not valid.')
-    else:
-        engine.instance.power.set_wallet(wallet)
-        engine.instance.power.register()
-        return generate_json_response('Running power')
-
-
-@app.route('/stop_power', methods=['GET', 'POST'])
-def stop_power():
-    if engine.instance.power.get_state() == Service.RUNNING:
-        engine.instance.power.unregister()
-        return 'Closed power'
-    else:
-        return 'Power is not running.'
-
-
-@app.route('/status_power', methods=['GET', 'POST'])
-def status_power():
-    return generate_json_response({
-        "status": engine.instance.power.get_status()
-    })
-
-
 def generate_json_response(obj):
     result_text = json.dumps(obj, cls=ComplexEncoder)
     return Response(response=result_text, headers={"Content-Type": "application/json"})
@@ -831,10 +469,6 @@ def peer_update():
 
 def new_tx_in_pool():
     socketio.emit('new_tx_in_pool')
-
-
-def power_status():
-    socketio.emit('power_status')
 
 
 def miner_status():
