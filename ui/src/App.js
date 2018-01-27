@@ -124,16 +124,13 @@ class App extends Component {
   render() {
     let page = <div />;
     if(this.state.status === null) {
-      page = <div className="row">Connecting to Halocoin Engine</div>;
+      page = <div>Connecting to Coinami Engine</div>;
     }
     else if(this.state.status === "running") {
       page = <div>Checking your wallet</div>;
     }
     else if(this.state.status === "closed") {
-      page = <div className="row">
-               <div className="col-lg-12">Could not connect to Halocoin Engine
-               </div>
-             </div>;
+      page = <div>Could not connect to Coinami Engine :(</div>;
     }
     else if(this.state.status === "yes_dw") {
       page = <MainPage socket={this.socket} notify={this.notify}/>;

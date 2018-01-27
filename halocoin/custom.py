@@ -1,8 +1,8 @@
 import os
 from cdecimal import Decimal
 
-version = "0.0012c"
-block_reward = 10 ** 2  # Initial block reward
+version = "0.0013c"
+block_reward = 500  # Initial block reward
 miner_core_count = -1  # -1 evaluates to number of cores
 # Lower limits on what the "time" tag in a block can say.
 median_block_time_limit = 100
@@ -23,8 +23,8 @@ recalculate_target_at = (4*60*60 // blocktime)  # It's every half day
 # Precalculate
 memoized_weights = [inflection ** i for i in range(history_length)]
 
-assignment_period = 10  # Assign jobs at each T rounds
-unassignment_after = 4   # Unassign jobs after T*M rounds
+assignment_period = 5  # Assign jobs at each T rounds
+unassignment_after = 8   # Unassign jobs after T*M rounds
 assignment_stake_burn = 0.1
 
 first_target = '0' * 4 + 'f' * 60
@@ -68,14 +68,6 @@ def generate_default_config():
 
     config["peers"] = {
         "list": [
-            {
-                'node_id': '52e6eb49-6d59-4bf3-af96-ca3252408a4e',
-                'ip': '159.89.9.43',
-                'port': 7002,
-                'rank': 1,
-                'diffLength': '',
-                'length': -1
-            },
             {
                 'node_id': '52e6eb49-6d59-4bf3-af96-ca3252408a4f',
                 'ip': '139.179.21.17',

@@ -290,7 +290,7 @@ def available_jobs():
     result = {'total': 0, 'page': page, 'rows_per_page': rows_per_page, 'jobs': []}
     jobs = list(engine.instance.statedb.get_available_jobs().values())
     result['total'] = len(jobs)
-    result['jobs'] = jobs[((page-1)*rows_per_page):(page*rows_per_page)]
+    result['jobs'] = jobs[((page - 1) * rows_per_page):(page * rows_per_page)]
 
     return generate_json_response(result)
 
@@ -349,8 +349,8 @@ def send():
         tx['signatures'] = [tools.sign(tools.det_hash(tx), wallet.privkey)]
     tx_queue_response['event'] = threading.Event()
     engine.instance.blockchain.tx_queue.put(tx)
-    #tx_queue_response['event'].wait()
-    #response["success"] = tx_queue_response['message'].getFlag()
+    # tx_queue_response['event'].wait()
+    # response["success"] = tx_queue_response['message'].getFlag()
     response["success"] = True
     response["message"] = "Your transaction is successfully added to the pool"
     response["tx"] = tx
@@ -414,8 +414,8 @@ def deposit():
         tx['signatures'] = [tools.sign(tools.det_hash(tx), wallet.privkey)]
     tx_queue_response['event'] = threading.Event()
     engine.instance.blockchain.tx_queue.put(tx)
-    #tx_queue_response['event'].wait()
-    #response["success"] = tx_queue_response['message'].getFlag()
+    # tx_queue_response['event'].wait()
+    # response["success"] = tx_queue_response['message'].getFlag()
     response["success"] = True
     response["message"] = "Your transaction is successfully added to the pool"
     response["tx"] = tx
@@ -470,8 +470,8 @@ def withdraw():
         tx['signatures'] = [tools.sign(tools.det_hash(tx), wallet.privkey)]
     tx_queue_response['event'] = threading.Event()
     engine.instance.blockchain.tx_queue.put(tx)
-    #tx_queue_response['event'].wait()
-    #response["success"] = tx_queue_response['message'].getFlag()
+    # tx_queue_response['event'].wait()
+    # response["success"] = tx_queue_response['message'].getFlag()
     response["success"] = True
     response["message"] = "Your transaction is successfully added to the pool"
     response["tx"] = tx
@@ -510,8 +510,8 @@ def reward():
     tx['signatures'] = [tools.sign(tools.det_hash(tx), privkey)]
     tx_queue_response['event'] = threading.Event()
     engine.instance.blockchain.tx_queue.put(tx)
-    #tx_queue_response['event'].wait()
-    #response["success"] = tx_queue_response['message'].getFlag()
+    # tx_queue_response['event'].wait()
+    # response["success"] = tx_queue_response['message'].getFlag()
     response["success"] = True
     response["message"] = "Your transaction is successfully added to the pool"
     response["tx"] = tx
@@ -551,10 +551,10 @@ def job_dump():
 
     tx['pubkeys'] = [privkey.get_verifying_key().to_string()]  # We use pubkey as string
     tx['signatures'] = [tools.sign(tools.det_hash(tx), privkey)]
-    #tx_queue_response['event'] = threading.Event()
+    # tx_queue_response['event'] = threading.Event()
     engine.instance.blockchain.tx_queue.put(tx)
-    #tx_queue_response['event'].wait()
-    #response["success"] = tx_queue_response['message'].getFlag()
+    # tx_queue_response['event'].wait()
+    # response["success"] = tx_queue_response['message'].getFlag()
     response["success"] = True
     response["message"] = "Your transaction is successfully added to the pool"
     response["tx"] = tx
@@ -601,8 +601,8 @@ def auth_reg():
     tx['signatures'] = [tools.sign(tools.det_hash(tx), privkey)]
     tx_queue_response['event'] = threading.Event()
     engine.instance.blockchain.tx_queue.put(tx)
-    #tx_queue_response['event'].wait()
-    #response["success"] = tx_queue_response['message'].getFlag()
+    # tx_queue_response['event'].wait()
+    # response["success"] = tx_queue_response['message'].getFlag()
     response["success"] = True
     response["message"] = "Your transaction is successfully added to the pool"
     response["tx"] = tx
@@ -839,3 +839,7 @@ def power_status():
 
 def miner_status():
     socketio.emit('miner_status')
+
+
+def cpu_usage(text):
+    socketio.emit('cpu_usage', {'message': text})

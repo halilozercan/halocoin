@@ -1,5 +1,9 @@
+import shutil
 import signal
 import sys
+
+import psutil
+import time
 
 from halocoin import api
 from halocoin import tools
@@ -10,7 +14,7 @@ from halocoin.miner import MinerService
 from halocoin.peer_check import PeerCheckService
 from halocoin.peer_listen import PeerListenService
 from halocoin.power import PowerService
-from halocoin.service import Service, async
+from halocoin.service import Service, async, threaded
 from halocoin.state import StateDatabase
 
 
@@ -117,6 +121,13 @@ class Engine(Service):
         for service in running_services:
             service.join()
             print('Closed {}'.format(service.name))
+
+    @threaded
+    def stats(self):
+        value = psutil.cpu_percent()
+        if int(psutil.cpu_percent()) > 0:
+            api.cpu_usage(str(value))
+        time.sleep(0.1)
 
     @async
     def stop(self):

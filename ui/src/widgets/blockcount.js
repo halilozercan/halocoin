@@ -30,7 +30,8 @@ class Blockcount extends Component {
     super(props);
     this.state = {
       'length': '-',
-      'known_length': '-'
+      'known_length': '-',
+      'cpu_usage': 0
     }
   }
 
@@ -41,6 +42,11 @@ class Blockcount extends Component {
     })
     this.props.socket.on('new_tx_in_pool', (socket) => {
       this.update();
+    })
+    this.props.socket.on('cpu_usage', (data) => {
+      this.setState({
+        cpu_usage: data['message']
+      });
     })
   }
 
@@ -78,7 +84,15 @@ class Blockcount extends Component {
             Blockcount: {this.state.length}/{this.state.known_length}
           </Chip>
         </div>
-        <div style={{"float":"right"}}>
+        <div style={{"float":"left"}}>
+          <Chip
+            style={styles.chip}
+          >
+            <Avatar icon={<FontIcon className="material-icons">compare_arrows</FontIcon>} />
+            Cpu Usage: {this.state.cpu_usage}%
+          </Chip>
+        </div>
+        <div style={{"float":"left"}}>
           <Chip
             onClick={() => {this.props.notify("Number of transactions that are waiting in the pool.")}}
             style={styles.chip}
