@@ -1,7 +1,7 @@
 Halocoin
 =============
 
-*In production*
+*In development*
 
 ![this is real, ok?](http://i.imgur.com/lz7hOlC.gif)
 
