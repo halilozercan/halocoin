@@ -8,7 +8,7 @@ Halocoin
 ## What is this?
 
 Halocoin is my personal project to learn, experiment and build around blockchain technology. This project is by no means production ready or close to actual implementation of Bitcoin protocol.
-However, I have tried to imitate what is proposed in Bitcoin white paper.
+However, I have tried to imitate what is proposed in Bitcoin white paper. For example, it is still missing Merkle Trees for transactions which is a core property of Bitcoin.
 
 Although source code is not related to original repository anymore and I already removed the fork tag, I want to acknowledge my initial start point. I thank zack-bitcoin for putting effort into
 developing a minimal blockchain.
@@ -16,18 +16,17 @@ developing a minimal blockchain.
 Objectives of this project:
 - Readable code
 - Modular services that explains how blockchain functions
+- Blockhain is a consensus protocol between peers. How does client side handle everything?
 - CLI or GUI to experiment with a cryptocurrency.
-- Enable people to learn and share knowledge on blockchain, what is real innovation in Bitcoin.
+- Enable people to learn and share knowledge on blockchain, which is the real innovation of Bitcoin.
 
 Blockchain services include:
 
-- Account : Take care of caching blockchain transactions and client-side data.
+- State : Take care of caching blockchain transactions and client-side data. Answers the question: What is the state right now?
 - Blockchain : Schedule adding, deleting, forking on blockchain
 - API : Answer requests coming from client
 - Peers Check : Regularly check known peers to stay up-to-date
 - Peer Listen : Listen to other peers who are checking
-
-It is important that account, blockchain, api and peers check services are working correctly.
 
 
 ## Getting started
@@ -87,3 +86,58 @@ Necessary parameters: wallet_name, password
 If you prefer CLI, you will be prompted to enter the password that is going to be used for encryption of the wallet. This password prompt will always pop up when you use your wallet if you do not set a default wallet.
 
 ## More documentation coming soon!!
+
+Since CLI is not ready and UI is ported from another project originated from this repository, I prefer to use Restful API to talk with the client.
+
+#### List of wallets
+```http://localhost:7001/wallets```
+
+#### New Wallet:
+```http://localhost:7001/new_wallet```
+
+Query Parameters:
+- wallet_name : String
+- password : String
+- set_default : boolean <Set this wallet as default upon creation>
+
+#### Blockcount:
+```http://localhost:7001/blockcount```
+
+#### Info Wallet:
+```http://localhost:7001/info_wallet```
+
+Returns information about a wallet. Address, public key, current balance and etc. If no parameters are given, client will return information about current default wallet. If it does not exist, an error will be thrown.
+
+Query Parameters:
+- wallet_name : String
+- password : String
+
+#### Mempool
+```http://localhost:7001/mempool```
+
+Transactions that are waiting in the pool
+
+#### Blocks
+```http://localhost:7001/blocks```
+
+Query Parameters:
+- start : int
+- end : int
+
+#### Balance
+```http://localhost:7001/balance```
+
+Query Parameters:
+- address : String
+
+#### Send
+```http://localhost:7001/send```
+
+Send halocoins to another address.
+
+Query Parameters:
+- address : String
+- amount : int
+- wallet_name : String
+- password : String
+- message : String optional
