@@ -18,7 +18,8 @@
     "test": "react-scripts test --env=jsdom",
     "eject": "react-scripts eject",
     "electron": "electron .",
-    "dev": "nf start"
+    "dev": "nf start",
+    "electron-dev": "concurrently \"BROWSER=none yarn start\" \"wait-on http://localhost:3000 && ELECTRON_START_URL=\"http://localhost:3000\" electron .\""
   },
   "devDependencies": {
     "npm": "^5.6.0",
