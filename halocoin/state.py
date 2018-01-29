@@ -381,6 +381,17 @@ class StateDatabase:
                 result[job_id] = self.db.get('job_' + job_id)
         return result
 
+    @lockit('kvstore')
+    def get_rewarded_jobs(self):
+        job_list = self.db.get('job_list')
+        result = {}
+        for job_id in job_list:
+            job = self.get_job(job_id)
+            # Here we check last transaction made on the job.
+            if job['status_list'][-1]['action'] == 'reward':
+                result[job_id] = self.db.get('job_' + job_id)
+        return result
+
     def add_new_job(self, tx_job, auth, block_number):
         job = copy.deepcopy(tx_job)
         job['auth'] = auth

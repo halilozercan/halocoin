@@ -1,9 +1,8 @@
-import shutil
 import signal
 import sys
+import time
 
 import psutil
-import time
 
 from halocoin import api
 from halocoin import tools

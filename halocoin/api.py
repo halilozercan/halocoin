@@ -273,12 +273,15 @@ def history():
 def jobs():
     type = request.values.get('type', 'all')
     page = request.values.get('page', 1)
-    result = {'available': None, 'assigned': None}
+    result = {'available': None, 'assigned': None, 'rewarded': None}
     if type == 'available' or type == 'all':
         result['available'] = engine.instance.statedb.get_available_jobs()
 
     if type == 'assigned' or type == 'all':
         result['assigned'] = engine.instance.statedb.get_assigned_jobs()
+
+    if type == 'rewarded' or type == 'all':
+        result['rewarded'] = engine.instance.statedb.get_rewarded_jobs()
 
     return generate_json_response(result)
 

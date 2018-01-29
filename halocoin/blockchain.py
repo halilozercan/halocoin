@@ -1,5 +1,4 @@
 import copy
-import pickle
 import threading
 import time
 from cdecimal import Decimal
@@ -195,7 +194,7 @@ class BlockchainService(Service):
         elif int(block['length']) > int(length) + 1:
             return 2
 
-        tools.echo('add block: ' + str(block['length']))
+        #tools.echo('add block: ' + str(block['length']))
 
         if (length >= 0 and block['diffLength'] != tools.hex_sum(block_at_length['diffLength'],
                                                                  tools.hex_invert(block['target']))) \
@@ -257,7 +256,7 @@ class BlockchainService(Service):
         for orphan in sorted(orphans, key=lambda x: x['count'] if 'count' in x else -1):
             self.tx_queue.put(orphan)
 
-        tools.techo('add block: ' + str(block['length']))
+        #tools.techo('add block: ' + str(block['length']))
         return 0
 
     def delete_block(self):
