@@ -27,8 +27,8 @@ class BlockchainService(Service):
     def __init__(self, engine):
         Service.__init__(self, name='blockchain')
         self.engine = engine
-        self.blocks_queue = NoExceptionQueue(10)
-        self.tx_queue = NoExceptionQueue(1000)
+        self.blocks_queue = NoExceptionQueue(3)
+        self.tx_queue = NoExceptionQueue(100)
         self.mempool = []
         self.db = None
         self.statedb = None

@@ -331,11 +331,17 @@ def lockit(lock_name, timeout=-1):
                 locks['__lock_{}__'.format(lock_name)] = mylock
             is_acquired = mylock.acquire(timeout=timeout)
             if is_acquired:
-                result = func(self, *args, **kwargs)
+                try:
+                    result = func(self, *args, **kwargs)
+                    mylock.release()
+                    return result
+                except Exception as e:
+                    tools.log("Exception occurred in a locked function")
+                    tools.log(e)
+                    mylock.release()
+                    raise e
             else:
-                raise LockException('Lock named {} could not be acquired in the given time'.format(lock_name))
-            mylock.release()
-            return result
+                tools.log('Lock named {} could not be acquired in the given time'.format(lock_name))
 
         wrapper._original = func
         wrapper.thread_safe = True
