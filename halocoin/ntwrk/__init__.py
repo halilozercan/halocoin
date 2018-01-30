@@ -111,7 +111,7 @@ def command(peer, message, node_id):
         if result:
             response, leftover = receive(sock, timeout=20)
             if response.getFlag():
-                response_msg = Message.from_yaml(response.getData())
+                response_msg = Message.from_str(response.getData())
                 return response_msg.get_body()
         else:
             return 'Could not receive proper result'

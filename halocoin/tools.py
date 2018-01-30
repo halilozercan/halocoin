@@ -41,6 +41,14 @@ class ComplexDecoder(json.JSONDecoder):
         return obj
 
 
+def serialize(obj):
+    return json.dumps(obj, cls=ComplexEncoder, sort_keys=True)
+
+
+def deserialize(obj):
+    return json.loads(obj, cls=ComplexDecoder)
+
+
 def init_logging(DEBUG, working_dir, log_file):
     if DEBUG:
         logging.basicConfig(level=logging.INFO,
@@ -98,7 +106,7 @@ def block_reward(length):
 
 def det_hash(x):
     """Deterministically takes sha256 of dict, list, int, or string."""
-    return hashlib.sha384(json.dumps(x, cls=ComplexEncoder, sort_keys=True).encode()).digest()[0:32]
+    return hashlib.sha384(serialize(x).encode()).digest()[0:32]
 
 
 def hash_without_nonce(block):

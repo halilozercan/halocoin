@@ -55,7 +55,7 @@ class PeerListenService(Service):
             client_sock, address = self.s.accept()
             response, leftover = ntwrk.receive(client_sock)
             if response.getFlag():
-                message = Message.from_yaml(response.getData())
+                message = Message.from_str(response.getData())
                 request = message.get_body()
                 try:
                     if hasattr(self, request['action']) \

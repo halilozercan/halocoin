@@ -1,6 +1,7 @@
 import uuid
 
 import yaml
+from halocoin import tools
 
 
 class Order:
@@ -46,16 +47,16 @@ class Message:
         return self.__body
 
     def __str__(self):
-        return yaml.dump({'headers': self.__headers,
-                          'body': self.__body})
+        return tools.serialize({'headers': self.__headers,
+                                'body': self.__body})
 
     def __repr__(self):
         return self.__body
 
     @staticmethod
-    def from_yaml(string):
+    def from_str(string):
         try:
-            as_dict = yaml.load(string)
+            as_dict = tools.deserialize(string)
         except:
             raise ValueError('Could not load yaml representation of arrived message')
 
