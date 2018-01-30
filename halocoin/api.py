@@ -31,20 +31,6 @@ class ComplexEncoder(json.JSONEncoder):
         return json.JSONEncoder.default(self, obj)
 
 
-def blockchain_synced(func):
-    def wrapper(*args, **kwargs):
-        if engine.instance.blockchain.get_chain_state() == BlockchainService.IDLE:
-            return func(*args, **kwargs)
-        else:
-            return 'Blockchain is syncing. This method is not reliable while operation continues.\n' + \
-                   str(engine.instance.db.get('length')) + '-' + str(engine.instance.clientdb.get('known_length'))
-
-    # To keep the function name same for RPC helper
-    wrapper.__name__ = func.__name__
-
-    return wrapper
-
-
 app = Flask(__name__)
 socketio = SocketIO(app, async_mode='threading')
 listen_thread = None
@@ -131,7 +117,7 @@ def info_wallet():
     if encrypted_wallet_content is not None:
         try:
             wallet = Wallet.from_string(tools.decrypt(password, encrypted_wallet_content))
-            account = engine.instance.statedb.get_account(wallet.address, apply_tx_pool=False)
+            account = engine.instance.statedb.get_account(wallet.address)
             return generate_json_response({
                 "name": wallet.name,
                 "pubkey": wallet.get_pubkey_str(),
@@ -253,7 +239,7 @@ def history():
         "send": [],
         "recv": []
     }
-    for block_index in reversed(account['tx_blocks']):
+    for block_index in reversed(list(account['tx_blocks'])):
         block = engine.instance.blockchain.get_block(block_index)
         for tx in block['txs']:
             if tx['type'] == 'mint':
@@ -343,7 +329,7 @@ def send():
 
     if 'count' not in tx:
         try:
-            tx['count'] = engine.instance.statedb.known_tx_count(wallet.address)
+            tx['count'] = engine.instance.statedb.known_tx_count(wallet.address, count_pool=True)
         except:
             tx['count'] = 0
     if 'pubkeys' not in tx:
@@ -408,7 +394,7 @@ def deposit():
 
     if 'count' not in tx:
         try:
-            tx['count'] = engine.instance.statedb.known_tx_count(wallet.address)
+            tx['count'] = engine.instance.statedb.known_tx_count(wallet.address, count_pool=True)
         except:
             tx['count'] = 0
     if 'pubkeys' not in tx:
@@ -464,7 +450,7 @@ def withdraw():
 
     if 'count' not in tx:
         try:
-            tx['count'] = engine.instance.statedb.known_tx_count(wallet.address)
+            tx['count'] = engine.instance.statedb.known_tx_count(wallet.address, count_pool=True)
         except:
             tx['count'] = 0
     if 'pubkeys' not in tx:
@@ -696,7 +682,7 @@ def balance():
             wallet = Wallet.from_string(tools.decrypt(password, encrypted_wallet_content))
             address = wallet.address
 
-    account = engine.instance.statedb.get_account(address, apply_tx_pool=False)
+    account = engine.instance.statedb.get_account(address)
     return generate_json_response({'balance': account['amount']})
 
 

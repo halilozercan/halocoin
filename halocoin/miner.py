@@ -47,8 +47,7 @@ class MinerService(Service):
 
     @threaded
     def worker(self):
-        if not self.blockchain.tx_queue.empty() or not self.blockchain.blocks_queue.empty() or \
-                self.blockchain.get_chain_state() != BlockchainService.IDLE:
+        if not self.blockchain.tx_queue.empty() or not self.blockchain.blocks_queue.empty():
             time.sleep(0.1)
             return
 

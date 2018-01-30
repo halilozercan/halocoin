@@ -36,10 +36,6 @@ class PeerCheckService(Service):
         If blockchain is synchronizing, don't check anyone.
         :return:
         """
-        if self.blockchain.get_chain_state() == blockchain.BlockchainService.SYNCING:
-            time.sleep(0.1)
-            return
-
         peers = self.clientdb.get_peers()
         if len(peers) > 0:
             i = tools.exponential_random(3.0 / 4) % len(peers)

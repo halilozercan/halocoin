@@ -199,8 +199,7 @@ class PowerService(Service):
             - Remove the downloaded files
         - Repeat
         """
-        if self.blockchain.get_chain_state() == blockchain.BlockchainService.SYNCING or \
-                self.clientdb.get_default_wallet() is None:
+        if self.clientdb.get_default_wallet() is None:
             time.sleep(1)
             return
 

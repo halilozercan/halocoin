@@ -2,6 +2,7 @@ import copy
 import threading
 import time
 from cdecimal import Decimal
+from queue import Empty
 
 from halocoin import custom, api
 from halocoin import tools
@@ -26,14 +27,12 @@ class BlockchainService(Service):
     def __init__(self, engine):
         Service.__init__(self, name='blockchain')
         self.engine = engine
-        self.blocks_queue = NoExceptionQueue(3)
-        self.tx_queue = NoExceptionQueue(100)
+        self.blocks_queue = NoExceptionQueue(10)
+        self.tx_queue = NoExceptionQueue(1000)
         self.mempool = []
         self.db = None
         self.statedb = None
         self.clientdb = None
-        self.__state = BlockchainService.IDLE
-        self.addLock = threading.RLock()
 
     def on_register(self):
         self.db = self.engine.db
@@ -56,48 +55,49 @@ class BlockchainService(Service):
         """
         try:
             candidate = self.blocks_queue.get(timeout=0.1)
-            self.set_chain_state(BlockchainService.SYNCING)
-            try:
-                if isinstance(candidate, tuple):
-                    blocks = candidate[0]
-                    node_id = candidate[1]
-                    total_number_of_blocks_added = 0
+            if isinstance(candidate, tuple):
+                blocks = candidate[0]
+                node_id = candidate[1]
+                total_number_of_blocks_added = 0
 
-                    for block in blocks:
-                        if not BlockchainService.block_integrity_check(block) and node_id != 'miner':
-                            self.peer_reported_false_blocks(node_id)
-                            return
+                for block in blocks:
+                    if not BlockchainService.block_integrity_check(block) and node_id != 'miner':
+                        self.peer_reported_false_blocks(node_id)
+                        return
 
-                    self.db.simulate()
-                    length = self.db.get('length')
-                    for i in range(20):
-                        block = self.get_block(length)
-                        if self.fork_check(blocks, length, block):
-                            self.delete_block()
-                            length -= 1
-                        else:
-                            break
-
-                    for block in blocks:
-                        add_block_result = self.add_block(block)
-                        if add_block_result == 2:  # A block that is ahead of us could not be added. No need to proceed.
-                            break
-                        elif add_block_result == 0:
-                            total_number_of_blocks_added += 1
-                            api.new_block()
-
-                    if total_number_of_blocks_added == 0 or self.db.get('length') != blocks[-1]['length']:
-                        # All received blocks failed. Punish the peer by lowering rank.
-                        self.db.rollback()
-                        if node_id != 'miner':
-                            self.peer_reported_false_blocks(node_id)
+                self.db.simulate()
+                length = self.db.get('length')
+                for i in range(20):
+                    block = self.get_block(length)
+                    if self.fork_check(blocks, length, block):
+                        self.delete_block()
+                        length -= 1
                     else:
-                        self.db.commit()
-            except Exception as e:
-                tools.log(e)
+                        break
+
+                for block in blocks:
+                    add_block_result = self.add_block(block)
+                    if add_block_result == 2:  # A block that is ahead of us could not be added. No need to proceed.
+                        break
+                    elif add_block_result == 0:
+                        total_number_of_blocks_added += 1
+                        api.new_block()
+
+                if total_number_of_blocks_added == 0 or self.db.get('length') != blocks[-1]['length']:
+                    # All received blocks failed. Punish the peer by lowering rank.
+                    self.db.rollback()
+                    if node_id != 'miner':
+                        self.peer_reported_false_blocks(node_id)
+                else:
+                    self.db.commit()
             self.blocks_queue.task_done()
-        except:
+        except Empty:
+            # We know that queue might be empty.
+            # This exception does not need handling
             pass
+        except Exception as e:
+            tools.log('Exception occurred in ' + threading.current_thread().getName())
+            tools.log(e)
 
         try:
             candidate_tx = self.tx_queue.get(timeout=0.1)
@@ -107,16 +107,6 @@ class BlockchainService(Service):
             self.tx_queue.task_done()
         except:
             pass
-
-        self.set_chain_state(BlockchainService.IDLE)
-
-    @sync
-    def set_chain_state(self, new_state):
-        self.__state = new_state
-
-    @sync
-    def get_chain_state(self):
-        return self.__state
 
     @lockit('kvstore')
     def tx_pool(self):
@@ -170,7 +160,7 @@ class BlockchainService(Service):
             return Response(False, 'Transaction failed integrity check: ' + integrity_check.getData())
         self.db.simulate()
         _tx = copy.deepcopy(tx)
-        current_state_check = self.statedb.update_database_with_tx(_tx, self.db.get('length')+1, count_pool=True)
+        current_state_check = self.statedb.update_database_with_tx(_tx, self.db.get('length')+1)
         self.db.rollback()
         if not current_state_check:
             return Response(False, 'Transaction failed current state check')
@@ -190,9 +180,6 @@ class BlockchainService(Service):
             return 1
         elif int(block['length']) > int(length) + 1:
             return 2
-
-        if block['length'] == 909:
-            print("Here we are")
 
         tools.echo('add block: ' + str(block['length']))
 

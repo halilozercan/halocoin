@@ -17,7 +17,7 @@ class StateDatabase:
         'amount': 0,
         'count': 0,
         'cache-length': -1,
-        'tx_blocks': [],
+        'tx_blocks': set(),
         'assigned_job': '',
         'stake': 0
     }
@@ -28,47 +28,16 @@ class StateDatabase:
         self.blockchain = self.engine.blockchain
 
     @lockit('kvstore')
-    def get_account(self, address, apply_tx_pool=False):
-        def update_account_with_txs(address, account, txs):
-            for tx in txs:
-                owner = tools.tx_owner_address(tx)
-                if tx['type'] == 'spend':
-                    if owner == address:
-                        account['amount'] -= tx['amount']
-                    if tx['to'] == address:
-                        account['amount'] += tx['amount']
-                elif tx['type'] == 'reward':
-                    # TODO: implement if reward is for this account
-                    pass
-                elif tx['type'] == 'deposit':
-                    if owner == address:
-                        account['amount'] -= tx['amount']
-                        account['stake'] += tx['amount']
-                elif tx['type'] == 'withdraw':
-                    if owner == address:
-                        account['amount'] += tx['amount']
-                        account['stake'] -= tx['amount']
-
-            return account
-
+    def get_account(self, address):
         if self.db.exists(address):
             account = self.db.get(address)
         else:
             account = copy.deepcopy(StateDatabase.default_account)
 
-        if apply_tx_pool:
-            txs = self.blockchain.tx_pool()
-            account = update_account_with_txs(address, account, txs)
-
         if 'tx_blocks' not in account:
-            account['tx_blocks'] = []
+            account['tx_blocks'] = set()
 
         return account
-
-    @lockit('kvstore')
-    def remove_account(self, address):
-        self.db.delete(address)
-        return True
 
     def update_account(self, address, new_account):
         if new_account['amount'] < 0 or new_account['stake'] < 0:
@@ -76,7 +45,7 @@ class StateDatabase:
         self.db.put(address, new_account)
         return True
 
-    def update_database_with_tx(self, tx, block_length, count_pool=False):
+    def update_database_with_tx(self, tx, block_length):
         send_address = tools.tx_owner_address(tx)
         send_account = self.get_account(send_address)
 
@@ -84,18 +53,18 @@ class StateDatabase:
             send_account['amount'] += tools.block_reward(block_length)
             self.update_account(send_address, send_account)
         elif tx['type'] == 'spend':
-            if tx['count'] != self.known_tx_count(send_address, count_pool=count_pool):
+            if tx['count'] < self.known_tx_count(send_address):
                 return False
 
             recv_address = tx['to']
             recv_account = self.get_account(recv_address)
 
             send_account['amount'] -= tx['amount']
-            send_account['count'] += 1
-            send_account['tx_blocks'].append(block_length)
+            send_account['count'] = (tx['count'] + 1)
+            send_account['tx_blocks'].add(block_length)
 
             recv_account['amount'] += tx['amount']
-            recv_account['tx_blocks'].append(block_length)
+            recv_account['tx_blocks'].add(block_length)
 
             if (recv_account['amount'] < 0) or (send_account['amount'] < 0):
                 return False
@@ -128,7 +97,7 @@ class StateDatabase:
 
             recv_account['assigned_job'] = ''
             recv_account['amount'] += job['amount']
-            recv_account['tx_blocks'].append(block_length)
+            recv_account['tx_blocks'].add(block_length)
             self.update_account(tx['to'], recv_account)
         elif tx['type'] == 'auth_reg':
             cert_valid = tools.check_certificate_chain(tx['certificate'])
@@ -157,12 +126,12 @@ class StateDatabase:
             self.add_new_job(tx['job'], tx['auth'], block_length)
             self.update_auth(tx['auth'], auth)
         elif tx['type'] == 'deposit':
-            if tx['count'] != self.known_tx_count(send_address, count_pool=count_pool):
+            if tx['count'] < self.known_tx_count(send_address):
                 return False
             send_account['amount'] -= tx['amount']
             send_account['stake'] += tx['amount']
-            send_account['count'] += 1
-            send_account['tx_blocks'].append(block_length)
+            send_account['count'] = (tx['count'] + 1)
+            send_account['tx_blocks'].add(block_length)
 
             if not (send_account['amount'] >= 0) and (send_account['stake'] >= 0):
                 return False
@@ -171,12 +140,12 @@ class StateDatabase:
             if send_account['stake'] > 0:
                 self.put_address_in_stake_pool(send_address)
         elif tx['type'] == 'withdraw':
-            if tx['count'] != self.known_tx_count(send_address, count_pool=count_pool):
+            if tx['count'] < self.known_tx_count(send_address):
                 return False
             send_account['amount'] += tx['amount']
             send_account['stake'] -= tx['amount']
-            send_account['count'] += 1
-            send_account['tx_blocks'].append(block_length)
+            send_account['count'] = (tx['count'] + 1)
+            send_account['tx_blocks'].add(block_length)
 
             if not (send_account['amount'] >= 0) and (send_account['stake'] >= 0):
                 return False
@@ -308,17 +277,24 @@ class StateDatabase:
                 self.db.update_job(job)
 
     @lockit('kvstore')
-    def known_tx_count(self, address, count_pool=True, txs_in_pool=None):
+    def known_tx_count(self, address, count_pool=False):
         # Returns the number of transactions that pubkey has broadcast.
-        def number_of_unconfirmed_txs(_address):
-            return len(list(filter(lambda t: _address == tools.tx_owner_address(t), txs_in_pool)))
+        def highest_order_unconfirmed_tx(_address):
+            # Find the transactions that include 'count', broadcasted from _address
+            txs = list(filter(lambda t: _address == tools.tx_owner_address(t) and 'count' in t, txs_in_pool))
+            if len(txs) > 0:
+                tx = max(txs, key=lambda t: t['count'])
+                return tx['count']
+            else:
+                return -1
 
         account = self.get_account(address)
-        surplus = 0
         if count_pool:
             txs_in_pool = self.blockchain.tx_pool()
-            surplus += number_of_unconfirmed_txs(address)
-        return account['count'] + surplus
+            pool_winner = highest_order_unconfirmed_tx(address) + 1
+            if account['count'] < pool_winner:
+                account['count'] = pool_winner
+        return account['count']
 
     @lockit('kvstore')
     def get_auth(self, auth_name):
