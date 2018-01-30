@@ -8,10 +8,6 @@ import struct
 import time
 from uuid import UUID
 
-import yaml
-
-from halocoin import custom
-
 alphabet = '123456789abcdefghijkmnopqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ'
 
 
@@ -107,6 +103,7 @@ def sign(msg, privkey):
 
 
 def block_reward(length):
+    from halocoin import custom
     import math
     a = length // custom.halve_at
     b = custom.block_reward / math.pow(2, a)
@@ -288,6 +285,7 @@ def validate_uuid4(uuid_string):
 
 
 def check_certificate_chain(intermediate_cert_pem):
+    from halocoin import custom
     from OpenSSL.crypto import load_certificate, FILETYPE_PEM, X509Store, X509StoreContext
     root_cert = load_certificate(FILETYPE_PEM, custom.root_cert_pem)
     intermediate_cert = load_certificate(FILETYPE_PEM, intermediate_cert_pem)
