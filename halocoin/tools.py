@@ -1,5 +1,6 @@
 import copy
 import hashlib
+import json
 import logging
 import os
 import random
@@ -11,6 +12,33 @@ import yaml
 from halocoin import custom
 
 alphabet = '123456789abcdefghijkmnopqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ'
+
+
+class ComplexEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, (bytes, bytearray)):
+            return {
+                "_type": type(obj).__name__,
+                "value": obj.hex()
+            }
+        # Let the base class default method raise the TypeError
+        return json.JSONEncoder.default(self, obj)
+
+
+class ComplexDecoder(json.JSONDecoder):
+    def __init__(self, *args, **kwargs):
+        json.JSONDecoder.__init__(self, object_hook=self.object_hook, *args, **kwargs)
+
+    def object_hook(self, obj):
+        if '_type' not in obj:
+            return obj
+        type = obj['_type']
+        if type == 'bytearray':
+            return bytearray.fromhex(obj['value'])
+        elif type == 'bytes':
+            return bytes(bytearray.fromhex(obj['value']))
+
+        return obj
 
 
 def init_logging(DEBUG, working_dir, log_file):
@@ -70,7 +98,7 @@ def block_reward(length):
 
 def det_hash(x):
     """Deterministically takes sha256 of dict, list, int, or string."""
-    return hashlib.sha384(yaml.dump(x).encode()).digest()[0:32]
+    return hashlib.sha384(json.dumps(x, cls=ComplexEncoder, sort_keys=True).encode()).digest()[0:32]
 
 
 def hash_without_nonce(block):
