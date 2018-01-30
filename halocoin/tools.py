@@ -6,6 +6,7 @@ import os
 import random
 import struct
 import time
+from uuid import UUID
 
 import yaml
 
@@ -21,6 +22,12 @@ class ComplexEncoder(json.JSONEncoder):
                 "_type": type(obj).__name__,
                 "value": obj.hex()
             }
+        elif isinstance(obj, UUID):
+            return {
+                "_type": 'UUID',
+                "value": str(obj)
+            }
+
         # Let the base class default method raise the TypeError
         return json.JSONEncoder.default(self, obj)
 
@@ -37,6 +44,8 @@ class ComplexDecoder(json.JSONDecoder):
             return bytearray.fromhex(obj['value'])
         elif type == 'bytes':
             return bytes(bytearray.fromhex(obj['value']))
+        elif type == 'UUID':
+            return UUID(obj['value'], version=4)
 
         return obj
 
