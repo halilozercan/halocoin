@@ -53,7 +53,7 @@ class Transaction:
 
         def match(sig, pubs, msg):
             for p in pubs:
-                if tools.signature_verify(msg, sig, p):
+                if tools.sign_verify(msg, sig, p):
                     return {'bool': True, 'pub': p}
             return {'bool': False}
 

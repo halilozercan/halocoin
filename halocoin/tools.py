@@ -8,7 +8,7 @@ import struct
 import time
 from uuid import UUID
 
-from fastecdsa import curve, ecdsa
+from fastecdsa import curve
 from fastecdsa.point import Point
 
 alphabet = '123456789abcdefghijkmnopqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ'
@@ -98,11 +98,92 @@ def reward_owner_name(tx):
         return get_commonname_from_certificate(tx['certificate'])
 
 
+def custom_verify(r, s, msg, Q):
+    from fastecdsa import _ecdsa
+    from fastecdsa.ecdsa import EcdsaError
+
+    if isinstance(Q, tuple):
+        Q = Point(Q[0], Q[1], curve)
+
+    # validate Q, r, s (Q should be validated in constructor of Point already but double check)
+    if not curve.secp256k1.is_point_on_curve((Q.x, Q.y)):
+        raise EcdsaError('Invalid public key, point is not on curve {}'.format(curve.secp256k1.name))
+    elif r > curve.secp256k1.q or r < 1:
+        raise EcdsaError(
+            'Invalid Signature: r is not a positive integer smaller than the curve order')
+    elif s > curve.secp256k1.q or s < 1:
+        raise EcdsaError(
+            'Invalid Signature: s is not a positive integer smaller than the curve order')
+
+    return _ecdsa.verify(
+        str(r),
+        str(s),
+        msg,
+        str(Q.x),
+        str(Q.y),
+        str(curve.secp256k1.p),
+        str(curve.secp256k1.a),
+        str(curve.secp256k1.b),
+        str(curve.secp256k1.q),
+        str(curve.secp256k1.gx),
+        str(curve.secp256k1.gy)
+    )
+
+
+def custom_sign(msg, d):
+    """Sign a message using the elliptic curve digital signature algorithm.
+
+    The elliptic curve signature algorithm is described in full in FIPS 186-4 Section 6. Please
+    refer to http://nvlpubs.nist.gov/nistpubs/FIPS/NIST.FIPS.186-4.pdf for more information.
+
+    Args:
+        |  msg (str): Hexadecimal representation of an object.
+        |  d (long): The ECDSA private key of the signer.
+        |  curve (fastecdsa.curve.Curve): The curve to be used to sign the message.
+        |  hashfunc (_hashlib.HASH): The hash function used to compress the message.
+    """
+    # generate a deterministic nonce per RFC6979
+    from fastecdsa.util import RFC6979
+    from fastecdsa import _ecdsa
+    rfc6979 = RFC6979(msg, d, curve.secp256k1.q, hashlib.sha256)
+    k = rfc6979.gen_nonce()
+
+    r, s = _ecdsa.sign(
+        msg,
+        str(d),
+        str(k),
+        str(curve.secp256k1.p),
+        str(curve.secp256k1.a),
+        str(curve.secp256k1.b),
+        str(curve.secp256k1.q),
+        str(curve.secp256k1.gx),
+        str(curve.secp256k1.gy)
+    )
+    return (int(r), int(s))
+
+
 def sign(msg, privkey):
     from ecdsa import SigningKey
+    from ecdsa.util import sigencode_string
     if isinstance(privkey, bytes):
         privkey = SigningKey.from_string(privkey)
-    return privkey.sign(msg)
+    r, s = custom_sign(msg.hex(), privkey.privkey.secret_multiplier)
+    return sigencode_string(r, s, curve.secp256k1.q)
+
+
+def sign_verify(message, signature, pubkey):
+    from ecdsa import VerifyingKey, SECP256k1
+    from ecdsa.util import sigdecode_string
+
+    if isinstance(pubkey, (str, bytes)):
+        pubkey = VerifyingKey.from_string(pubkey, curve=SECP256k1)
+
+    r, s = sigdecode_string(signature, pubkey.pubkey.order)
+    try:
+        fast_pubkey = Point(pubkey.pubkey.point.x(), pubkey.pubkey.point.y(), curve.secp256k1)
+        return custom_verify(r, s, message.hex(), fast_pubkey)
+    except Exception as e:
+        return False
 
 
 def block_reward(length):
@@ -241,54 +322,6 @@ def decrypt(key, content, chunksize=24 * 1024):
 
     outfile.truncate(origsize)
     return outfile.getvalue()
-
-
-def custom_verify(sig, msg, Q):
-    from fastecdsa import _ecdsa
-    from fastecdsa.ecdsa import EcdsaError
-
-    if isinstance(Q, tuple):
-        Q = Point(Q[0], Q[1], curve)
-    r, s = sig
-
-    # validate Q, r, s (Q should be validated in constructor of Point already but double check)
-    if not curve.secp256k1.is_point_on_curve((Q.x, Q.y)):
-        raise EcdsaError('Invalid public key, point is not on curve {}'.format(curve.secp256k1.name))
-    elif r > curve.secp256k1.q or r < 1:
-        raise EcdsaError(
-            'Invalid Signature: r is not a positive integer smaller than the curve order')
-    elif s > curve.secp256k1.q or s < 1:
-        raise EcdsaError(
-            'Invalid Signature: s is not a positive integer smaller than the curve order')
-
-    return _ecdsa.verify(
-        str(r),
-        str(s),
-        msg,
-        str(Q.x),
-        str(Q.y),
-        str(curve.secp256k1.p),
-        str(curve.secp256k1.a),
-        str(curve.secp256k1.b),
-        str(curve.secp256k1.q),
-        str(curve.secp256k1.gx),
-        str(curve.secp256k1.gy)
-    )
-
-
-def signature_verify(message, signature, pubkey):
-    from ecdsa import VerifyingKey, SECP256k1
-    from ecdsa.util import sigdecode_string
-
-    if isinstance(pubkey, (str, bytes)):
-        pubkey = VerifyingKey.from_string(pubkey, curve=SECP256k1)
-
-    r, s = sigdecode_string(signature, pubkey.pubkey.order)
-    try:
-        fast_pubkey = Point(pubkey.pubkey.point.x(), pubkey.pubkey.point.y(), curve.secp256k1)
-        return custom_verify((r, s), message, fast_pubkey)
-    except:
-        return False
 
 
 def validate_uuid4(uuid_string):
