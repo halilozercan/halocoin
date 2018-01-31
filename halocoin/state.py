@@ -75,7 +75,7 @@ class StateDatabase:
             auth = self.get_auth(tx['auth'])
             if auth is None:
                 return False
-            if tx['pubkeys'] != [tools.get_pubkey_from_certificate(auth['certificate']).to_string()]:
+            if tx['pubkeys'] != auth['pubkeys']:
                 return False
             job = self.db.get('job_' + tx['job_id'])
             last_change = job['status_list'][-1]
@@ -112,7 +112,7 @@ class StateDatabase:
             auth = self.get_auth(tx['auth'])
             if auth is None:
                 return False
-            elif tx['pubkeys'] != [tools.get_pubkey_from_certificate(auth['certificate']).to_string()]:
+            elif tx['pubkeys'] != auth['pubkeys']:
                 return False
             # Check if job already exists
             if self.db.exists('job_' + tx['job']['id']):
@@ -306,7 +306,8 @@ class StateDatabase:
             auth = {
                 'certificate': cert_pem,
                 'host': host,
-                'supply': supply
+                'supply': supply,
+                'pubkeys': [tools.get_pubkey_from_certificate(cert_pem).to_string()]
             }
             self.db.put('auth_' + common_name, auth)
 

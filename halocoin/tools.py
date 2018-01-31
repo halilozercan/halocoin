@@ -8,6 +8,9 @@ import struct
 import time
 from uuid import UUID
 
+from fastecdsa import curve, ecdsa
+from fastecdsa.point import Point
+
 alphabet = '123456789abcdefghijkmnopqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ'
 
 
@@ -240,24 +243,55 @@ def decrypt(key, content, chunksize=24 * 1024):
     return outfile.getvalue()
 
 
+def custom_verify(sig, msg, Q):
+    from fastecdsa import _ecdsa
+    from fastecdsa.ecdsa import EcdsaError
+
+    if isinstance(Q, tuple):
+        Q = Point(Q[0], Q[1], curve)
+    r, s = sig
+
+    # validate Q, r, s (Q should be validated in constructor of Point already but double check)
+    if not curve.secp256k1.is_point_on_curve((Q.x, Q.y)):
+        raise EcdsaError('Invalid public key, point is not on curve {}'.format(curve.secp256k1.name))
+    elif r > curve.secp256k1.q or r < 1:
+        raise EcdsaError(
+            'Invalid Signature: r is not a positive integer smaller than the curve order')
+    elif s > curve.secp256k1.q or s < 1:
+        raise EcdsaError(
+            'Invalid Signature: s is not a positive integer smaller than the curve order')
+
+    return _ecdsa.verify(
+        str(r),
+        str(s),
+        msg,
+        str(Q.x),
+        str(Q.y),
+        str(curve.secp256k1.p),
+        str(curve.secp256k1.a),
+        str(curve.secp256k1.b),
+        str(curve.secp256k1.q),
+        str(curve.secp256k1.gx),
+        str(curve.secp256k1.gy)
+    )
+
+
 def signature_verify(message, signature, pubkey):
     from ecdsa import VerifyingKey, SECP256k1
-    if isinstance(pubkey, str):
-        pubkey = VerifyingKey.from_string(pubkey, curve=SECP256k1)
-    elif isinstance(pubkey, bytes):
+    from ecdsa.util import sigdecode_string
+
+    if isinstance(pubkey, (str, bytes)):
         pubkey = VerifyingKey.from_string(pubkey, curve=SECP256k1)
 
-    if isinstance(pubkey, VerifyingKey):
-        try:
-            return pubkey.verify(signature, message)
-        except:
-            return False
-    else:
+    r, s = sigdecode_string(signature, pubkey.pubkey.order)
+    try:
+        fast_pubkey = Point(pubkey.pubkey.point.x(), pubkey.pubkey.point.y(), curve.secp256k1)
+        return custom_verify((r, s), message, fast_pubkey)
+    except:
         return False
 
 
 def validate_uuid4(uuid_string):
-
     """
     Validate that a UUID string is in
     fact a valid uuid4.
@@ -313,6 +347,7 @@ def get_commonname_from_certificate(intermediate_cert_pem):
     intermediate_cert = load_certificate(FILETYPE_PEM, intermediate_cert_pem)
     return slugify(intermediate_cert.get_subject().commonName)
 
+
 last = 0
 
 
@@ -327,12 +362,12 @@ def techo(text):
     if last == 0:
         print(text)
     else:
-        print(text + ": {}".format(time.time()-last))
+        print(text + ": {}".format(time.time() - last))
         last = time.time()
 
 
 def readable_bytes(num, suffix='B'):
-    for unit in ['','Ki','Mi','Gi','Ti','Pi','Ei','Zi']:
+    for unit in ['', 'Ki', 'Mi', 'Gi', 'Ti', 'Pi', 'Ei', 'Zi']:
         if abs(num) < 1024.0:
             return "%3.1f%s%s" % (num, unit, suffix)
         num /= 1024.0
