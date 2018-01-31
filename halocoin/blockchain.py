@@ -411,12 +411,13 @@ class BlockchainService(Service):
                 return Response(False, 'Reward must be addressed to a job id')
             if 'to' not in tx or not tools.is_address_valid(tx['to']):
                 return Response(False, 'There must be a receiver of the reward.')
-        # TODO: Add signature check for authority transactions
         elif tx['type'] == 'auth_reg':
             if 'certificate' not in tx:
                 return Response(False, 'Auth must register with a valid certificate')
             elif tx['pubkeys'] != [tools.get_pubkey_from_certificate(tx['certificate']).to_string()]:
                 return Response(False, 'pubkeys do not match with certificate')
+            elif not BlockchainService.tx_signature_check(tx):
+                return Response(False, 'Transaction is not properly signed')
             elif 'host' not in tx or not isinstance(tx['host'], str):
                 return Response(False, 'Authorities require to provide a hosting address')
             elif 'supply' not in tx or not isinstance(tx['supply'], int):
@@ -424,10 +425,12 @@ class BlockchainService(Service):
         elif tx['type'] == 'job_dump':
             if 'auth' not in tx:
                 return Response(False, 'Job dump transactions must include auth name')
-            if 'job' not in tx or not isinstance(tx['job'], dict) or \
+            elif not BlockchainService.tx_signature_check(tx):
+                return Response(False, 'Transaction is not properly signed')
+            elif 'job' not in tx or not isinstance(tx['job'], dict) or \
                             'id' not in tx['job'] or 'timestamp' not in tx['job']:
                 return Response(False, 'Job dump transactions must include a job in it. Makes sense right?')
-            if 'amount' not in tx['job']:
+            elif 'amount' not in tx['job']:
                 return Response(False, 'Job dump transactions must specify the reward')
         elif tx['type'] == 'deposit' or tx['type'] == 'withdraw':
             if not BlockchainService.tx_signature_check(tx):
