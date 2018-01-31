@@ -17,7 +17,7 @@ class NoExceptionQueue(queue.Queue):
     def __init__(self, maxsize=0):
         queue.Queue.__init__(self, maxsize)
 
-    def put(self, item, block=True, timeout=None):
+    def put(self, item, block=False, timeout=None):
         try:
             queue.Queue.put(self, item, block, timeout)
         except queue.Full:
