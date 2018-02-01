@@ -7,7 +7,7 @@ import requests
 import yaml
 from docker.errors import ImageNotFound
 
-from halocoin import blockchain, api
+from halocoin import api
 from halocoin import tools
 from halocoin.ntwrk import Response
 from halocoin.service import Service, threaded, sync, lockit
@@ -15,9 +15,9 @@ from halocoin.service import Service, threaded, sync, lockit
 
 class PowerService(Service):
     """
-    This is the power service, designed and developed for Coinami.
-    Power service is similar to a miner. It solves problems and earns you currency.
-    Power contacts with sub-authorities in the network to dowload problems that you are assigned.
+    This is the power service, designed for Coinami.
+    Power service is similar to a miner. It solves problems and earns you coins.
+    Power contacts with sub-authorities in the network to download problems that you are assigned.
     These problems are related to Bioinformatics, DNA mapping.
     After solving these problems, authority verifies the results and rewards you.
     """

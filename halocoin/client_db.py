@@ -91,13 +91,14 @@ class ClientDB:
           - If <ip, port> exists, do nothing.
           - Otherwise, add.
 
-        In this sceme, ultimate resolver is greetings messages.
+        In this scheme, ultimate resolver is greetings messages.
         If we cannot communicate(greet) with a peer in last 24 hours or 50 tries, whichever comes later,
         we drop this peer from the list.
         :param peer: Peer dict to be added
         :param type: Its origin
         :return: None
         """
+        # TODO: 24 Hours stuff
         if not self.is_peer(peer):
             return
 
