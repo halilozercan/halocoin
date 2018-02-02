@@ -95,7 +95,7 @@ class StateDatabase:
             self.reward_job(tx['job_id'], tx['to'], block_length)
 
             recv_account['assigned_job'] = ''
-            recv_account['deposit'] += (job['amount'] * custom.assignment_stake_burn)
+            recv_account['stake'] += (job['amount'] * custom.assignment_stake_burn)
             recv_account['amount'] += (job['amount'] * (1 - custom.assignment_stake_burn))
             recv_account['tx_blocks'].add(block_length)
             self.update_account(tx['to'], recv_account)
