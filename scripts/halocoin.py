@@ -29,6 +29,8 @@ elif sys.argv[0] == "info_wallet":
     content = run_command(['curl', 'http://0.0.0.0:7001/info_wallet'])
 elif sys.argv[0] == "mempool":
     content = run_command(['curl', 'http://0.0.0.0:7001/mempool'])
+elif sys.argv[0] == "blockcount":
+    content = run_command(['curl', 'http://0.0.0.0:7001/blockcount'])
 elif sys.argv[0] == "deposit":
     amount = sys.argv[1]
     password = sys.argv[2]
@@ -37,7 +39,7 @@ elif sys.argv[0] == "send":
     address = sys.argv[1]
     amount = sys.argv[2]
     password = sys.argv[3]
-    content = run_command(['curl', 'http://0.0.0.0:7001/deposit?address=' + address + '&amount=' + amount +
+    content = run_command(['curl', 'http://0.0.0.0:7001/send?address=' + address + '&amount=' + amount +
                            "&password=" + password])
 
 print(highlight(content, JsonLexer(), TerminalFormatter()))

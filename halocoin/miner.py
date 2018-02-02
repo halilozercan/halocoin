@@ -47,9 +47,9 @@ class MinerService(Service):
 
     @threaded
     def worker(self):
-        if not self.blockchain.tx_queue.empty() or not self.blockchain.blocks_queue.empty():
-            time.sleep(0.1)
-            return
+        # if not self.blockchain.tx_queue.empty() or not self.blockchain.blocks_queue.empty():
+        #     time.sleep(0.1)
+        #     return
 
         print('Miner preparing block %d' % (self.db.get('length') + 1))
         candidate_block = self.get_candidate_block()

@@ -103,11 +103,12 @@ class BlockchainService(Service):
             tools.log(e)
 
         try:
-            candidate_tx = self.tx_queue.get(timeout=0.1)
-            result = self.add_tx(candidate_tx)
-            api.tx_queue_response['message'] = result
-            api.tx_queue_response['event'].set()
-            self.tx_queue.task_done()
+            while not self.tx_queue.empty():
+                candidate_tx = self.tx_queue.get(timeout=0.1)
+                result = self.add_tx(candidate_tx)
+                api.tx_queue_response['message'] = result
+                api.tx_queue_response['event'].set()
+                self.tx_queue.task_done()
         except Empty:
             pass
         except Exception as e:
