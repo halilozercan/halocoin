@@ -81,7 +81,8 @@ class PowerService(Service):
     def download_job(self, job_id):
         print('Downloading {}'.format(job_id))
         job = self.statedb.get_job(job_id)
-        endpoint = "http://139.179.21.17:5000/job_download/{}".format(job_id)
+        auth = self.statedb.get_auth(job['auth'])
+        endpoint = auth['host'] + "/job_download/{}".format(job_id)
         job_directory = os.path.join(self.engine.working_dir, 'jobs', job_id)
         if not os.path.exists(job_directory):
             os.makedirs(job_directory)
@@ -152,7 +153,8 @@ class PowerService(Service):
         print('Uploading {}'. format(job_id))
         self.set_status("Uploading...")
         job = self.statedb.get_job(job_id)
-        endpoint = "http://139.179.21.17:5000/job_upload/{}".format(job_id)
+        auth = self.statedb.get_auth(job['auth'])
+        endpoint = auth['host'] + "/job_upload/{}".format(job_id)
         result_directory = os.path.join(self.engine.working_dir, 'jobs', job_id, 'output')
         if not os.path.exists(result_directory):
             os.makedirs(result_directory)

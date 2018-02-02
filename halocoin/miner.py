@@ -51,7 +51,9 @@ class MinerService(Service):
             time.sleep(0.1)
             return
 
+        print('Miner preparing block %d' % (self.db.get('length') + 1))
         candidate_block = self.get_candidate_block()
+        print('Miner starting to work for block %d' % (candidate_block['length']))
         self.start_workers(candidate_block)
 
         possible_blocks = []
@@ -122,7 +124,6 @@ class MinerService(Service):
     @lockit('write_kvstore')
     def get_candidate_block(self):
         length = self.db.get('length')
-        print('Miner working for block', (length + 1))
         if length == -1:
             candidate_block = self.genesis(self.wallet.get_pubkey_str())
         else:
