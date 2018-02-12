@@ -11,7 +11,6 @@ from flask import Flask, request, Response, send_file
 from flask_socketio import SocketIO
 
 from halocoin import tools, engine, custom
-from halocoin.blockchain import BlockchainService
 from halocoin.power import PowerService
 from halocoin.service import Service
 
@@ -259,15 +258,18 @@ def history():
 def jobs():
     type = request.values.get('type', 'all')
     page = request.values.get('page', 1)
-    result = {'available': None, 'assigned': None, 'rewarded': None}
+    result = {'available': [], 'assigned': [], 'rewarded': []}
     if type == 'available' or type == 'all':
         result['available'] = engine.instance.statedb.get_available_jobs()
+        result['available'] = list(result['available'].values())
 
     if type == 'assigned' or type == 'all':
         result['assigned'] = engine.instance.statedb.get_assigned_jobs()
+        result['assigned'] = list(result['assigned'].values())
 
     if type == 'rewarded' or type == 'all':
         result['rewarded'] = engine.instance.statedb.get_rewarded_jobs()
+        result['rewarded'] = list(result['rewarded'].values())
 
     return generate_json_response(result)
 
@@ -797,12 +799,13 @@ def stop_power():
 @app.route('/status_power', methods=['GET', 'POST'])
 def status_power():
     return generate_json_response({
-        "status": engine.instance.power.get_status()
+        "status": engine.instance.power.get_status(),
+        "description": engine.instance.power.description
     })
 
 
 def generate_json_response(obj):
-    result_text = json.dumps(obj, cls=ComplexEncoder)
+    result_text = json.dumps(obj, cls=ComplexEncoder, sort_keys=True)
     return Response(response=result_text, headers={"Content-Type": "application/json"})
 
 

@@ -10,7 +10,7 @@ from docker.errors import ImageNotFound
 from halocoin import api
 from halocoin import tools
 from halocoin.ntwrk import Response
-from halocoin.service import Service, threaded, sync, lockit
+from halocoin.service import Service, threaded, lockit
 
 
 class PowerService(Service):
@@ -29,6 +29,7 @@ class PowerService(Service):
         self.clientdb = None
         self.statedb = None
         self.status = "Loading"
+        self.description = ""
 
     def on_register(self):
         self.clientdb = self.engine.clientdb
@@ -40,7 +41,6 @@ class PowerService(Service):
         self.wallet = None
         print('Power is turned off')
 
-    @sync
     def get_job_status(self, job_id):
         if self.clientdb.get('local_job_repo_' + job_id) is not None:
             job_directory = os.path.join(self.engine.working_dir, 'jobs', job_id)
@@ -66,18 +66,17 @@ class PowerService(Service):
         return self.status
 
     @lockit('power')
-    def set_status(self, status):
+    def set_status(self, status, description=""):
         self.status = status
+        self.description = description
         api.power_status()
 
-    @sync
     def initiate_job(self, job_id):
         print('Assigned {}'.format(job_id))
         self.clientdb.put('local_job_repo_' + job_id, {
             "status": "assigned",
         })
 
-    @sync
     def download_job(self, job_id):
         print('Downloading {}'.format(job_id))
         job = self.statedb.get_job(job_id)
@@ -97,12 +96,15 @@ class PowerService(Service):
             'payload': payload
         })
         downloaded = 0
+        total_length = int(r.headers.get("Content-Length"))
         with open(job_file, 'wb') as f:
             for chunk in r.iter_content(chunk_size=1024 * 1024):
                 if chunk:  # filter out keep-alive new chunks
                     f.write(chunk)
                     downloaded += 1024*1024
-                    self.set_status("Downloading... {}".format(tools.readable_bytes(downloaded)))
+                    self.set_status("Downloading... {}/{}".format(
+                        tools.readable_bytes(downloaded),
+                        tools.readable_bytes(total_length)))
         if os.path.exists(job_file):
             import tarfile
             tar_ref = tarfile.open(job_file, mode='r:gz')
@@ -122,7 +124,6 @@ class PowerService(Service):
         else:
             return False
 
-    @sync
     def execute_job(self, job_id):
         print('Executing {}'.format(job_id))
         self.set_status("Executing...")
@@ -135,10 +136,16 @@ class PowerService(Service):
         if not os.path.exists(output_directory):
             os.makedirs(output_directory)
         result_file = os.path.join(output_directory, 'result.zip')
-        client.containers.run(self.engine.config['coinami']['container'], user=os.getuid(), volumes={
+        container = client.containers.run(self.engine.config['coinami']['container'], user=os.getuid(), volumes={
             job_directory: {'bind': '/input', 'mode': 'rw'},
             output_directory: {'bind': '/output', 'mode': 'rw'}
-        })
+        }, detach=True)
+        while client.containers.get(container.id).status == 'running' or \
+                        client.containers.get(container.id).status == 'created':
+            self.set_status('Executing...', client.containers.get(container.id).logs().decode())
+            if not self.threaded_running():
+                client.containers.get(container.id).kill()
+            time.sleep(1)
         if os.path.exists(result_file):
             self.set_status("Executed...")
             entry = self.clientdb.get('local_job_repo_' + job_id)
@@ -148,7 +155,6 @@ class PowerService(Service):
         else:
             return False
 
-    @sync
     def upload_job(self, job_id):
         print('Uploading {}'. format(job_id))
         self.set_status("Uploading...")
@@ -175,7 +181,6 @@ class PowerService(Service):
             entry['status'] = 'uploaded'
             self.clientdb.put('local_job_repo_' + job_id, entry)
 
-    @sync
     def done_job(self, job_id):
         job = self.statedb.get_job(job_id)
         job_directory = os.path.join(self.engine.working_dir, 'jobs', job_id)

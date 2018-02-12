@@ -13,6 +13,7 @@ class Power extends Component {
     super(props);
     this.state = {
       'status': 'Loading...',
+      'description': '',
       'available': 'Loading...'
     }
     this.props.socket.on('power_status', (socket) => {
@@ -45,6 +46,7 @@ class Power extends Component {
       let data = response.data;
       this.setState((state) => {
         state['status'] = data.status;
+        state['description'] = data.description;
         return state;
       });
     });
@@ -59,7 +61,7 @@ class Power extends Component {
           avatar={<Avatar backgroundColor={green500} icon={<FontIcon className="material-icons">whatshot</FontIcon>} />}
         />
         <CardActions style={{ width: '100%', textAlign: 'right' }}>
-          <FlatButton label={this.state.status} disabled={true}/>
+          <FlatButton onClick={() => {console.log(this.state.description);}} label={this.state.status} disabled={this.state.description == ''}/>
         </CardActions>
       </Card>
     );

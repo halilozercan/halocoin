@@ -193,7 +193,7 @@ def send(address, amount, pw, wallet=None, message=None):
 
 
 @action
-def deposit(amount, pw, wallet=None, force=None):
+def deposit(amount, pw=None, wallet=None, force=None):
     from getpass import getpass
     if pw is None:
         wallet_pw = getpass('Wallet password: ')
