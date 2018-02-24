@@ -4,6 +4,8 @@ RUN apt-get update -y --fix-missing
 RUN apt-get -y install software-properties-common wget default-jre \
     zip gcc zlib1g-dev libbz2-dev liblzma-dev make git python3
 
+RUN apt-get -y install bzip2
+
 # Samtools
 RUN wget https://github.com/samtools/samtools/releases/download/1.6/samtools-1.6.tar.bz2 -O /tmp/samtools.tar.bz2 && \
     mkdir /tmp/samtools/ && \
@@ -28,6 +30,8 @@ RUN wget https://github.com/broadinstitute/picard/releases/download/2.16.0/picar
 RUN mkdir /coinami
 WORKDIR /coinami
 ADD executor.sh /coinami/executor.sh
+ADD decompressor /coinami/decompressor
+RUN gcc -o /usr/bin/decompress decompressor/main.c -lz
 RUN chmod a+x executor.sh
 
 VOLUME /input

@@ -2,7 +2,7 @@
 cd /input
 
 echo "Starting decompressing..."
-decompress job.cfq
+decompress job.cfq.gz
 echo "Finished decompressing..."
 
 num_of_threads=$(python3 -c "import json; a=json.load(open('config.json')); print(a['threads'])")

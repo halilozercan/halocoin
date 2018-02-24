@@ -90,10 +90,10 @@ class Engine(Service):
             self.unregister_sub_services()
             return False
 
-        # if not self.power.register():
-        #     sys.stderr.write("Power service has failed. Exiting!\n")
-        #     self.unregister_sub_services()
-        #     return False
+        if not self.power.register():
+            sys.stderr.write("Power service has failed. Exiting!\n")
+            self.unregister_sub_services()
+            return False
 
         api.run()
 

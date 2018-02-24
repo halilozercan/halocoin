@@ -45,8 +45,8 @@ class PowerService(Service):
     def get_job_status(self, job_id):
         if self.clientdb.get('local_job_repo_' + job_id) is not None:
             job_directory = os.path.join(self.engine.working_dir, 'jobs', job_id)
-            result_file = os.path.join(job_directory, 'output', 'result.zip')
-            job_file = os.path.join(job_directory, 'coinami.job.json')
+            result_file = os.path.join(job_directory, 'result.zip')
+            job_file = os.path.join(job_directory, 'job.cfq.gz')
             result_exists = os.path.exists(result_file)
             job_exists = os.path.exists(job_file)
             entry = self.clientdb.get('local_job_repo_' + job_id)
@@ -87,6 +87,8 @@ class PowerService(Service):
         job_file = os.path.join(job_directory, 'job.cfq.gz')
 
         auth = self.statedb.get_auth(job['auth'])
+        if not auth['host'].startswith("http"):
+            auth['host'] = "http://" + auth['host']
         endpoint = auth['host'] + "/job_download/{}".format(job_id)
         secret_message = str(uuid.uuid4())
         payload = yaml.dump({
@@ -150,11 +152,11 @@ class PowerService(Service):
         self.set_status("Uploading...")
         job = self.statedb.get_job(job_id)
         auth = self.statedb.get_auth(job['auth'])
+        if not auth['host'].startswith("http"):
+            auth['host'] = "http://" + auth['host']
         endpoint = auth['host'] + "/job_upload/{}".format(job_id)
-        result_directory = os.path.join(self.engine.working_dir, 'jobs', job_id, 'output')
-        if not os.path.exists(result_directory):
-            os.makedirs(result_directory)
-        result_file = os.path.join(result_directory, 'result.zip')
+        job_directory = os.path.join(self.engine.working_dir, 'jobs', job_id)
+        result_file = os.path.join(job_directory, 'result.zip')
         secret_message = str(uuid.uuid4())
         payload = yaml.dump({
             "message": tools.det_hash(secret_message),

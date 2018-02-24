@@ -64,7 +64,6 @@ class JobListing extends Component {
     </TableRow>
     if(this.state.data !== null) {
       content = Object.keys(this.state.data).map((_row, i) => {
-        console.log(this.state.data[_row]);
         return <TableRow>
           <TableHeaderColumn>{this.state.data[_row].auth}</TableHeaderColumn>
           <TableHeaderColumn>{this.state.data[_row].id.substr(0,8)}</TableHeaderColumn>
