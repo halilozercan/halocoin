@@ -1,3 +1,4 @@
+import json
 import os
 import time
 import uuid
@@ -122,6 +123,10 @@ class PowerService(Service):
         job_directory = os.path.join(self.engine.working_dir, 'jobs', job_id)
         job_directory = os.path.abspath(job_directory)
         result_file = os.path.join(job_directory, 'result.zip')
+
+        config_file = os.path.join(job_directory, 'config.json')
+        json.dump(self.engine.config['coinami'], open(config_file, "w"))
+
         container = client.containers.run(self.engine.config['coinami']['container'], user=os.getuid(), volumes={
             job_directory: {'bind': '/input', 'mode': 'rw'}
         }, detach=True)

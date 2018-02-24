@@ -82,7 +82,7 @@ def generate_default_config():
 
     config["coinami"] = {
         "container": "coinami/power2",
-        "cores": -1
+        "threads": -1
     }
     return config
 

@@ -5,7 +5,7 @@ echo "Starting decompressing..."
 decompress job.cfq
 echo "Finished decompressing..."
 
-num_of_threads=$(python3 -c "import json; a=json.load(open('coinami.job.json')); print(a['threads'])")
+num_of_threads=$(python3 -c "import json; a=json.load(open('config.json')); print(a['threads'])")
 
 echo "Starting BWA..."
 bwa mem -t $num_of_threads /reference/human_g1k_v37.fasta reads.1.fq reads.2.fq > output.sam
