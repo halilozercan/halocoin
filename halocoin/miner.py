@@ -5,7 +5,6 @@ from multiprocessing import Process
 
 from halocoin import custom, api
 from halocoin import tools
-from halocoin.blockchain import BlockchainService
 from halocoin.service import Service, threaded, lockit
 
 
@@ -47,10 +46,6 @@ class MinerService(Service):
 
     @threaded
     def worker(self):
-        # if not self.blockchain.tx_queue.empty() or not self.blockchain.blocks_queue.empty():
-        #     time.sleep(0.1)
-        #     return
-
         print('Miner preparing block %d' % (self.db.get('length') + 1))
         candidate_block = self.get_candidate_block()
         print('Miner starting to work for block %d' % (candidate_block['length']))
@@ -150,12 +145,5 @@ class MinerService(Service):
             if current_hash <= candidate_block['target']:
                 queue.put(candidate_block)
         except Exception as e:
-            tools.log('miner fucked up' + str(e))
+            tools.log('Miner ran into a problem ' + str(e))
             pass
-
-    @staticmethod
-    def is_everyone_dead(processes):
-        for p in processes:
-            if p.is_alive():
-                return False
-        return True

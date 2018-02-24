@@ -9,7 +9,7 @@ from queue import Empty
 from halocoin import custom, api
 from halocoin import tools
 from halocoin.ntwrk import Response
-from halocoin.service import Service, threaded, sync, NoExceptionQueue, lockit
+from halocoin.service import Service, threaded, NoExceptionQueue, lockit
 
 
 class BlockchainService(Service):
@@ -106,8 +106,6 @@ class BlockchainService(Service):
             while not self.tx_queue.empty():
                 candidate_tx = self.tx_queue.get(timeout=0.1)
                 result = self.add_tx(candidate_tx)
-                api.tx_queue_response['message'] = result
-                api.tx_queue_response['event'].set()
                 self.tx_queue.task_done()
         except Empty:
             pass

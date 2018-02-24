@@ -46,7 +46,7 @@ class Engine(Service):
         self.config = config
         self.working_dir = working_dir
 
-        self.db = KeyValueStore(self, self.config['database']['location'])
+        self.db = KeyValueStore(self)
         self.blockchain = BlockchainService(self)
         self.peers_check = PeerCheckService(self, self.config['peers']['list'])
         self.peer_receive = PeerListenService(self)
@@ -90,10 +90,10 @@ class Engine(Service):
             self.unregister_sub_services()
             return False
 
-        if not self.power.register():
-            sys.stderr.write("Power service has failed. Exiting!\n")
-            self.unregister_sub_services()
-            return False
+        # if not self.power.register():
+        #     sys.stderr.write("Power service has failed. Exiting!\n")
+        #     self.unregister_sub_services()
+        #     return False
 
         api.run()
 

@@ -16,11 +16,6 @@ from halocoin.service import Service
 
 async_threading  # PyCharm automatically removes unused imports. This prevents it
 
-tx_queue_response = {
-    "result": None,
-    "event": threading.Event()
-}
-
 
 class ComplexEncoder(json.JSONEncoder):
     def default(self, obj):
@@ -51,11 +46,6 @@ def run():
     listen_thread = threading.Thread(target=thread_target, daemon=True)
     listen_thread.start()
     print("Started API on {}:{}".format(host, engine.instance.config['port']['api']))
-    """
-    Deprecated in favor of electron app
-    import webbrowser
-    webbrowser.open('http://' + host + ':' + str(engine.instance.config['port']['api']))
-    """
 
 
 @socketio.on('connect')
@@ -133,7 +123,7 @@ def info_wallet():
 
 
 @app.route('/remove_wallet', methods=['GET', 'POST'])
-def remove_wallet(wallet):
+def remove_wallet():
     from halocoin.model.wallet import Wallet
     wallet_name = request.values.get('wallet_name', None)
     password = request.values.get('password', None)
@@ -221,7 +211,6 @@ def set_default_wallet():
 
 
 @app.route('/history', methods=['GET', 'POST'])
-# @blockchain_synced
 def history():
     from halocoin.model.wallet import Wallet
     address = request.values.get('address', None)
@@ -287,7 +276,6 @@ def available_jobs():
 
 
 @app.route('/send', methods=['GET', 'POST'])
-# @blockchain_synced
 def send():
     from halocoin.model.wallet import Wallet
     amount = int(request.values.get('amount', 0))
@@ -338,18 +326,14 @@ def send():
         tx['pubkeys'] = [wallet.get_pubkey_str()]  # We use pubkey as string
     if 'signatures' not in tx:
         tx['signatures'] = [tools.sign(tools.det_hash(tx), wallet.privkey)]
-    tx_queue_response['event'] = threading.Event()
     engine.instance.blockchain.tx_queue.put(tx)
-    # tx_queue_response['event'].wait()
-    # response["success"] = tx_queue_response['message'].getFlag()
     response["success"] = True
-    response["message"] = "Your transaction is successfully added to the pool"
+    response["message"] = "Your transaction is successfully added to the queue"
     response["tx"] = tx
     return generate_json_response(response)
 
 
 @app.route('/deposit', methods=['GET', 'POST'])
-# @blockchain_synced
 def deposit():
     from halocoin.model.wallet import Wallet
     amount = int(request.values.get('amount', 0))  # Bidding amount
@@ -403,18 +387,14 @@ def deposit():
         tx['pubkeys'] = [wallet.get_pubkey_str()]  # We use pubkey as string
     if 'signatures' not in tx:
         tx['signatures'] = [tools.sign(tools.det_hash(tx), wallet.privkey)]
-    tx_queue_response['event'] = threading.Event()
     engine.instance.blockchain.tx_queue.put(tx)
-    # tx_queue_response['event'].wait()
-    # response["success"] = tx_queue_response['message'].getFlag()
     response["success"] = True
-    response["message"] = "Your transaction is successfully added to the pool"
+    response["message"] = "Your transaction is successfully added to the queue"
     response["tx"] = tx
     return generate_json_response(response)
 
 
 @app.route('/withdraw', methods=['GET', 'POST'])
-# @blockchain_synced
 def withdraw():
     from halocoin.model.wallet import Wallet
     amount = int(request.values.get('amount', 0))  # Bidding amount
@@ -459,12 +439,9 @@ def withdraw():
         tx['pubkeys'] = [wallet.get_pubkey_str()]  # We use pubkey as string
     if 'signatures' not in tx:
         tx['signatures'] = [tools.sign(tools.det_hash(tx), wallet.privkey)]
-    tx_queue_response['event'] = threading.Event()
     engine.instance.blockchain.tx_queue.put(tx)
-    # tx_queue_response['event'].wait()
-    # response["success"] = tx_queue_response['message'].getFlag()
     response["success"] = True
-    response["message"] = "Your transaction is successfully added to the pool"
+    response["message"] = "Your transaction is successfully added to the queue"
     response["tx"] = tx
     return generate_json_response(response)
 
@@ -499,12 +476,9 @@ def reward():
 
     tx['pubkeys'] = [privkey.get_verifying_key().to_string()]  # We use pubkey as string
     tx['signatures'] = [tools.sign(tools.det_hash(tx), privkey)]
-    tx_queue_response['event'] = threading.Event()
     engine.instance.blockchain.tx_queue.put(tx)
-    # tx_queue_response['event'].wait()
-    # response["success"] = tx_queue_response['message'].getFlag()
     response["success"] = True
-    response["message"] = "Your transaction is successfully added to the pool"
+    response["message"] = "Your transaction is successfully added to the queue"
     response["tx"] = tx
     return generate_json_response(response)
 
@@ -542,12 +516,9 @@ def job_dump():
 
     tx['pubkeys'] = [privkey.get_verifying_key().to_string()]  # We use pubkey as string
     tx['signatures'] = [tools.sign(tools.det_hash(tx), privkey)]
-    # tx_queue_response['event'] = threading.Event()
     engine.instance.blockchain.tx_queue.put(tx)
-    # tx_queue_response['event'].wait()
-    # response["success"] = tx_queue_response['message'].getFlag()
     response["success"] = True
-    response["message"] = "Your transaction is successfully added to the pool"
+    response["message"] = "Your transaction is successfully added to the queue"
     response["tx"] = tx
     return generate_json_response(response)
 
@@ -590,12 +561,9 @@ def auth_reg():
 
     tx['pubkeys'] = [privkey.get_verifying_key().to_string()]  # We use pubkey as string
     tx['signatures'] = [tools.sign(tools.det_hash(tx), privkey)]
-    tx_queue_response['event'] = threading.Event()
     engine.instance.blockchain.tx_queue.put(tx)
-    # tx_queue_response['event'].wait()
-    # response["success"] = tx_queue_response['message'].getFlag()
     response["success"] = True
-    response["message"] = "Your transaction is successfully added to the pool"
+    response["message"] = "Your transaction is successfully added to the queue"
     response["tx"] = tx
     return generate_json_response(response)
 
@@ -664,14 +632,12 @@ def blocks():
 
 
 @app.route('/difficulty', methods=['GET', 'POST'])
-# @blockchain_synced
 def difficulty():
     diff = engine.instance.blockchain.target(engine.instance.db.get('length'))
     return generate_json_response({"difficulty": diff})
 
 
 @app.route('/balance', methods=['GET', 'POST'])
-# @blockchain_synced
 def balance():
     from halocoin.model.wallet import Wallet
     address = request.values.get('address', None)

@@ -80,12 +80,13 @@ class PowerService(Service):
     def download_job(self, job_id):
         print('Downloading {}'.format(job_id))
         job = self.statedb.get_job(job_id)
-        auth = self.statedb.get_auth(job['auth'])
-        endpoint = auth['host'] + "/job_download/{}".format(job_id)
         job_directory = os.path.join(self.engine.working_dir, 'jobs', job_id)
         if not os.path.exists(job_directory):
             os.makedirs(job_directory)
-        job_file = os.path.join(job_directory, 'job.tar.gz')
+        job_file = os.path.join(job_directory, 'job.cfq.gz')
+
+        auth = self.statedb.get_auth(job['auth'])
+        endpoint = auth['host'] + "/job_download/{}".format(job_id)
         secret_message = str(uuid.uuid4())
         payload = yaml.dump({
             "message": tools.det_hash(secret_message),
@@ -106,17 +107,6 @@ class PowerService(Service):
                         tools.readable_bytes(downloaded),
                         tools.readable_bytes(total_length)))
         if os.path.exists(job_file):
-            import tarfile
-            tar_ref = tarfile.open(job_file, mode='r:gz')
-            self.set_status("Decompressing...")
-            tar_ref.extractall(job_directory)
-            tar_ref.close()
-            if os.path.exists(os.path.join(job_directory, 'coinami.job.json')) and \
-                            self.engine.config['coinami']['cores'] > 0:
-                import json
-                job_desc = json.load(open(os.path.join(job_directory, 'coinami.job.json')))
-                job_desc['threads'] = self.engine.config['coinami']['cores']
-                json.dump(job_desc, open(os.path.join(job_directory, 'coinami.job.json'), 'w'))
             entry = self.clientdb.get('local_job_repo_' + job_id)
             entry['status'] = 'downloaded'
             self.clientdb.put('local_job_repo_' + job_id, entry)
@@ -130,15 +120,10 @@ class PowerService(Service):
         import docker
         client = docker.from_env()
         job_directory = os.path.join(self.engine.working_dir, 'jobs', job_id)
-        output_directory = os.path.join(job_directory, 'output')
         job_directory = os.path.abspath(job_directory)
-        output_directory = os.path.abspath(output_directory)
-        if not os.path.exists(output_directory):
-            os.makedirs(output_directory)
-        result_file = os.path.join(output_directory, 'result.zip')
+        result_file = os.path.join(job_directory, 'result.zip')
         container = client.containers.run(self.engine.config['coinami']['container'], user=os.getuid(), volumes={
-            job_directory: {'bind': '/input', 'mode': 'rw'},
-            output_directory: {'bind': '/output', 'mode': 'rw'}
+            job_directory: {'bind': '/input', 'mode': 'rw'}
         }, detach=True)
         while client.containers.get(container.id).status == 'running' or \
                         client.containers.get(container.id).status == 'created':

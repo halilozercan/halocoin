@@ -1,7 +1,7 @@
 import os
 from cdecimal import Decimal
 
-version = "0.0014c"
+version = "0.0015c"
 block_reward = 500  # Initial block reward
 miner_core_count = -1  # -1 evaluates to number of cores
 # Lower limits on what the "time" tag in a block can say.
@@ -16,15 +16,15 @@ history_length = 110
 # total weight.
 inflection = Decimal('0.98')
 # How often to generate a block in seconds
-blocktime = 60
+blocktime = 30
 halve_at = (365 * 24 * 60 * 60 / blocktime)  # Approximately one year
 recalculate_target_at = (4*60*60 // blocktime)  # It's every half day
 
 # Precalculate
 memoized_weights = [inflection ** i for i in range(history_length)]
 
-assignment_period = 5  # Assign jobs at each T rounds
-unassignment_after = 8   # Unassign jobs after T*M rounds
+assignment_period = 10  # Assign jobs at each T rounds
+unassignment_after = 16   # Unassign jobs after T*M rounds
 assignment_stake_burn = 0.1
 
 first_target = '0' * 4 + 'f' * 60
@@ -52,10 +52,6 @@ AiAqmCqPhs3ICqNPTDZ0Q2SSk0dTZptbG5cGxDgBoefoPg==
 def generate_default_config():
     config = dict()
     config['DEBUG'] = False
-    config['database'] = {
-        "type": "sql",
-        "location": "coinami.db"
-    }
 
     config['logging'] = {
         'file': 'log'
@@ -77,7 +73,7 @@ def generate_default_config():
                 'length': -1
             }
         ],
-        "download_limit": 190
+        "download_limit": 250
     }
 
     config["miner"] = {
@@ -85,8 +81,7 @@ def generate_default_config():
     }
 
     config["coinami"] = {
-        "docker": "/usr/bin/docker",
-        "container": "coinami/power",
+        "container": "coinami/power2",
         "cores": -1
     }
     return config
