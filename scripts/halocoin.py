@@ -41,5 +41,9 @@ elif sys.argv[0] == "send":
     password = sys.argv[3]
     content = run_command(['curl', 'http://0.0.0.0:7001/send?address=' + address + '&amount=' + amount +
                            "&password=" + password])
+elif sys.argv[0] == "start_miner":
+    content = run_command(['curl', 'http://0.0.0.0:7001/start_miner'])
+elif sys.argv[0] == "stop_miner":
+    content = run_command(['curl', 'http://0.0.0.0:7001/stop_miner'])
 
 print(highlight(content, JsonLexer(), TerminalFormatter()))
