@@ -1,10 +1,8 @@
 FROM coinami/reference
 
 RUN apt-get update -y --fix-missing
-RUN apt-get -y install software-properties-common wget default-jre \
-    zip gcc zlib1g-dev libbz2-dev liblzma-dev make git python3
-
-RUN apt-get -y install bzip2
+RUN apt-get -y install software-properties-common wget \
+    zip gcc zlib1g-dev bzip2 libbz2-dev liblzma-dev make git python3
 
 # Samtools
 RUN wget https://github.com/samtools/samtools/releases/download/1.6/samtools-1.6.tar.bz2 -O /tmp/samtools.tar.bz2 && \
@@ -23,9 +21,6 @@ RUN wget https://github.com/lh3/bwa/releases/download/v0.7.17/bwa-0.7.17.tar.bz2
     cd /usr/local/bwa && \
     make all
 ENV PATH=/usr/local/bwa:$PATH
-
-# Picard
-RUN wget https://github.com/broadinstitute/picard/releases/download/2.16.0/picard.jar -O /usr/local/bin/picard.jar
 
 RUN mkdir /coinami
 WORKDIR /coinami

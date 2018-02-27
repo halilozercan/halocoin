@@ -16,17 +16,13 @@ samtools view -@ $num_of_threads -bS -o output.bam output.sam
 echo "Finished Samtools View..."
 
 echo "Starting Samtools Sort..."
-samtools sort -@ $num_of_threads output.bam -o output.sorted
+samtools sort -@ $num_of_threads output.bam -o output.sorted.bam
 echo "Finished Samtools Sort..."
 
-echo "Starting MarkDuplicates..."
-java -jar /usr/local/bin/picard.jar MarkDuplicates I=output.sorted O=output.markdup.bam M=duplicate_metrics.txt
-echo "Finished MarkDuplicates..."
-
 echo "Starting Samtools Index..."
-samtools index -@ $num_of_threads output.markdup.bam
+samtools index -@ $num_of_threads output.sorted.bam
 echo "Finished Samtools Index..."
 
 echo "Starting Zip..."
-zip result.zip output.markdup.bam output.markdup.bam.bai
+zip result.zip output.sorted.bam output.sorted.bam.bai
 echo "Finished Zip..."

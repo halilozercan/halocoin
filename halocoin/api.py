@@ -485,10 +485,10 @@ def job_dump():
         'id': request.values.get('job_id', None),
         'timestamp': request.values.get('job_timestamp', None),
         'amount': int(request.values.get('amount', 0)),
-        'download_url': '',
-        'upload_url': '',
-        'hashsum': '',
-        'image': '',
+        'download_url': request.values.get('download_url', None),
+        'upload_url': request.values.get('upload_url', None),
+        'hashsum': request.values.get('hashsum', None),
+        'image': request.values.get('image', None),
     }
     certificate = request.values.get('certificate', None)
     privkey = request.values.get('privkey', None)
