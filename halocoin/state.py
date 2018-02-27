@@ -326,7 +326,7 @@ class StateDatabase:
             elif tx['pubkeys'] != auth['pubkeys']:
                 return False
             # Check if job already exists
-            if self.db.exists('job_' + tx['job']['id']):
+            if self.get_job(tx['auth'], tx['job']['id']) is not None:
                 return False
 
             # Check if authority has remaining supply

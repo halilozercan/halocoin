@@ -482,8 +482,8 @@ def reward():
 def job_dump():
     from ecdsa import SigningKey
     job = {
-        'id': request.values.get('job_id', None),
-        'timestamp': request.values.get('job_timestamp', None),
+        'id': request.values.get('id', None),
+        'timestamp': request.values.get('timestamp', None),
         'amount': int(request.values.get('amount', 0)),
         'download_url': request.values.get('download_url', None),
         'upload_url': request.values.get('upload_url', None),
@@ -497,14 +497,29 @@ def job_dump():
     if job['id'] is None:
         response['error'] = "Job id missing"
         return generate_json_response(response)
+    elif job['timestamp'] is None:
+        response['error'] = "Job timestamp missing"
+        return generate_json_response(response)
+    elif job['amount'] == 0:
+        response['error'] = "Reward amount is missing"
+        return generate_json_response(response)
+    elif job['download_url'] is None:
+        response['error'] = "Job download url missing"
+        return generate_json_response(response)
+    elif job['upload_url'] is None:
+        response['error'] = "Job upload url missing"
+        return generate_json_response(response)
+    elif job['hashsum'] is None:
+        response['error'] = "Job hashsum missing"
+        return generate_json_response(response)
+    elif job['image'] is None:
+        response['error'] = "Job image missing"
+        return generate_json_response(response)
     elif privkey is None:
         response['error'] = "Job dumps need to be signed by private key belonging to certificate"
         return generate_json_response(response)
     elif certificate is None:
         response['error'] = "To give jobs, you must specify a certificate that is granted by root"
-        return generate_json_response(response)
-    elif job['amount'] == 0:
-        response['error'] = "Reward amount is missing"
         return generate_json_response(response)
 
     tx = {'type': 'job_dump', 'job': job, 'version': custom.version}

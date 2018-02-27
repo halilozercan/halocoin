@@ -134,7 +134,7 @@ class BlockchainService(Service):
 
     @lockit('kvstore')
     def tx_pool_pop_all(self):
-        #TODO: empty the pool
+        # TODO: empty the pool
         """
         Atomic operation to pop everything
         :return: transactions list
@@ -162,7 +162,7 @@ class BlockchainService(Service):
             return Response(False, 'Invalid type')
         self.db.simulate()
         _tx = copy.deepcopy(tx)
-        current_state_check = self.statedb.update_database_with_tx(_tx, self.db.get('length')+1)
+        current_state_check = self.statedb.update_database_with_tx(_tx, self.db.get('length') + 1)
         self.db.rollback()
         if not current_state_check:
             return Response(False, 'Transaction failed current state check')
@@ -436,14 +436,11 @@ class BlockchainService(Service):
             elif 'id' not in tx['job'] or \
                             'timestamp' not in tx['job'] or \
                             'amount' not in tx['job'] or \
-                            'id' not in tx['job'] or \
                             'image' not in tx['job'] or \
                             'download_url' not in tx['job'] or \
                             'upload_url' not in tx['job'] or \
                             'hashsum' not in tx['job']:
                 return Response(False, 'Job dump transaction includes an invalid job description')
-            elif 'amount' not in tx['job']:
-                return Response(False, 'Job dump transactions must specify the reward')
         elif tx['type'] == 'deposit' or tx['type'] == 'withdraw':
             if not BlockchainService.tx_signature_check(tx):
                 return Response(False, 'Transaction is not properly signed')

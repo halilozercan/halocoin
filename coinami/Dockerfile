@@ -2,7 +2,7 @@ FROM coinami/reference
 
 RUN apt-get update -y --fix-missing
 RUN apt-get -y install software-properties-common wget \
-    zip gcc zlib1g-dev bzip2 libbz2-dev liblzma-dev make git python3
+    zip gcc zlib1g-dev bzip2 libbz2-dev liblzma-dev make python3
 
 # Samtools
 RUN wget https://github.com/samtools/samtools/releases/download/1.6/samtools-1.6.tar.bz2 -O /tmp/samtools.tar.bz2 && \
