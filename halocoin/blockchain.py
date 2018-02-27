@@ -431,14 +431,24 @@ class BlockchainService(Service):
                 return Response(False, 'Job dump transactions must include auth name')
             elif not BlockchainService.tx_signature_check(tx):
                 return Response(False, 'Transaction is not properly signed')
-            elif 'job' not in tx or not isinstance(tx['job'], dict) or \
-                            'id' not in tx['job'] or 'timestamp' not in tx['job']:
+            elif 'job' not in tx or not isinstance(tx['job'], dict):
                 return Response(False, 'Job dump transactions must include a job in it. Makes sense right?')
+            elif 'id' not in tx['job'] or \
+                            'timestamp' not in tx['job'] or \
+                            'amount' not in tx['job'] or \
+                            'id' not in tx['job'] or \
+                            'image' not in tx['job'] or \
+                            'download_url' not in tx['job'] or \
+                            'upload_url' not in tx['job'] or \
+                            'hashsum' not in tx['job']:
+                return Response(False, 'Job dump transaction includes an invalid job description')
             elif 'amount' not in tx['job']:
                 return Response(False, 'Job dump transactions must specify the reward')
         elif tx['type'] == 'deposit' or tx['type'] == 'withdraw':
             if not BlockchainService.tx_signature_check(tx):
                 return Response(False, 'Transaction is not properly signed')
+            if 'auth' not in tx:
+                return Response(False, 'Deposit and withdraw transactions must include auth name')
             if 'amount' not in tx or not isinstance(tx['amount'], int):
                 return Response(False, 'Transaction amount is not given or not a proper integer')
             if 'count' not in tx or not isinstance(tx['count'], int):

@@ -42,14 +42,15 @@ class PowerService(Service):
         self.wallet = None
         print('Power is turned off')
 
-    def get_job_status(self, job_id):
-        if self.clientdb.get('local_job_repo_' + job_id) is not None:
-            job_directory = os.path.join(self.engine.working_dir, 'jobs', job_id)
+    def get_job_status(self, job):
+        job_name = job['auth'] + '_' + job['job_id']
+        if self.clientdb.get('local_job_repo_' + job_name) is not None:
+            job_directory = os.path.join(self.engine.working_dir, 'jobs', job_name)
             result_file = os.path.join(job_directory, 'result.zip')
             job_file = os.path.join(job_directory, 'job.cfq.gz')
             result_exists = os.path.exists(result_file)
             job_exists = os.path.exists(job_file)
-            entry = self.clientdb.get('local_job_repo_' + job_id)
+            entry = self.clientdb.get('local_job_repo_' + job_name)
             if entry['status'] == 'executed' or entry['status'] == 'downloaded':
                 if result_exists:
                     return "executed"
@@ -72,31 +73,27 @@ class PowerService(Service):
         self.description = description
         api.power_status()
 
-    def initiate_job(self, job_id):
-        print('Assigned {}'.format(job_id))
-        self.clientdb.put('local_job_repo_' + job_id, {
+    def initiate_job(self, job):
+        job_name = job['auth'] + '_' + job['id']
+        print('Assigned {}'.format(job_name))
+        self.clientdb.put('local_job_repo_' + job_name, {
             "status": "assigned",
         })
 
-    def download_job(self, job_id):
-        print('Downloading {}'.format(job_id))
-        job = self.statedb.get_job(job_id)
-        job_directory = os.path.join(self.engine.working_dir, 'jobs', job_id)
+    def download_job(self, job):
+        job_name = job['auth'] + '_' + job['id']
+        print('Downloading {}'.format(job_name))
+        job_directory = os.path.join(self.engine.working_dir, 'jobs', job_name)
         if not os.path.exists(job_directory):
             os.makedirs(job_directory)
         job_file = os.path.join(job_directory, 'job.cfq.gz')
-
-        auth = self.statedb.get_auth(job['auth'])
-        if not auth['host'].startswith("http"):
-            auth['host'] = "http://" + auth['host']
-        endpoint = auth['host'] + "/job_download/{}".format(job_id)
         secret_message = str(uuid.uuid4())
         payload = yaml.dump({
             "message": tools.det_hash(secret_message),
             "signature": tools.sign(tools.det_hash(secret_message), self.wallet.privkey),
             "pubkey": self.wallet.get_pubkey_str()
         })
-        r = requests.get(endpoint, stream=True, data={
+        r = requests.get(job['download_url'], stream=True, data={
             'payload': payload
         })
         downloaded = 0
@@ -110,26 +107,27 @@ class PowerService(Service):
                         tools.readable_bytes(downloaded),
                         tools.readable_bytes(total_length)))
         if os.path.exists(job_file):
-            entry = self.clientdb.get('local_job_repo_' + job_id)
+            entry = self.clientdb.get('local_job_repo_' + job_name)
             entry['status'] = 'downloaded'
-            self.clientdb.put('local_job_repo_' + job_id, entry)
+            self.clientdb.put('local_job_repo_' + job_name, entry)
             return True
         else:
             return False
 
-    def execute_job(self, job_id):
-        print('Executing {}'.format(job_id))
+    def execute_job(self, job):
+        job_name = job['auth'] + '_' + job['id']
+        print('Executing {}'.format(job_name))
         self.set_status("Executing...")
         import docker
         client = docker.from_env()
-        job_directory = os.path.join(self.engine.working_dir, 'jobs', job_id)
+        job_directory = os.path.join(self.engine.working_dir, 'jobs', job_name)
         job_directory = os.path.abspath(job_directory)
         result_file = os.path.join(job_directory, 'result.zip')
 
         config_file = os.path.join(job_directory, 'config.json')
         json.dump(self.engine.config['coinami'], open(config_file, "w"))
 
-        container = client.containers.run(self.engine.config['coinami']['container'], user=os.getuid(), volumes={
+        container = client.containers.run(job['image'], user=os.getuid(), volumes={
             job_directory: {'bind': '/input', 'mode': 'rw'}
         }, detach=True)
         while client.containers.get(container.id).status == 'running' or \
@@ -140,22 +138,18 @@ class PowerService(Service):
             time.sleep(1)
         if os.path.exists(result_file):
             self.set_status("Executed...")
-            entry = self.clientdb.get('local_job_repo_' + job_id)
+            entry = self.clientdb.get('local_job_repo_' + job_name)
             entry['status'] = 'executed'
-            self.clientdb.put('local_job_repo_' + job_id, entry)
+            self.clientdb.put('local_job_repo_' + job_name, entry)
             return True
         else:
             return False
 
-    def upload_job(self, job_id):
-        print('Uploading {}'. format(job_id))
+    def upload_job(self, job):
+        job_name = job['auth'] + '_' + job['id']
+        print('Uploading {}'. format(job['id']))
         self.set_status("Uploading...")
-        job = self.statedb.get_job(job_id)
-        auth = self.statedb.get_auth(job['auth'])
-        if not auth['host'].startswith("http"):
-            auth['host'] = "http://" + auth['host']
-        endpoint = auth['host'] + "/job_upload/{}".format(job_id)
-        job_directory = os.path.join(self.engine.working_dir, 'jobs', job_id)
+        job_directory = os.path.join(self.engine.working_dir, 'jobs', job_name)
         result_file = os.path.join(job_directory, 'result.zip')
         secret_message = str(uuid.uuid4())
         payload = yaml.dump({
@@ -166,24 +160,24 @@ class PowerService(Service):
         files = {'file': open(result_file, 'rb')}
         values = {'payload': payload}
 
-        r = requests.post(endpoint, files=files, data=values)
+        r = requests.post(job['upload_url'], files=files, data=values)
         if r.status_code == 200 and r.json()['success']:
-            entry = self.clientdb.get('local_job_repo_' + job_id)
+            entry = self.clientdb.get('local_job_repo_' + job_name)
             self.set_status("Uploaded and Rewarded!")
             entry['status'] = 'uploaded'
-            self.clientdb.put('local_job_repo_' + job_id, entry)
+            self.clientdb.put('local_job_repo_' + job_name, entry)
 
-    def done_job(self, job_id):
-        job = self.statedb.get_job(job_id)
-        job_directory = os.path.join(self.engine.working_dir, 'jobs', job_id)
+    def done_job(self, job):
+        job_name = job['auth'] + '_' + job['id']
+        job_directory = os.path.join(self.engine.working_dir, 'jobs', job_name)
         if os.path.exists(job_directory):
             self.set_status("Cleaning job...")
             import shutil
             shutil.rmtree(job_directory)
 
-        entry = self.clientdb.get('local_job_repo_' + job_id)
+        entry = self.clientdb.get('local_job_repo_' + job_name)
         entry['status'] = 'done'
-        self.clientdb.put('local_job_repo_' + job_id, entry)
+        self.clientdb.put('local_job_repo_' + job_name, entry)
 
     @threaded
     def worker(self):
@@ -209,11 +203,12 @@ class PowerService(Service):
         own_address = self.wallet.address
         own_account = self.statedb.get_account(own_address)
         assigned_job = own_account['assigned_job']
-        if assigned_job == '':
+        if assigned_job['auth'] is None:
             self.set_status("No assignment!")
             time.sleep(1)
             return
 
+        assigned_job = self.statedb.get_job(assigned_job['auth'], assigned_job['job_id'])
         job_status = self.get_job_status(assigned_job)
         if job_status == 'null':
             self.set_status("Job assigned! Initializing...")
@@ -233,14 +228,11 @@ class PowerService(Service):
         time.sleep(0.1)
 
     @staticmethod
-    def system_status(container_name):
+    def system_status():
         try:
             client = docker.from_env()
             if not client.ping():
                 return Response(False, "Docker daemon is not responding")
-            client.images.get(container_name)
-        except ImageNotFound:
-            return Response(False, "Image missing")
         except:
             return Response(False, "An expection occurred")
 

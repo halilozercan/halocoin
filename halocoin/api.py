@@ -341,12 +341,12 @@ def deposit():
     password = request.values.get('password', None)
     force = request.values.get('force', None)
 
-    status = PowerService.system_status(engine.instance.config['coinami']['container'])
+    status = PowerService.system_status()
     if not status.getFlag() and force is None:
         return generate_json_response({
             'error': 'Power service is unavailable',
             'message': 'Power service cannot seem to function right now. '
-                       'If you want to make a deposit, specify force parameter'
+                       'This probably means there is a problem with Docker connection or Docker is not installed.'
         })
 
     if wallet_name is None:
@@ -715,7 +715,7 @@ def status_miner():
 
 @app.route('/power_available')
 def power_available():
-    status = PowerService.system_status(engine.instance.config['coinami']['container'])
+    status = PowerService.system_status()
     return generate_json_response({
         "success": status.getFlag(),
         "message": status.getData()
