@@ -18,7 +18,9 @@ class StateDatabase:
         'count': 0,
         'tx_blocks': set(),
         'assigned_job': '',
-        'stake': 0
+        'stakes': {
+
+        }
     }
 
     def __init__(self, engine):
@@ -32,16 +34,220 @@ class StateDatabase:
             account = self.db.get(address)
         else:
             account = copy.deepcopy(StateDatabase.default_account)
-
-        if 'tx_blocks' not in account:
-            account['tx_blocks'] = set()
-
         return account
 
     def update_account(self, address, new_account):
-        if new_account['amount'] < 0 or new_account['stake'] < 0:
+        if new_account['amount'] < 0:
             return False
+        for auth_name, stake in new_account['stakes'].items():
+            if stake < 0:
+                return False
         self.db.put(address, new_account)
+        return True
+
+    @lockit('kvstore')
+    def get_auth_list(self):
+        if self.db.exists('auth_list'):
+            return self.db.get('auth_list')
+        else:
+            return list()
+
+    def update_auth_list(self, auth_list):
+        self.db.put('auth_list', auth_list)
+
+    @lockit('kvstore')
+    def get_auth(self, auth_name):
+        return self.db.get('auth_' + auth_name)
+
+    def put_auth(self, **kwargs):
+        """
+        Register a new subauthority.
+        :param kwargs:
+            - certificate: Certificate in PEM format
+            - description: Description of new authority
+            - block_number: At which block is this authority registered
+            - host: Main page of authority website
+            - supply: Initial supply
+        :return:
+        """
+        if tools.check_certificate_chain(kwargs['certificate']):
+            common_name = tools.get_commonname_from_certificate(kwargs['certificate'])
+            auth = {
+                'name': common_name,
+                'description': kwargs['description'],
+                'register_block': kwargs['block_number'],
+                'certificate': kwargs['certificate'],
+                'host': kwargs['host'],
+                'initial_supply': kwargs['supply'],
+                'current_supply': kwargs['supply'],
+                'pubkeys': [tools.get_pubkey_from_certificate(kwargs['certificate']).to_string()]
+            }
+            self.db.put('auth_' + common_name, auth)
+            auth_list = self.get_auth_list()
+            auth_list.append(common_name)
+            self.update_auth_list(auth_list)
+
+    def update_auth(self, auth_name, auth):
+        self.db.put('auth_' + auth_name, auth)
+
+    def delete_auth(self, cert_pem):
+        common_name = tools.get_commonname_from_certificate(cert_pem)
+        self.db.delete('auth_' + common_name)
+
+    @lockit('kvstore')
+    def get_stake_pool(self):
+        result = self.db.get('stake_pool')
+        if result is None:
+            return set()
+        else:
+            return set(self.db.get('stake_pool'))
+
+    def put_address_in_stake_pool(self, address):
+        stake_pool = self.get_stake_pool()
+        stake_pool.add(address)
+        self.db.put('stake_pool', stake_pool)
+
+    def remove_address_from_stake_pool(self, address):
+        stake_pool = self.get_stake_pool()
+        stake_pool.remove(address)
+        self.db.put('stake_pool', stake_pool)
+
+    @lockit('kvstore')
+    def get_available_jobs(self):
+        auth_list = self.db.get('auth_list')
+        result = {}
+        for auth_name in auth_list:
+            job_list = self.db.get('auth_' + auth_name + '_jobs')
+            for job_id in job_list:
+                job = self.get_job(job_id)
+                # Here we check last transaction made on the job.
+                if job['status_list'][-1]['action'] == 'add' or job['status_list'][-1]['action'] == 'unassign':
+                    result[job_id] = self.db.get('job_' + job_id)
+        return result
+
+    @lockit('kvstore')
+    def get_assigned_jobs(self):
+        auth_list = self.db.get('auth_list')
+        result = {}
+        for auth_name in auth_list:
+            job_list = self.db.get('auth_' + auth_name + '_jobs')
+            for job_id in job_list:
+                job = self.get_job(job_id)
+                # Here we check last transaction made on the job.
+                if job['status_list'][-1]['action'] == 'assign':
+                    result[job_id] = self.db.get('job_' + job_id)
+        return result
+
+    @lockit('kvstore')
+    def get_rewarded_jobs(self):
+        auth_list = self.db.get('auth_list')
+        result = {}
+        for auth_name in auth_list:
+            job_list = self.db.get('auth_' + auth_name + '_jobs')
+            for job_id in job_list:
+                job = self.get_job(job_id)
+                # Here we check last transaction made on the job.
+                if job['status_list'][-1]['action'] == 'reward':
+                    result[job_id] = self.db.get('job_' + job_id)
+        return result
+
+    def add_new_job(self, **kwargs):
+        """
+
+        :param kwargs:
+            - auth: Which authority supplied this job
+            - reward: Amount of reward
+            - id: Original job id
+            - timestamp: Unique timestamp given by supplying auth
+            - image: Which docker image is going to be used
+            - download_url:
+            - upload_url:
+            - hashsum: SHA256 hashsum of the job. It is not necessarily exact file hashsum.
+            - block_number: At which block this job was added
+        :return:
+        """
+        job = {
+            'auth': kwargs['auth'],
+            'reward': kwargs['reward'],
+            'id': kwargs['id'],
+            'timestampe': kwargs['timestamp'],
+            'image': kwargs['image'],
+            'download_url': kwargs['download_url'],
+            'upload_url': kwargs['upload_url'],
+            'hashsum': kwargs['hashsum'],
+            'status_list': [{
+                'action': 'add',
+                'block': kwargs['block_number']
+            }]
+        }
+        job_list = self.db.get('auth_' + kwargs['auth'] + '_jobs')
+        job_list.append(job['id'])
+        self.db.put('auth_' + kwargs['auth'] + '_jobs', job_list)
+        self.db.put('job_' + kwargs['auth'] + '_' + job['id'], job)
+        return True
+
+    def assign_job(self, job_id, address, block_number):
+        job = self.db.get('job_' + job_id)
+        if job['status_list'][-1]['action'] != 'add' and job['status_list'][-1]['action'] != 'unassign':
+            return False
+        account = self.get_account(address)
+        if account['assigned_job'] != '':
+            return False
+
+        job['status_list'].append({
+            'action': 'assign',
+            'block': block_number,
+            'address': address
+        })
+        account['assigned_job'] = job_id
+        account['stake'] -= int(job['amount'] * custom.assignment_stake_burn)
+        self.db.put('job_' + job_id, job)
+        self.update_account(address, account)
+        if account['stake'] == 0:
+            self.remove_address_from_stake_pool(address)
+        return True
+
+    def reward_job(self, job_id, address, block_number):
+        job = self.db.get('job_' + job_id)
+
+        job['status_list'].append({
+            'action': 'reward',
+            'block': block_number,
+            'address': address
+        })
+        self.db.put('job_' + job_id, job)
+        return True
+
+    def unassign_job(self, job_id, block_number):
+        job = self.db.get('job_' + job_id)
+        if job['status_list'][-1]['action'] != 'assign':
+            return False
+
+        last_assigned_address = job['status_list'][-1]['address']
+        last_assigned_account = self.get_account(last_assigned_address)
+
+        job = self.db.get('job_' + job_id)
+        job['status_list'].append({
+            'action': 'unassign',
+            'block': block_number
+        })
+        last_assigned_account['assigned_job'] = ''
+        self.db.put('job_' + job_id, job)
+        self.update_account(last_assigned_address, last_assigned_account)
+        return True
+
+    @lockit('kvstore')
+    def get_job(self, auth_name, job_id):
+        return self.db.get('job_' + auth_name + '_' + job_id)
+
+    def update_job(self, job):
+        return self.db.put('job_' + job['auth'] + '_' + job['id'], job)
+
+    def delete_job(self, job):
+        job_list = self.db.get('auth_' + job['auth'] + '_jobs')
+        job_list.remove(job['id'])
+        self.db.put('job_list', job_list)
+        self.db.delete('job_' + job['id'])
         return True
 
     def update_database_with_tx(self, tx, block_length):
@@ -295,153 +501,3 @@ class StateDatabase:
             if account['count'] < pool_winner:
                 account['count'] = pool_winner
         return account['count']
-
-    @lockit('kvstore')
-    def get_auth(self, auth_name):
-        return self.db.get('auth_' + auth_name)
-
-    def put_auth(self, cert_pem, host, supply):
-        if tools.check_certificate_chain(cert_pem):
-            common_name = tools.get_commonname_from_certificate(cert_pem)
-            auth = {
-                'certificate': cert_pem,
-                'host': host,
-                'supply': supply,
-                'pubkeys': [tools.get_pubkey_from_certificate(cert_pem).to_string()]
-            }
-            self.db.put('auth_' + common_name, auth)
-
-    def update_auth(self, auth_name, auth):
-        self.db.put('auth_' + auth_name, auth)
-
-    def delete_auth(self, cert_pem):
-        common_name = tools.get_commonname_from_certificate(cert_pem)
-        self.db.delete('auth_' + common_name)
-
-    @lockit('kvstore')
-    def get_stake_pool(self):
-        result = self.db.get('stake_pool')
-        if result is None:
-            return set()
-        else:
-            return set(self.db.get('stake_pool'))
-
-    def put_address_in_stake_pool(self, address):
-        stake_pool = self.get_stake_pool()
-        stake_pool.add(address)
-        self.db.put('stake_pool', stake_pool)
-
-    def remove_address_from_stake_pool(self, address):
-        stake_pool = self.get_stake_pool()
-        stake_pool.remove(address)
-        self.db.put('stake_pool', stake_pool)
-
-    @lockit('kvstore')
-    def get_available_jobs(self):
-        job_list = self.db.get('job_list')
-        result = {}
-        for job_id in job_list:
-            job = self.get_job(job_id)
-            # Here we check last transaction made on the job.
-            if job['status_list'][-1]['action'] == 'add' or job['status_list'][-1]['action'] == 'unassign':
-                result[job_id] = self.db.get('job_' + job_id)
-        return result
-
-    @lockit('kvstore')
-    def get_assigned_jobs(self):
-        job_list = self.db.get('job_list')
-        result = {}
-        for job_id in job_list:
-            job = self.get_job(job_id)
-            # Here we check last transaction made on the job.
-            if job['status_list'][-1]['action'] == 'assign':
-                result[job_id] = self.db.get('job_' + job_id)
-        return result
-
-    @lockit('kvstore')
-    def get_rewarded_jobs(self):
-        job_list = self.db.get('job_list')
-        result = {}
-        for job_id in job_list:
-            job = self.get_job(job_id)
-            # Here we check last transaction made on the job.
-            if job['status_list'][-1]['action'] == 'reward':
-                result[job_id] = self.db.get('job_' + job_id)
-        return result
-
-    def add_new_job(self, tx_job, auth, block_number):
-        job = copy.deepcopy(tx_job)
-        job['auth'] = auth
-        job['status_list'] = [{
-            'action': 'add',
-            'block': block_number
-        }]
-        job_list = self.db.get('job_list')
-        job_list.append(job['id'])
-        self.db.put('job_list', job_list)
-        self.db.put('job_' + job['id'], job)
-        return True
-
-    def assign_job(self, job_id, address, block_number):
-        job = self.db.get('job_' + job_id)
-        if job['status_list'][-1]['action'] != 'add' and job['status_list'][-1]['action'] != 'unassign':
-            return False
-        account = self.get_account(address)
-        if account['assigned_job'] != '':
-            return False
-
-        job['status_list'].append({
-            'action': 'assign',
-            'block': block_number,
-            'address': address
-        })
-        account['assigned_job'] = job_id
-        account['stake'] -= int(job['amount'] * custom.assignment_stake_burn)
-        self.db.put('job_' + job_id, job)
-        self.update_account(address, account)
-        if account['stake'] == 0:
-            self.remove_address_from_stake_pool(address)
-        return True
-
-    def reward_job(self, job_id, address, block_number):
-        job = self.db.get('job_' + job_id)
-
-        job['status_list'].append({
-            'action': 'reward',
-            'block': block_number,
-            'address': address
-        })
-        self.db.put('job_' + job_id, job)
-        return True
-
-    def unassign_job(self, job_id, block_number):
-        job = self.db.get('job_' + job_id)
-        if job['status_list'][-1]['action'] != 'assign':
-            return False
-
-        last_assigned_address = job['status_list'][-1]['address']
-        last_assigned_account = self.get_account(last_assigned_address)
-
-        job = self.db.get('job_' + job_id)
-        job['status_list'].append({
-            'action': 'unassign',
-            'block': block_number
-        })
-        last_assigned_account['assigned_job'] = ''
-        self.db.put('job_' + job_id, job)
-        self.update_account(last_assigned_address, last_assigned_account)
-        return True
-
-    @lockit('kvstore')
-    def get_job(self, job_id):
-        return self.db.get('job_' + job_id)
-
-    def update_job(self, job):
-        return self.db.put('job_' + job['id'], job)
-
-    def delete_job(self, job_id):
-        job_list = self.db.get('job_list')
-        job_list.remove(job_id)
-        self.db.put('job_list', job_list)
-        self.db.delete('job_' + job_id)
-        return True

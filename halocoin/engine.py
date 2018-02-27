@@ -72,6 +72,7 @@ class Engine(Service):
             self.db.put('times', {})
             self.db.put('diffLength', '0')
             self.db.put('accounts', {})
+            self.db.put('auth_list', [])
             self.db.put('job_list', [])
             self.clientdb.put('known_length', -1)
 
