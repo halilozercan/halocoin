@@ -172,6 +172,22 @@ def new_wallet():
     })
 
 
+@app.route('/set_default_wallet', methods=['GET', 'POST'])
+def set_default_wallet():
+    wallet_name = request.values.get('wallet_name', None)
+    password = request.values.get('password', None)
+    return generate_json_response({
+        "success": engine.instance.clientdb.set_default_wallet(wallet_name, password)
+    })
+
+
+@app.route('/remove_default_wallet', methods=['GET', 'POST'])
+def remove_default_wallet():
+    return generate_json_response({
+        "success": engine.instance.clientdb.delete_default_wallet()
+    })
+
+
 @app.route('/wallets', methods=['GET', 'POST'])
 def wallets():
     default_wallet = engine.instance.clientdb.get_default_wallet()
@@ -194,22 +210,7 @@ def peers():
 def node_id():
     return generate_json_response(engine.instance.db.get('node_id'))
 
-
-@app.route('/set_default_wallet', methods=['GET', 'POST'])
-def set_default_wallet():
-    wallet_name = request.values.get('wallet_name', None)
-    password = request.values.get('password', None)
-    delete = request.values.get('delete', None)
-    if delete is not None:
-        return generate_json_response({
-            "success": engine.instance.clientdb.delete_default_wallet()
-        })
-    else:
-        return generate_json_response({
-            "success": engine.instance.clientdb.set_default_wallet(wallet_name, password)
-        })
-
-
+"""
 @app.route('/history', methods=['GET', 'POST'])
 def history():
     from halocoin.model.wallet import Wallet
@@ -241,34 +242,20 @@ def history():
             elif tx['type'] == 'reward' and tx['to'] == address:
                 txs['recv'].append(tx)
     return generate_json_response(txs)
+"""
 
 
 @app.route('/jobs')
 def jobs():
-    type = request.values.get('type', 'all')
-    page = request.values.get('page', 1)
-    result = {'available': [], 'assigned': [], 'rewarded': []}
-    if type == 'available' or type == 'all':
-        result['available'] = engine.instance.statedb.get_available_jobs()
-        result['available'] = list(result['available'].values())
-
-    if type == 'assigned' or type == 'all':
-        result['assigned'] = engine.instance.statedb.get_assigned_jobs()
-        result['assigned'] = list(result['assigned'].values())
-
-    if type == 'rewarded' or type == 'all':
-        result['rewarded'] = engine.instance.statedb.get_rewarded_jobs()
-        result['rewarded'] = list(result['rewarded'].values())
-
-    return generate_json_response(result)
-
-
-@app.route('/available_jobs')
-def available_jobs():
+    type = request.values.get('type', 'available')
     page = int(request.values.get('page', 1))
     rows_per_page = int(request.values.get('rows_per_page', 5))
     result = {'total': 0, 'page': page, 'rows_per_page': rows_per_page, 'jobs': []}
-    jobs = list(engine.instance.statedb.get_available_jobs().values())
+    if type == 'available':
+        jobs = list(engine.instance.statedb.get_available_jobs().values())
+    elif type == 'assigned':
+        jobs = list(engine.instance.statedb.get_assigned_jobs().values())
+
     result['total'] = len(jobs)
     result['jobs'] = jobs[((page - 1) * rows_per_page):(page * rows_per_page)]
 
@@ -337,6 +324,7 @@ def send():
 def deposit():
     from halocoin.model.wallet import Wallet
     amount = int(request.values.get('amount', 0))  # Bidding amount
+    auth = request.values.get('auth', None)
     wallet_name = request.values.get('wallet_name', None)
     password = request.values.get('password', None)
     force = request.values.get('force', None)
@@ -358,6 +346,9 @@ def deposit():
     if amount <= 0:
         response['error'] = "Amount cannot be lower than or equal to 0"
         return generate_json_response(response)
+    elif auth is None:
+        response['error'] = "Auth is not given"
+        return generate_json_response(response)
     elif wallet_name is None:
         response['error'] = "Wallet name is not given and there is no default wallet"
         return generate_json_response(response)
@@ -365,7 +356,7 @@ def deposit():
         response['error'] = "Password missing!"
         return generate_json_response(response)
 
-    tx = {'type': 'deposit', 'amount': int(amount), 'version': custom.version}
+    tx = {'type': 'deposit', 'amount': int(amount), 'version': custom.version, 'auth': auth}
 
     encrypted_wallet_content = engine.instance.clientdb.get_wallet(wallet_name)
     if encrypted_wallet_content is not None:
@@ -398,6 +389,7 @@ def deposit():
 def withdraw():
     from halocoin.model.wallet import Wallet
     amount = int(request.values.get('amount', 0))  # Bidding amount
+    auth = request.values.get('auth', None)
     wallet_name = request.values.get('wallet_name', None)
     password = request.values.get('password', None)
 
@@ -410,6 +402,9 @@ def withdraw():
     if amount <= 0:
         response['error'] = "Amount cannot be lower than or equal to 0"
         return generate_json_response(response)
+    elif auth is None:
+        response['error'] = "Auth is not given"
+        return generate_json_response(response)
     elif wallet_name is None:
         response['error'] = "Wallet name is not given and there is no default wallet"
         return generate_json_response(response)
@@ -417,7 +412,7 @@ def withdraw():
         response['error'] = "Password missing!"
         return generate_json_response(response)
 
-    tx = {'type': 'withdraw', 'amount': int(amount), 'version': custom.version}
+    tx = {'type': 'withdraw', 'amount': int(amount), 'version': custom.version, 'auth': auth}
 
     encrypted_wallet_content = engine.instance.clientdb.get_wallet(wallet_name)
     if encrypted_wallet_content is not None:
@@ -451,8 +446,8 @@ def reward():
     from ecdsa import SigningKey
     job_id = request.values.get('job_id', None)
     address = request.values.get('address', None)
-    cert_pem = request.values.get('cert_pem', None)
-    priv_key_pem = request.values.get('privkey_pem', None)
+    certificate = request.values.get('certificate', None)
+    privkey = request.values.get('privkey', None)
 
     response = {"success": False}
     if job_id is None:
@@ -461,17 +456,17 @@ def reward():
     elif address is None:
         response['error'] = "You need to specify a receiving address for the reward"
         return generate_json_response(response)
-    elif priv_key_pem is None:
+    elif privkey is None:
         response['error'] = "Reward transactions need to be signed by private key belonging to certificate"
         return generate_json_response(response)
-    elif cert_pem is None:
+    elif certificate is None:
         response['error'] = "To reward, you must specify a common name or certificate that is granted by root"
         return generate_json_response(response)
 
     tx = {'type': 'reward', 'job_id': job_id, 'to': address, 'version': custom.version}
 
-    privkey = SigningKey.from_pem(priv_key_pem)
-    common_name = tools.get_commonname_from_certificate(cert_pem)
+    privkey = SigningKey.from_pem(privkey)
+    common_name = tools.get_commonname_from_certificate(certificate)
     tx['auth'] = common_name
 
     tx['pubkeys'] = [privkey.get_verifying_key().to_string()]  # We use pubkey as string
@@ -489,19 +484,23 @@ def job_dump():
     job = {
         'id': request.values.get('job_id', None),
         'timestamp': request.values.get('job_timestamp', None),
-        'amount': int(request.values.get('amount', 0))
+        'amount': int(request.values.get('amount', 0)),
+        'download_url': '',
+        'upload_url': '',
+        'hashsum': '',
+        'image': '',
     }
-    cert_pem = request.values.get('cert_pem', None)
-    priv_key_pem = request.values.get('privkey_pem', None)
+    certificate = request.values.get('certificate', None)
+    privkey = request.values.get('privkey', None)
 
     response = {"success": False}
     if job['id'] is None:
         response['error'] = "Job id missing"
         return generate_json_response(response)
-    elif priv_key_pem is None:
+    elif privkey is None:
         response['error'] = "Job dumps need to be signed by private key belonging to certificate"
         return generate_json_response(response)
-    elif cert_pem is None:
+    elif certificate is None:
         response['error'] = "To give jobs, you must specify a certificate that is granted by root"
         return generate_json_response(response)
     elif job['amount'] == 0:
@@ -510,8 +509,8 @@ def job_dump():
 
     tx = {'type': 'job_dump', 'job': job, 'version': custom.version}
 
-    privkey = SigningKey.from_pem(priv_key_pem)
-    common_name = tools.get_commonname_from_certificate(cert_pem)
+    privkey = SigningKey.from_pem(privkey)
+    common_name = tools.get_commonname_from_certificate(certificate)
     tx['auth'] = common_name
 
     tx['pubkeys'] = [privkey.get_verifying_key().to_string()]  # We use pubkey as string
