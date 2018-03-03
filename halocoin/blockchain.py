@@ -22,7 +22,7 @@ class BlockchainService(Service):
     job_dump: Announcing jobs that are prepared and ready to be downloaded
     job_request: Entering a pool for a job request.
     """
-    tx_types = ['spend', 'mint', 'reward', 'auth_reg', 'job_dump', 'deposit', 'withdraw']
+    tx_types = ['spend', 'mint', 'reward', 'auth_reg', 'job_dump', 'pool_reg', 'application']
     IDLE = 1
     SYNCING = 2
 
@@ -441,15 +441,20 @@ class BlockchainService(Service):
                             'upload_url' not in tx['job'] or \
                             'hashsum' not in tx['job']:
                 return Response(False, 'Job dump transaction includes an invalid job description')
-        elif tx['type'] == 'deposit' or tx['type'] == 'withdraw':
+        elif tx['type'] == 'pool_reg':
             if not BlockchainService.tx_signature_check(tx):
                 return Response(False, 'Transaction is not properly signed')
-            if 'auth' not in tx:
-                return Response(False, 'Deposit and withdraw transactions must include auth name')
-            if 'amount' not in tx or not isinstance(tx['amount'], int):
-                return Response(False, 'Transaction amount is not given or not a proper integer')
             if 'count' not in tx or not isinstance(tx['count'], int):
                 return Response(False, 'transaction count is missing')
+        elif tx['type'] == 'application':
+            if not BlockchainService.tx_signature_check(tx):
+                return Response(False, 'Transaction is not properly signed')
+            elif 'count' not in tx or not isinstance(tx['count'], int):
+                return Response(False, 'transaction count is missing')
+            elif 'list' not in tx or not isinstance(tx['list'], list):
+                return Response(False, 'application list is missing')
+            elif 'list_old' not in tx or not isinstance(tx['list_old'], list):
+                return Response(False, 'current application list is missing')
 
         return Response(True, 'Everything seems fine')
 

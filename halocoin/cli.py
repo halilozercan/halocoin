@@ -213,19 +213,21 @@ def reward(certificate, privkey, job_id, address):
 
 
 @action
-def job_dump(certificate, privkey, job_id, amount):
+def job_dump(certificate, privkey, job_id, amount, download_url, upload_url, hashsum, image):
     import time
     cert_pem = open(certificate, 'rb').read()
     privkey_pem = open(privkey, 'rb').read()
-    print(make_api_request("job_dump", job_id=job_id, job_timestamp=time.time(), amount=amount,
-                           cert_pem=cert_pem, privkey_pem=privkey_pem))
+    print(make_api_request("job_dump", id=job_id, timestamp=time.time(), amount=amount,
+                           certificate=cert_pem, privkey=privkey_pem, download_url=download_url,
+                           upload_url=upload_url, hashsum=hashsum, image=image))
 
 
 @action
-def auth_reg(certificate, privkey, host, amount):
+def auth_reg(certificate, privkey, host, amount, description):
     cert_pem = open(certificate, 'rb').read()
     privkey_pem = open(privkey, 'rb').read()
-    print(make_api_request("auth_reg", cert_pem=cert_pem, privkey_pem=privkey_pem, host=host, supply=amount))
+    print(make_api_request("auth_reg", certificate=cert_pem, privkey=privkey_pem, host=host,
+                           supply=amount, description=description))
 
 
 @action
@@ -296,6 +298,16 @@ def run(argv):
                         help='Wallet name')
     parser.add_argument('--certificate', action="store", type=str, dest='certificate',
                         help='Rewarding sub-auth certificate file in pem format')
+    parser.add_argument('--download-url', action="store", type=str, dest='download_url',
+                        help='Job dump download address')
+    parser.add_argument('--upload-url', action="store", type=str, dest='upload_url',
+                        help='Job dump upload address')
+    parser.add_argument('--image', action="store", type=str, dest='image',
+                        help='Job dump docker image tag')
+    parser.add_argument('--hashsum', action="store", type=str, dest='hashsum',
+                        help='Job dump file hashsum')
+    parser.add_argument('--description', action="store", type=str, dest='description',
+                        help='Required at sub-auth registration')
     parser.add_argument('--job-id', action="store", type=str, dest='job_id',
                         help='While dumping, requesting, or rewarding, necessary job id.')
     parser.add_argument('--privkey', action="store", type=str, dest='privkey',

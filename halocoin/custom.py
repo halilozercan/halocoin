@@ -25,7 +25,7 @@ memoized_weights = [inflection ** i for i in range(history_length)]
 
 assignment_period = 10  # Assign jobs at each T rounds
 unassignment_after = 16   # Unassign jobs after T*M rounds
-assignment_stake_burn = 0.1
+pool_reg_amount = 1000
 
 first_target = '0' * 4 + 'f' * 60
 

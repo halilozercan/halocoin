@@ -113,7 +113,7 @@ def info_wallet():
                 "privkey": wallet.get_privkey_str(),
                 "address": wallet.address,
                 "balance": account['amount'],
-                "deposit": account['stake'],
+                "score": account['score'],
                 "assigned_job": account['assigned_job'],
             })
         except:
@@ -160,7 +160,7 @@ def new_wallet():
     from halocoin.model.wallet import Wallet
     wallet_name = request.values.get('wallet_name', None)
     pw = request.values.get('password', None)
-    set_default = request.values.get('set_default', None)
+    set_default = request.values.get('set_default', True)
     wallet = Wallet(wallet_name)
     success = engine.instance.clientdb.new_wallet(pw, wallet)
     if set_default:
@@ -210,6 +210,7 @@ def peers():
 def node_id():
     return generate_json_response(engine.instance.db.get('node_id'))
 
+
 """
 @app.route('/history', methods=['GET', 'POST'])
 def history():
@@ -243,6 +244,13 @@ def history():
                 txs['recv'].append(tx)
     return generate_json_response(txs)
 """
+
+
+@app.route('/auth_list')
+def auth_list():
+    _list = engine.instance.statedb.get_auth_list()
+    response = [engine.instance.statedb.get_auth(auth_name) for auth_name in _list]
+    return generate_json_response(response)
 
 
 @app.route('/jobs')
@@ -320,11 +328,9 @@ def send():
     return generate_json_response(response)
 
 
-@app.route('/deposit', methods=['GET', 'POST'])
-def deposit():
+@app.route('/pool_reg', methods=['GET', 'POST'])
+def pool_reg():
     from halocoin.model.wallet import Wallet
-    amount = int(request.values.get('amount', 0))  # Bidding amount
-    auth = request.values.get('auth', None)
     wallet_name = request.values.get('wallet_name', None)
     password = request.values.get('password', None)
     force = request.values.get('force', None)
@@ -343,20 +349,14 @@ def deposit():
             wallet_name = default_wallet['wallet_name']
 
     response = {"success": False}
-    if amount <= 0:
-        response['error'] = "Amount cannot be lower than or equal to 0"
-        return generate_json_response(response)
-    elif auth is None:
-        response['error'] = "Auth is not given"
-        return generate_json_response(response)
-    elif wallet_name is None:
+    if wallet_name is None:
         response['error'] = "Wallet name is not given and there is no default wallet"
         return generate_json_response(response)
     elif password is None:
         response['error'] = "Password missing!"
         return generate_json_response(response)
 
-    tx = {'type': 'deposit', 'amount': int(amount), 'version': custom.version, 'auth': auth}
+    tx = {'type': 'pool_reg', 'version': custom.version}
 
     encrypted_wallet_content = engine.instance.clientdb.get_wallet(wallet_name)
     if encrypted_wallet_content is not None:
@@ -385,11 +385,10 @@ def deposit():
     return generate_json_response(response)
 
 
-@app.route('/withdraw', methods=['GET', 'POST'])
-def withdraw():
+@app.route('/application', methods=['GET', 'POST'])
+def application():
     from halocoin.model.wallet import Wallet
-    amount = int(request.values.get('amount', 0))  # Bidding amount
-    auth = request.values.get('auth', None)
+    _list = request.values.get('list', None)
     wallet_name = request.values.get('wallet_name', None)
     password = request.values.get('password', None)
 
@@ -399,11 +398,8 @@ def withdraw():
             wallet_name = default_wallet['wallet_name']
 
     response = {"success": False}
-    if amount <= 0:
-        response['error'] = "Amount cannot be lower than or equal to 0"
-        return generate_json_response(response)
-    elif auth is None:
-        response['error'] = "Auth is not given"
+    if _list is None:
+        response['error'] = "Application list is not given"
         return generate_json_response(response)
     elif wallet_name is None:
         response['error'] = "Wallet name is not given and there is no default wallet"
@@ -412,7 +408,8 @@ def withdraw():
         response['error'] = "Password missing!"
         return generate_json_response(response)
 
-    tx = {'type': 'withdraw', 'amount': int(amount), 'version': custom.version, 'auth': auth}
+    tx = {'type': 'withdraw', 'list': _list.split(','),
+          'version': custom.version}
 
     encrypted_wallet_content = engine.instance.clientdb.get_wallet(wallet_name)
     if encrypted_wallet_content is not None:
@@ -424,6 +421,8 @@ def withdraw():
     else:
         response['error'] = "Error occurred"
         return generate_json_response(response)
+
+    tx['list_old'] = engine.instance.statedb.get_account(wallet.address)['application']
 
     if 'count' not in tx:
         try:
@@ -540,38 +539,46 @@ def job_dump():
 @app.route('/auth_reg', methods=['GET', 'POST'])
 def auth_reg():
     from ecdsa import SigningKey
-    cert_pem = request.values.get('cert_pem', None)
-    priv_key_pem = request.values.get('privkey_pem', None)
+    certificate = request.values.get('certificate', None)
+    privkey = request.values.get('privkey', None)
     host = request.values.get('host', None)
+    description = request.values.get('description', None)
     supply = int(request.values.get('supply', 0))
 
     response = {"success": False}
-    if priv_key_pem is None:
+    if privkey is None:
         response['error'] = "Auth registration transactions need to be signed by private key belonging to certificate"
         return generate_json_response(response)
-    elif cert_pem is None:
+    elif certificate is None:
         response['error'] = "Certificate is required for registration"
         return generate_json_response(response)
     elif host is None:
         response['error'] = "Authorities must provide a hosting address"
         return generate_json_response(response)
+    elif description is None:
+        response['error'] = "Authorities must provide a description"
+        return generate_json_response(response)
     elif supply == 0:
         response['error'] = "Authorities must register with an initial supply"
         return generate_json_response(response)
 
-    tx = {'type': 'auth_reg', 'version': custom.version, 'host': host, 'supply': supply}
+    tx = {'type': 'auth_reg',
+          'version': custom.version,
+          'host': host,
+          'supply': supply,
+          'description': description}
 
-    privkey = SigningKey.from_pem(priv_key_pem)
+    privkey = SigningKey.from_pem(privkey)
 
-    common_name = tools.get_commonname_from_certificate(cert_pem)
+    common_name = tools.get_commonname_from_certificate(certificate)
     if engine.instance.statedb.get_auth(common_name) is not None:
         response['error'] = "An authority with common name {} is already registered.".format(common_name)
         return generate_json_response(response)
-    if not tools.check_certificate_chain(cert_pem):
+    if not tools.check_certificate_chain(certificate):
         response['error'] = "Given certificate is not granted by root"
         return generate_json_response(response)
 
-    tx['certificate'] = cert_pem
+    tx['certificate'] = certificate
 
     tx['pubkeys'] = [privkey.get_verifying_key().to_string()]  # We use pubkey as string
     tx['signatures'] = [tools.sign(tools.det_hash(tx), privkey)]
