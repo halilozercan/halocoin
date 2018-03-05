@@ -20,7 +20,7 @@ class KeyValueStore:
         self.req_count = 0
         self.log = dict()
         try:
-            db_location = os.path.join(self.engine.working_dir, 'coinami.db')
+            db_location = os.path.join(self.engine.working_dir, 'halocoin.db')
             DB = plyvel.DB(db_location, create_if_missing=True)
             self.DB = DB.prefixed_db(custom.version.encode())
             self.iterator = self.DB.iterator

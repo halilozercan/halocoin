@@ -187,6 +187,11 @@ class StateDatabase:
     @lockit('kvstore')
     def get_jobs(self, auth, type):
         result = []
+        if auth is None:
+            auth_list = self.get_auth_list()
+            for _auth in auth_list:
+                result += self.get_jobs(_auth, type)
+            return result
         job_list = self.db.get('auth_' + auth + '_jobs')
         if job_list is None:
             job_list = []
@@ -195,13 +200,13 @@ class StateDatabase:
             # Here we check last transaction made on the job.
             if type == 'available':
                 if job['status_list'][-1]['action'] == 'add' or job['status_list'][-1]['action'] == 'unassign':
-                    result.append(self.db.get('job_' + job_id))
+                    result.append(job)
             elif type == 'assigned':
                 if job['status_list'][-1]['action'] == 'assign':
-                    result.append(self.db.get('job_' + job_id))
+                    result.append(job)
             elif type == 'rewarded':
                 if job['status_list'][-1]['action'] == 'reward':
-                    result.append(self.db.get('job_' + job_id))
+                    result.append(job)
         return result
 
     def add_new_job(self, **kwargs):

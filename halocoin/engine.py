@@ -7,8 +7,8 @@ import psutil
 from halocoin import api
 from halocoin import tools
 from halocoin.blockchain import BlockchainService
-from halocoin.client_db import ClientDB
-from halocoin.database import KeyValueStore
+from halocoin.db_client import ClientDB
+from halocoin.db_blockchain import KeyValueStore
 from halocoin.miner import MinerService
 from halocoin.peer_check import PeerCheckService
 from halocoin.peer_listen import PeerListenService

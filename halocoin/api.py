@@ -257,13 +257,10 @@ def auth_list():
 def jobs():
     type = request.values.get('type', 'available')
     page = int(request.values.get('page', 1))
+    auth = request.values.get('auth', None)
     rows_per_page = int(request.values.get('rows_per_page', 5))
     result = {'total': 0, 'page': page, 'rows_per_page': rows_per_page, 'jobs': []}
-    if type == 'available':
-        jobs = list(engine.instance.statedb.get_available_jobs().values())
-    elif type == 'assigned':
-        jobs = list(engine.instance.statedb.get_assigned_jobs().values())
-
+    jobs = engine.instance.statedb.get_jobs(auth=auth, type=type)
     result['total'] = len(jobs)
     result['jobs'] = jobs[((page - 1) * rows_per_page):(page * rows_per_page)]
 

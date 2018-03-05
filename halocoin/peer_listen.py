@@ -5,7 +5,7 @@ import uuid
 
 from halocoin import ntwrk, custom
 from halocoin import tools
-from halocoin.client_db import ClientDB
+from halocoin.db_client import ClientDB
 from halocoin.ntwrk import Message
 from halocoin.service import Service, threaded, sync
 
