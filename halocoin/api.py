@@ -59,7 +59,7 @@ def hello():
     return "~Healthy and alive~"
 
 
-@app.route("/upload_wallet", methods=['GET', 'POST'])
+@app.route("/wallet/upload", methods=['POST'])
 def upload_wallet():
     wallet_name = request.values.get('wallet_name', None)
     wallet_file = request.files['wallet_file']
@@ -71,14 +71,8 @@ def upload_wallet():
     })
 
 
-@app.route('/download_wallet', methods=['GET', 'POST'])
-def download_wallet():
-    wallet_name = request.values.get('wallet_name', None)
-    if wallet_name is None:
-        return generate_json_response({
-            "success": False,
-            "error": "Give a valid wallet name"
-        })
+@app.route('/wallet/<wallet_name>/download', methods=['GET'])
+def download_wallet(wallet_name):
     wallet_content = engine.instance.clientdb.get_wallet(wallet_name)
     if wallet_content is None:
         return generate_json_response({
@@ -91,48 +85,21 @@ def download_wallet():
     return send_file(f, as_attachment=True, attachment_filename=wallet_name)
 
 
-@app.route('/info_wallet', methods=['GET', 'POST'])
-def info_wallet():
+@app.route('/address/<address>', methods=['GET'])
+def info_address(address):
+    account = engine.instance.statedb.get_account(address)
+    return generate_json_response({
+        "address": address,
+        "balance": account['amount'],
+        "score": account['score'],
+        "assigned_job": account['assigned_job'],
+    })
+
+
+@app.route('/wallet/<wallet_name>/remove', methods=['GET', 'POST'])
+def remove_wallet(wallet_name):
     from halocoin.model.wallet import Wallet
-    wallet_name = request.values.get('wallet_name', None)
     password = request.values.get('password', None)
-    if wallet_name is None:
-        default_wallet = engine.instance.clientdb.get_default_wallet()
-        if default_wallet is not None:
-            wallet_name = default_wallet['wallet_name']
-            password = default_wallet['password']
-
-    encrypted_wallet_content = engine.instance.clientdb.get_wallet(wallet_name)
-    if encrypted_wallet_content is not None:
-        try:
-            wallet = Wallet.from_string(tools.decrypt(password, encrypted_wallet_content))
-            account = engine.instance.statedb.get_account(wallet.address)
-            return generate_json_response({
-                "name": wallet.name,
-                "pubkey": wallet.get_pubkey_str(),
-                "privkey": wallet.get_privkey_str(),
-                "address": wallet.address,
-                "balance": account['amount'],
-                "score": account['score'],
-                "assigned_job": account['assigned_job'],
-            })
-        except:
-            return generate_json_response("Password incorrect")
-    else:
-        return generate_json_response("Error occurred")
-
-
-@app.route('/remove_wallet', methods=['GET', 'POST'])
-def remove_wallet():
-    from halocoin.model.wallet import Wallet
-    wallet_name = request.values.get('wallet_name', None)
-    password = request.values.get('password', None)
-    default_wallet = engine.instance.clientdb.get_default_wallet()
-    if default_wallet is not None and default_wallet['wallet_name'] == wallet_name:
-        return generate_json_response({
-            'success': False,
-            'error': 'Cannot remove default wallet. First remove its default state!'
-        })
 
     encrypted_wallet_content = engine.instance.clientdb.get_wallet(wallet_name)
     if encrypted_wallet_content is not None:
@@ -160,11 +127,8 @@ def new_wallet():
     from halocoin.model.wallet import Wallet
     wallet_name = request.values.get('wallet_name', None)
     pw = request.values.get('password', None)
-    set_default = request.values.get('set_default', True)
     wallet = Wallet(wallet_name)
     success = engine.instance.clientdb.new_wallet(pw, wallet)
-    if set_default:
-        engine.instance.clientdb.set_default_wallet(wallet_name, pw)
 
     return generate_json_response({
         "name": wallet_name,
@@ -172,32 +136,10 @@ def new_wallet():
     })
 
 
-@app.route('/set_default_wallet', methods=['GET', 'POST'])
-def set_default_wallet():
-    wallet_name = request.values.get('wallet_name', None)
-    password = request.values.get('password', None)
-    return generate_json_response({
-        "success": engine.instance.clientdb.set_default_wallet(wallet_name, password)
-    })
-
-
-@app.route('/remove_default_wallet', methods=['GET', 'POST'])
-def remove_default_wallet():
-    return generate_json_response({
-        "success": engine.instance.clientdb.delete_default_wallet()
-    })
-
-
 @app.route('/wallets', methods=['GET', 'POST'])
 def wallets():
-    default_wallet = engine.instance.clientdb.get_default_wallet()
-    if default_wallet is None:
-        wallet_name = ''
-    else:
-        wallet_name = default_wallet['wallet_name']
     return generate_json_response({
-        'wallets': engine.instance.clientdb.get_wallets(),
-        'default_wallet': wallet_name
+        'wallets': engine.instance.clientdb.get_wallets()
     })
 
 
@@ -211,42 +153,7 @@ def node_id():
     return generate_json_response(engine.instance.db.get('node_id'))
 
 
-"""
-@app.route('/history', methods=['GET', 'POST'])
-def history():
-    from halocoin.model.wallet import Wallet
-    address = request.values.get('address', None)
-    if address is None:
-        default_wallet = engine.instance.clientdb.get_default_wallet()
-        if default_wallet is not None:
-            wallet_name = default_wallet['wallet_name']
-            password = default_wallet['password']
-            encrypted_wallet_content = engine.instance.clientdb.get_wallet(wallet_name)
-            wallet = Wallet.from_string(tools.decrypt(password, encrypted_wallet_content))
-            address = wallet.address
-    account = engine.instance.statedb.get_account(wallet.address)
-    txs = {
-        "send": [],
-        "recv": []
-    }
-    for block_index in reversed(list(account['tx_blocks'])):
-        block = engine.instance.blockchain.get_block(block_index)
-        for tx in block['txs']:
-            if tx['type'] == 'mint':
-                continue
-            tx['block'] = block_index
-            owner = tools.tx_owner_address(tx)
-            if owner == address:
-                txs['send'].append(tx)
-            elif tx['type'] == 'spend' and tx['to'] == address:
-                txs['recv'].append(tx)
-            elif tx['type'] == 'reward' and tx['to'] == address:
-                txs['recv'].append(tx)
-    return generate_json_response(txs)
-"""
-
-
-@app.route('/auth_list')
+@app.route('/subauths')
 def auth_list():
     _list = engine.instance.statedb.get_auth_list()
     response = [engine.instance.statedb.get_auth(auth_name) for auth_name in _list]
@@ -276,12 +183,10 @@ def send():
     wallet_name = request.values.get('wallet_name', None)
     password = request.values.get('password', None)
 
-    if wallet_name is None:
-        default_wallet = engine.instance.clientdb.get_default_wallet()
-        if default_wallet is not None:
-            wallet_name = default_wallet['wallet_name']
-
     response = {"success": False}
+    if wallet_name is None:
+        response['error'] = "Wallet name cannot be empty"
+        return generate_json_response(response)
     if amount <= 0:
         response['error'] = "Amount cannot be lower than or equal to 0"
         return generate_json_response(response)
@@ -340,14 +245,9 @@ def pool_reg():
                        'This probably means there is a problem with Docker connection or Docker is not installed.'
         })
 
-    if wallet_name is None:
-        default_wallet = engine.instance.clientdb.get_default_wallet()
-        if default_wallet is not None:
-            wallet_name = default_wallet['wallet_name']
-
     response = {"success": False}
     if wallet_name is None:
-        response['error'] = "Wallet name is not given and there is no default wallet"
+        response['error'] = "Wallet name missing!"
         return generate_json_response(response)
     elif password is None:
         response['error'] = "Password missing!"
@@ -388,11 +288,6 @@ def application():
     _list = request.values.get('list', None)
     wallet_name = request.values.get('wallet_name', None)
     password = request.values.get('password', None)
-
-    if wallet_name is None:
-        default_wallet = engine.instance.clientdb.get_default_wallet()
-        if default_wallet is not None:
-            wallet_name = default_wallet['wallet_name']
 
     response = {"success": False}
     if _list is None:
@@ -655,23 +550,6 @@ def difficulty():
     return generate_json_response({"difficulty": diff})
 
 
-@app.route('/balance', methods=['GET', 'POST'])
-def balance():
-    from halocoin.model.wallet import Wallet
-    address = request.values.get('address', None)
-    if address is None:
-        default_wallet = engine.instance.clientdb.get_default_wallet()
-        if default_wallet is not None:
-            wallet_name = default_wallet['wallet_name']
-            password = default_wallet['password']
-            encrypted_wallet_content = engine.instance.clientdb.get_wallet(wallet_name)
-            wallet = Wallet.from_string(tools.decrypt(password, encrypted_wallet_content))
-            address = wallet.address
-
-    account = engine.instance.statedb.get_account(address)
-    return generate_json_response({'balance': account['amount']})
-
-
 @app.route('/stop', methods=['GET', 'POST'])
 def stop():
     engine.instance.db.put('stop', True)
@@ -681,17 +559,11 @@ def stop():
     return generate_json_response('Shutting down')
 
 
-@app.route('/start_miner', methods=['GET', 'POST'])
+@app.route('/miner/start', methods=['GET', 'POST'])
 def start_miner():
     from halocoin.model.wallet import Wallet
     wallet_name = request.values.get('wallet_name', None)
     password = request.values.get('password', None)
-
-    if wallet_name is None:
-        default_wallet = engine.instance.clientdb.get_default_wallet()
-        if default_wallet is not None:
-            wallet_name = default_wallet['wallet_name']
-            password = default_wallet['password']
 
     encrypted_wallet_content = engine.instance.clientdb.get_wallet(wallet_name)
     if encrypted_wallet_content is not None:
@@ -712,7 +584,7 @@ def start_miner():
         return generate_json_response('Running miner')
 
 
-@app.route('/stop_miner', methods=['GET', 'POST'])
+@app.route('/miner/stop', methods=['GET', 'POST'])
 def stop_miner():
     if engine.instance.miner.get_state() == Service.RUNNING:
         engine.instance.miner.unregister()
@@ -721,7 +593,7 @@ def stop_miner():
         return generate_json_response('Miner is not running.')
 
 
-@app.route('/status_miner', methods=['GET', 'POST'])
+@app.route('/miner', methods=['GET', 'POST'])
 def status_miner():
     status = {
         'running': engine.instance.miner.get_state() == Service.RUNNING
@@ -731,7 +603,7 @@ def status_miner():
     return generate_json_response(status)
 
 
-@app.route('/power_available')
+@app.route('/power/available')
 def power_available():
     status = PowerService.system_status()
     return generate_json_response({
@@ -740,17 +612,11 @@ def power_available():
     })
 
 
-@app.route('/start_power', methods=['GET', 'POST'])
+@app.route('/power/start', methods=['POST'])
 def start_power():
     from halocoin.model.wallet import Wallet
     wallet_name = request.values.get('wallet_name', None)
     password = request.values.get('password', None)
-
-    if wallet_name is None:
-        default_wallet = engine.instance.clientdb.get_default_wallet()
-        if default_wallet is not None:
-            wallet_name = default_wallet['wallet_name']
-            password = default_wallet['password']
 
     encrypted_wallet_content = engine.instance.clientdb.get_wallet(wallet_name)
     if encrypted_wallet_content is not None:
@@ -771,7 +637,7 @@ def start_power():
         return generate_json_response('Running power')
 
 
-@app.route('/stop_power', methods=['GET', 'POST'])
+@app.route('/power/stop', methods=['POST'])
 def stop_power():
     if engine.instance.power.get_state() == Service.RUNNING:
         engine.instance.power.unregister()
@@ -780,7 +646,7 @@ def stop_power():
         return 'Power is not running.'
 
 
-@app.route('/status_power', methods=['GET', 'POST'])
+@app.route('/power', methods=['GET'])
 def status_power():
     return generate_json_response({
         "status": engine.instance.power.get_status(),
