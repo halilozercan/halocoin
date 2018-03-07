@@ -51,7 +51,7 @@ class PowerService(Service):
         print('Power is turned off')
 
     def get_job_status(self, job):
-        job_name = job['auth'] + '_' + job['job_id']
+        job_name = job['auth'] + '_' + job['id']
         if self.clientdb.get('local_job_repo_' + job_name) is not None:
             job_directory = os.path.join(self.engine.working_dir, 'jobs', job_name)
             result_file = os.path.join(job_directory, 'result.zip')

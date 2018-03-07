@@ -450,7 +450,7 @@ class StateDatabase:
             for job in assigned_jobs:
                 assigned_block = job['status_list'][-1]['block']
                 if assigned_block <= (block['length'] - custom.unassignment_after * custom.assignment_period):
-                    self.unassign_job(job['id'], block['length'])
+                    self.unassign_job(job, block['length'])
 
             accounts = [(self.get_account(address), address) for address in self.get_worker_pool()
                         if self.get_account(address)['assigned_job']['job_id'] is None]
