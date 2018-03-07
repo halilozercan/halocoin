@@ -39,4 +39,3 @@ class Wallet:
     def from_string(wallet_string):
         wallet_dict = pickle.loads(wallet_string)
         return Wallet(wallet_dict['name'], SigningKey.from_string(wallet_dict['privkey'], curve=SECP256k1))
-

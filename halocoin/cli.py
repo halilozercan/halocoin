@@ -4,13 +4,19 @@ import os
 import sys
 from functools import wraps
 from inspect import Parameter
-from pprint import pprint
 
 import requests
 
 from halocoin import custom
 from halocoin import engine
 from halocoin import tools
+
+
+# TODO
+""" 
+@app.route('/tx/application', methods=['POST'])
+@app.route('/power/available', methods=['GET'])
+"""
 
 
 class Colors:
@@ -39,20 +45,15 @@ def action(func):
     return wrapper
 
 
-def make_api_request(method, files=None, **kwargs):
-    from requests_toolbelt import MultipartEncoder
-    if files is None:
-        files = {}
-    url = "http://" + str(host) + ":" + str(connection_port) + "/" + method
+def make_api_request(method, http_method="GET", **kwargs):
+    if not method.startswith("/"):
+        raise ValueError('Method endpoints should start with backslash')
+    url = "http://" + str(host) + ":" + str(connection_port) + method
 
     kwargs = {k: v for k, v in kwargs.items() if v is not None}
 
-    if len(files) > 0:
-        fields = {}
-        fields.update(kwargs)
-        fields.update(files)
-        m = MultipartEncoder(fields=fields)
-        response = requests.post(url, data=m, headers={'Content-Type': m.content_type})
+    if http_method == "GET":
+        response = requests.get(url, params=kwargs)
     else:
         response = requests.post(url, data=kwargs)
     if response.status_code != 200:
@@ -62,6 +63,15 @@ def make_api_request(method, files=None, **kwargs):
         }
     else:
         return response.json()
+
+
+def haloprint(text):
+    import json
+    content = json.dumps(text, indent=4, sort_keys=True)
+    from pygments import highlight
+    from pygments.formatters import TerminalFormatter
+    from pygments.lexers import JsonLexer
+    print(highlight(content, JsonLexer(), TerminalFormatter()))
 
 
 def extract_configuration(dir, config):
@@ -119,152 +129,192 @@ def new_wallet(wallet, pw):
     else:
         wallet_pw = pw
 
-    print(make_api_request("new_wallet", wallet_name=wallet, password=wallet_pw))
-
-
-@action
-def info_wallet(wallet=None, pw=None):
-    from getpass import getpass
-    if pw is None:
-        wallet_pw = getpass('Wallet password: ')
-    else:
-        wallet_pw = pw
-
-    information = make_api_request("info_wallet", wallet_name=wallet, password=wallet_pw)
-
-    if isinstance(information, dict):
-        print("Address: {}".format(information['address']))
-        print("Balance: {}".format(information['balance']))
-        print("Pubkey: {}".format(information['pubkey']))
-        print("Privkey: {}".format(information['privkey']))
-    else:
-        pprint(information)
+    haloprint(make_api_request("/wallet/new", http_method="POST", wallet_name=wallet, password=wallet_pw))
 
 
 @action
 def upload_wallet(file, wallet):
-    files = {
-        "wallet_file": ('wallet_file', open(file, 'rb')),
-        "wallet_name": wallet
-    }
-    print(make_api_request("upload_wallet", files=files))
+    haloprint(make_api_request("/wallet/upload", http_method="POST",
+                               wallet_name=wallet,
+                               wallet_file=open(file, 'rb').read()))
 
 
 @action
 def download_wallet(wallet):
-    print(make_api_request("download_wallet", wallet_name=wallet))
+    # TODO: actual file download
+    haloprint(make_api_request("/wallet/" + wallet + "/download", http_method="GET"))
+
+
+@action
+def auth_list():
+    haloprint(make_api_request("/subauths", http_method="GET"))
+
+
+@action
+def wallets():
+    haloprint(make_api_request("/wallet/list", http_method="GET"))
+
+
+@action
+def info_wallet(wallet, pw=None):
+    from getpass import getpass
+    if pw is None:
+        wallet_pw = getpass('Wallet password: ')
+    else:
+        wallet_pw = pw
+
+    information = make_api_request("/wallet/" + wallet, http_method="GET",
+                                   password=wallet_pw)
+    haloprint(information)
+
+
+@action
+def remove_wallet(wallet, pw=None):
+    from getpass import getpass
+    if pw is None:
+        wallet_pw = getpass('Wallet password: ')
+    else:
+        wallet_pw = pw
+
+    information = make_api_request("/wallet/" + wallet + '/remove', http_method="GET",
+                                   password=wallet_pw)
+    haloprint(information)
+
+
+@action
+def info_address(address=None):
+    information = make_api_request("/address/" + address, http_method="GET")
+    haloprint(information)
 
 
 @action
 def blocks(start, end=None):
-    _blocks = make_api_request("blocks", start=start, end=end)
-    pprint(_blocks)
+    _blocks = make_api_request("/blocks", http_method="GET", start=start, end=end)
+    haloprint(_blocks)
 
 
 @action
 def blockcount():
-    result = make_api_request("blockcount")
-    print('We have {} blocks.'.format(result['length']))
-    if result['length'] != result['known_length']:
-        print('Peers are reporting {} blocks.'.format(result['known_length']))
-
-
-@action
-def balance(address=None):
-    print(make_api_request("balance", address=address))
+    result = make_api_request("/blockcount", http_method="GET")
+    haloprint(result)
 
 
 @action
 def node_id():
-    print(make_api_request("node_id"))
+    haloprint(make_api_request("node_id", http_method="GET"))
 
 
 @action
-def send(address, amount, pw, wallet=None, message=None):
+def send(address, amount, wallet, pw=None, message=None):
     from getpass import getpass
     if pw is None:
         wallet_pw = getpass('Wallet password: ')
     else:
         wallet_pw = pw
 
-    print(make_api_request(action, address=address,
-                           amount=amount, message=message,
-                           wallet_name=wallet, password=wallet_pw))
+    haloprint(make_api_request("/tx/send", http_method="POST", address=address,
+                               amount=amount, message=message,
+                               wallet_name=wallet, password=wallet_pw))
 
 
 @action
-def deposit(amount, pw=None, wallet=None, force=None):
+def pool_reg(wallet, pw=None, force=None):
     from getpass import getpass
     if pw is None:
         wallet_pw = getpass('Wallet password: ')
     else:
         wallet_pw = pw
 
-    print(make_api_request("deposit", amount=amount,
-                           wallet_name=wallet, password=wallet_pw))
+    haloprint(make_api_request("/tx/pool_reg", http_method="POST",
+                               wallet_name=wallet, password=wallet_pw, force=force))
 
 
 @action
 def reward(certificate, privkey, job_id, address):
-    cert_pem = open(certificate, 'rb').read()
-    privkey_pem = open(privkey, 'rb').read()
-    print(make_api_request("reward", address=address, job_id=job_id,
-                           cert_pem=cert_pem, privkey_pem=privkey_pem))
+    certificate = open(certificate, 'rb').read()
+    privkey = open(privkey, 'rb').read()
+    haloprint(make_api_request("/tx/reward", http_method="POST", address=address, job_id=job_id,
+                               certificate=certificate, privkey=privkey))
 
 
 @action
 def job_dump(certificate, privkey, job_id, amount, download_url, upload_url, hashsum, image):
     import time
-    cert_pem = open(certificate, 'rb').read()
-    privkey_pem = open(privkey, 'rb').read()
-    print(make_api_request("job_dump", id=job_id, timestamp=time.time(), amount=amount,
-                           certificate=cert_pem, privkey=privkey_pem, download_url=download_url,
-                           upload_url=upload_url, hashsum=hashsum, image=image))
+    certificate = open(certificate, 'rb').read()
+    privkey = open(privkey, 'rb').read()
+    haloprint(make_api_request("/tx/job_dump", http_method="POST", id=job_id, timestamp=time.time(), amount=amount,
+                               certificate=certificate, privkey=privkey, download_url=download_url,
+                               upload_url=upload_url, hashsum=hashsum, image=image))
 
 
 @action
 def auth_reg(certificate, privkey, host, amount, description):
-    cert_pem = open(certificate, 'rb').read()
-    privkey_pem = open(privkey, 'rb').read()
-    print(make_api_request("auth_reg", certificate=cert_pem, privkey=privkey_pem, host=host,
-                           supply=amount, description=description))
+    certificate = open(certificate, 'rb').read()
+    privkey = open(privkey, 'rb').read()
+    haloprint(make_api_request("/tx/auth_reg", http_method="POST", certificate=certificate, privkey=privkey, host=host,
+                               supply=amount, description=description))
 
+
+@action
+def jobs():
+    haloprint(make_api_request("/job/list", http_method="GET"))
 
 @action
 def peers():
-    peers = make_api_request("peers")
-    pprint(peers)
-
-
-@action
-def history(address):
-    history = make_api_request("history", address=address)
-    pprint(history)
+    peers = make_api_request("/peers", http_method="GET")
+    haloprint(peers)
 
 
 @action
 def stop():
-    print(make_api_request("stop"))
+    haloprint(make_api_request("/stop", http_method="POST"))
 
 
 @action
-def start_miner(pw, wallet=None):
-    print(make_api_request("start_miner", wallet_name=wallet, password=pw))
+def start_miner(wallet, pw=None):
+    from getpass import getpass
+    if pw is None:
+        wallet_pw = getpass('Wallet password: ')
+    else:
+        wallet_pw = pw
+
+    haloprint(make_api_request("/miner/start", http_method="POST", wallet_name=wallet, password=wallet_pw))
 
 
 @action
 def stop_miner():
-    print(make_api_request("stop_miner"))
+    haloprint(make_api_request("/miner/stop", http_method="POST"))
 
 
 @action
 def status_miner():
-    print(make_api_request("status_miner"))
+    haloprint(make_api_request("/miner", http_method="GET"))
+
+
+@action
+def start_power(wallet, pw=None):
+    from getpass import getpass
+    if pw is None:
+        wallet_pw = getpass('Wallet password: ')
+    else:
+        wallet_pw = pw
+
+    haloprint(make_api_request("/power/start", http_method="POST", wallet_name=wallet, password=wallet_pw))
+
+
+@action
+def stop_power():
+    haloprint(make_api_request("/miner/power", http_method="POST"))
+
+
+@action
+def status_power():
+    haloprint(make_api_request("/power", http_method="GET"))
 
 
 @action
 def difficulty():
-    result = make_api_request("difficulty")
+    result = make_api_request("difficulty", http_method="GET")
     if isinstance(result, bytearray):
         print(result.hex())
     else:
@@ -273,8 +323,8 @@ def difficulty():
 
 @action
 def mempool():
-    txs = make_api_request("mempool")
-    pprint(txs)
+    txs = make_api_request("mempool", http_method="GET")
+    haloprint(txs)
 
 
 def run(argv):
@@ -324,7 +374,6 @@ def run(argv):
                         help='Define a host address while registering an auth.')
     parser.add_argument('--force', action="store_true", dest='force',
                         help='Force something that makes trouble.')
-
     args = parser.parse_args(argv[1:])
 
     config, working_dir = extract_configuration(args.dir, args.config)

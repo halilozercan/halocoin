@@ -19,8 +19,16 @@ async_threading  # PyCharm automatically removes unused imports. This prevents i
 
 class ComplexEncoder(json.JSONEncoder):
     def default(self, obj):
+        from halocoin.model.wallet import Wallet
         if isinstance(obj, (bytes, bytearray)):
             return obj.hex()
+        elif isinstance(obj, Wallet):
+            return {
+                "name": obj.name,
+                "privkey": obj.get_privkey_str(),
+                "pubkey": obj.get_pubkey_str(),
+                "address": obj.address
+            }
         # Let the base class default method raise the TypeError
         return json.JSONEncoder.default(self, obj)
 
@@ -56,14 +64,13 @@ def connect():
 
 @app.route('/')
 def hello():
-    return "~Healthy and alive~"
+    return "~Alive and healthy~"
 
 
 @app.route("/wallet/upload", methods=['POST'])
 def upload_wallet():
     wallet_name = request.values.get('wallet_name', None)
-    wallet_file = request.files['wallet_file']
-    wallet_content = wallet_file.stream.read()
+    wallet_content = request.values.get('wallet_file', None)
     success = engine.instance.clientdb.upload_wallet(wallet_name, wallet_content)
     return generate_json_response({
         "success": success,
@@ -85,18 +92,32 @@ def download_wallet(wallet_name):
     return send_file(f, as_attachment=True, attachment_filename=wallet_name)
 
 
-@app.route('/address/<address>', methods=['GET'])
-def info_address(address):
-    account = engine.instance.statedb.get_account(address)
-    return generate_json_response({
-        "address": address,
-        "balance": account['amount'],
-        "score": account['score'],
-        "assigned_job": account['assigned_job'],
-    })
+@app.route('/wallet/<wallet_name>', methods=['GET'])
+def info_wallet(wallet_name):
+    from halocoin.model.wallet import Wallet
+    password = request.values.get('password', None)
+
+    encrypted_wallet_content = engine.instance.clientdb.get_wallet(wallet_name)
+    if encrypted_wallet_content is not None:
+        try:
+            wallet = Wallet.from_string(tools.decrypt(password, encrypted_wallet_content))
+            return generate_json_response({
+                "success": True,
+                "wallet": wallet
+            })
+        except Exception as e:
+            return generate_json_response({
+                "success": False,
+                "error": "Password incorrect"
+            })
+    else:
+        return generate_json_response({
+            "success": False,
+            "error": "Unidentified error occurred!"
+        })
 
 
-@app.route('/wallet/<wallet_name>/remove', methods=['GET', 'POST'])
+@app.route('/wallet/<wallet_name>/remove', methods=['POST'])
 def remove_wallet(wallet_name):
     from halocoin.model.wallet import Wallet
     password = request.values.get('password', None)
@@ -122,7 +143,7 @@ def remove_wallet(wallet_name):
         })
 
 
-@app.route('/new_wallet', methods=['GET', 'POST'])
+@app.route('/wallet/new', methods=['POST'])
 def new_wallet():
     from halocoin.model.wallet import Wallet
     wallet_name = request.values.get('wallet_name', None)
@@ -136,31 +157,42 @@ def new_wallet():
     })
 
 
-@app.route('/wallets', methods=['GET', 'POST'])
+@app.route('/wallet/list', methods=['GET'])
 def wallets():
     return generate_json_response({
         'wallets': engine.instance.clientdb.get_wallets()
     })
 
 
-@app.route('/peers', methods=['GET', 'POST'])
+@app.route('/address/<address>', methods=['GET'])
+def info_address(address):
+    account = engine.instance.statedb.get_account(address)
+    return generate_json_response({
+        "address": address,
+        "balance": account['amount'],
+        "score": account['score'],
+        "assigned_job": account['assigned_job'],
+    })
+
+
+@app.route('/peers', methods=['GET'])
 def peers():
     return generate_json_response(engine.instance.clientdb.get_peers())
 
 
-@app.route('/node_id', methods=['GET', 'POST'])
+@app.route('/node_id', methods=['GET'])
 def node_id():
     return generate_json_response(engine.instance.db.get('node_id'))
 
 
-@app.route('/subauths')
+@app.route('/subauths', methods=['GET'])
 def auth_list():
     _list = engine.instance.statedb.get_auth_list()
     response = [engine.instance.statedb.get_auth(auth_name) for auth_name in _list]
     return generate_json_response(response)
 
 
-@app.route('/jobs')
+@app.route('/job/list', methods=['GET'])
 def jobs():
     type = request.values.get('type', 'available')
     page = int(request.values.get('page', 1))
@@ -174,7 +206,7 @@ def jobs():
     return generate_json_response(result)
 
 
-@app.route('/send', methods=['GET', 'POST'])
+@app.route('/tx/send', methods=['POST'])
 def send():
     from halocoin.model.wallet import Wallet
     amount = int(request.values.get('amount', 0))
@@ -230,7 +262,7 @@ def send():
     return generate_json_response(response)
 
 
-@app.route('/pool_reg', methods=['GET', 'POST'])
+@app.route('/tx/pool_reg', methods=['POST'])
 def pool_reg():
     from halocoin.model.wallet import Wallet
     wallet_name = request.values.get('wallet_name', None)
@@ -282,7 +314,7 @@ def pool_reg():
     return generate_json_response(response)
 
 
-@app.route('/application', methods=['GET', 'POST'])
+@app.route('/tx/application', methods=['POST'])
 def application():
     from halocoin.model.wallet import Wallet
     _list = request.values.get('list', None)
@@ -332,7 +364,7 @@ def application():
     return generate_json_response(response)
 
 
-@app.route('/reward', methods=['GET', 'POST'])
+@app.route('/tx/reward', methods=['POST'])
 def reward():
     from ecdsa import SigningKey
     job_id = request.values.get('job_id', None)
@@ -369,7 +401,7 @@ def reward():
     return generate_json_response(response)
 
 
-@app.route('/job_dump', methods=['GET', 'POST'])
+@app.route('/tx/job_dump', methods=['POST'])
 def job_dump():
     from ecdsa import SigningKey
     job = {
@@ -428,7 +460,7 @@ def job_dump():
     return generate_json_response(response)
 
 
-@app.route('/auth_reg', methods=['GET', 'POST'])
+@app.route('/tx/auth_reg', methods=['POST'])
 def auth_reg():
     from ecdsa import SigningKey
     certificate = request.values.get('certificate', None)
@@ -481,7 +513,7 @@ def auth_reg():
     return generate_json_response(response)
 
 
-@app.route('/blockcount', methods=['GET', 'POST'])
+@app.route('/blockcount', methods=['GET'])
 def blockcount():
     result = dict(length=engine.instance.db.get('length'),
                   known_length=engine.instance.clientdb.get('known_length'))
@@ -489,7 +521,7 @@ def blockcount():
     return Response(response=result_text, headers={"Content-Type": "application/json"})
 
 
-@app.route('/mempool', methods=['GET', 'POST'])
+@app.route('/mempool', methods=['GET'])
 def mempool():
     purge = request.values.get('purge', None)
     if purge is not None:
@@ -515,7 +547,7 @@ def mempool():
     return generate_json_response(pool)
 
 
-@app.route('/blocks', methods=['GET', 'POST'])
+@app.route('/blocks', methods=['GET'])
 def blocks():
     start = int(request.values.get('start', '-1'))
     end = int(request.values.get('end', '-1'))
@@ -544,13 +576,13 @@ def blocks():
     return generate_json_response(result)
 
 
-@app.route('/difficulty', methods=['GET', 'POST'])
+@app.route('/difficulty', methods=['GET'])
 def difficulty():
     diff = engine.instance.blockchain.target(engine.instance.db.get('length'))
     return generate_json_response({"difficulty": diff})
 
 
-@app.route('/stop', methods=['GET', 'POST'])
+@app.route('/stop', methods=['POST'])
 def stop():
     engine.instance.db.put('stop', True)
     shutdown_server()
@@ -559,7 +591,7 @@ def stop():
     return generate_json_response('Shutting down')
 
 
-@app.route('/miner/start', methods=['GET', 'POST'])
+@app.route('/miner/start', methods=['POST'])
 def start_miner():
     from halocoin.model.wallet import Wallet
     wallet_name = request.values.get('wallet_name', None)
@@ -584,7 +616,7 @@ def start_miner():
         return generate_json_response('Running miner')
 
 
-@app.route('/miner/stop', methods=['GET', 'POST'])
+@app.route('/miner/stop', methods=['POST'])
 def stop_miner():
     if engine.instance.miner.get_state() == Service.RUNNING:
         engine.instance.miner.unregister()
@@ -593,7 +625,7 @@ def stop_miner():
         return generate_json_response('Miner is not running.')
 
 
-@app.route('/miner', methods=['GET', 'POST'])
+@app.route('/miner', methods=['GET'])
 def status_miner():
     status = {
         'running': engine.instance.miner.get_state() == Service.RUNNING
@@ -603,7 +635,7 @@ def status_miner():
     return generate_json_response(status)
 
 
-@app.route('/power/available')
+@app.route('/power/available', methods=['GET'])
 def power_available():
     status = PowerService.system_status()
     return generate_json_response({
