@@ -356,7 +356,7 @@ class StateDatabase:
                 'job_id': None
             }
             recv_account['score'] += 10
-            recv_account['amount'] += int(job['amount'])
+            recv_account['amount'] += int(job['reward'])
             recv_account['tx_blocks'].add(block_length)
             self.update_account(tx['to'], recv_account)
         elif tx['type'] == 'auth_reg':
@@ -462,7 +462,7 @@ class StateDatabase:
                 for _auth in account['application']:
                     auth_available_jobs = self.get_jobs(_auth, 'available')
                     auth_available_jobs = sorted(auth_available_jobs,
-                                                 key=lambda x: (x['amount'], x['id']),
+                                                 key=lambda x: (x['reward'], x['id']),
                                                  reverse=True)
                     if len(auth_available_jobs) > 0:
                         self.assign_job(auth_available_jobs[0], address, block['length'])

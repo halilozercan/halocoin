@@ -29,6 +29,8 @@ class ComplexEncoder(json.JSONEncoder):
                 "pubkey": obj.get_pubkey_str(),
                 "address": obj.address
             }
+        elif isinstance(obj, set):
+            return list(obj)
         # Let the base class default method raise the TypeError
         return json.JSONEncoder.default(self, obj)
 
@@ -101,9 +103,11 @@ def info_wallet(wallet_name):
     if encrypted_wallet_content is not None:
         try:
             wallet = Wallet.from_string(tools.decrypt(password, encrypted_wallet_content))
+            account = engine.instance.statedb.get_account(wallet.address)
             return generate_json_response({
                 "success": True,
-                "wallet": wallet
+                "wallet": wallet,
+                "account": account
             })
         except Exception as e:
             return generate_json_response({
@@ -332,7 +336,7 @@ def application():
         response['error'] = "Password missing!"
         return generate_json_response(response)
 
-    tx = {'type': 'withdraw', 'list': _list.split(','),
+    tx = {'type': 'application', 'list': _list.split(','),
           'version': custom.version}
 
     encrypted_wallet_content = engine.instance.clientdb.get_wallet(wallet_name)
