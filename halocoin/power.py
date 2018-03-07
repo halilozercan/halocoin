@@ -29,14 +29,22 @@ class PowerService(Service):
         self.blockchain = None
         self.clientdb = None
         self.statedb = None
+        self.wallet = None
         self.status = "Loading"
         self.description = ""
+
+    def set_wallet(self, wallet):
+        self.wallet = wallet
 
     def on_register(self):
         self.clientdb = self.engine.clientdb
         self.blockchain = self.engine.blockchain
         self.statedb = self.engine.statedb
-        return True
+
+        if self.wallet is not None and hasattr(self.wallet, 'privkey'):
+            return True
+        else:
+            return False
 
     def on_close(self):
         self.wallet = None
@@ -192,14 +200,7 @@ class PowerService(Service):
             - Remove the downloaded files
         - Repeat
         """
-        if self.clientdb.get_default_wallet() is None:
-            time.sleep(1)
-            return
 
-        from halocoin.model.wallet import Wallet
-        default_wallet_info = self.clientdb.get_default_wallet()
-        encrypted_wallet_content = self.clientdb.get_wallet(default_wallet_info['wallet_name'])
-        self.wallet = Wallet.from_string(tools.decrypt(default_wallet_info['password'], encrypted_wallet_content))
         own_address = self.wallet.address
         own_account = self.statedb.get_account(own_address)
         assigned_job = own_account['assigned_job']
