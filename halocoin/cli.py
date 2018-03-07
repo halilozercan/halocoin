@@ -314,7 +314,7 @@ def status_power():
 
 @action
 def difficulty():
-    result = make_api_request("difficulty", http_method="GET")
+    result = make_api_request("/difficulty", http_method="GET")
     if isinstance(result, bytearray):
         print(result.hex())
     else:
@@ -323,7 +323,7 @@ def difficulty():
 
 @action
 def mempool():
-    txs = make_api_request("mempool", http_method="GET")
+    txs = make_api_request("/mempool", http_method="GET")
     haloprint(txs)
 
 
