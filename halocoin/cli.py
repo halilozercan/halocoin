@@ -11,7 +11,6 @@ from halocoin import custom
 from halocoin import engine
 from halocoin import tools
 
-
 # TODO
 """ 
 @app.route('/tx/application', methods=['POST'])
@@ -74,7 +73,7 @@ def haloprint(text):
     print(highlight(content, JsonLexer(), TerminalFormatter()))
 
 
-def extract_configuration(dir, config):
+def extract_configuration(dir):
     if dir is None:
         working_dir = tools.get_default_dir()
     else:
@@ -94,9 +93,7 @@ def extract_configuration(dir, config):
             print("Could not create a directory!")
             exit(1)
 
-    if config is not None:
-        config = custom.read_config_file(config)
-    elif os.path.exists(os.path.join(working_dir, 'config')):
+    if os.path.exists(os.path.join(working_dir, 'config')):
         config = os.path.join(working_dir, 'config')
         config = custom.read_config_file(config)
     else:
@@ -117,7 +114,7 @@ def start(dir=None, config=None):
 
 
 @action
-def new_wallet(wallet, pw):
+def new_wallet(wallet, pw=None):
     from getpass import getpass
 
     if pw is None:
@@ -227,6 +224,18 @@ def pool_reg(wallet, pw=None, force=None):
 
     haloprint(make_api_request("/tx/pool_reg", http_method="POST",
                                wallet_name=wallet, password=wallet_pw, force=force))
+
+
+@action
+def application(wallet, list, pw=None):
+    from getpass import getpass
+    if pw is None:
+        wallet_pw = getpass('Wallet password: ')
+    else:
+        wallet_pw = pw
+
+    haloprint(make_api_request("/tx/application", http_method="POST",
+                               wallet_name=wallet, password=wallet_pw, list=list))
 
 
 @action
@@ -362,8 +371,6 @@ def run(argv):
                         help='While dumping, requesting, or rewarding, necessary job id.')
     parser.add_argument('--privkey', action="store", type=str, dest='privkey',
                         help='Rewarding sub-auth private key file in pem format')
-    parser.add_argument('--config', action="store", type=str, dest='config',
-                        help='Config file address. Use with start command.')
     parser.add_argument('--pw', action="store", type=str, dest='pw',
                         help='NOT RECOMMENDED! If you want to pass wallet password as argument.')
     parser.add_argument('--dir', action="store", type=str, dest='dir',
@@ -372,11 +379,13 @@ def run(argv):
                         help='Override API port defined in config file.')
     parser.add_argument('--host', action="store", type=str, dest='host',
                         help='Define a host address while registering an auth.')
+    parser.add_argument('--list', action="store", type=str, dest='list',
+                        help='Sub authority application list')
     parser.add_argument('--force', action="store_true", dest='force',
                         help='Force something that makes trouble.')
     args = parser.parse_args(argv[1:])
 
-    config, working_dir = extract_configuration(args.dir, args.config)
+    config, working_dir = extract_configuration(args.dir)
     global connection_port
     connection_port = config['port']['api']
 

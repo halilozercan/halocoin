@@ -38,6 +38,9 @@ class ComplexEncoder(json.JSONEncoder):
 app = Flask(__name__)
 socketio = SocketIO(app, async_mode='threading')
 listen_thread = None
+logged_in_wallets = {
+
+}
 
 
 def shutdown_server():
@@ -92,6 +95,33 @@ def download_wallet(wallet_name):
     f.write(wallet_content)
     f.seek(0)
     return send_file(f, as_attachment=True, attachment_filename=wallet_name)
+
+
+@app.route('/wallet/<wallet_name>/login', methods=['GET'])
+def default_wallet(wallet_name):
+    from halocoin.model.wallet import Wallet
+    password = request.values.get('password', None)
+
+    encrypted_wallet_content = engine.instance.clientdb.get_wallet(wallet_name)
+    if encrypted_wallet_content is not None:
+        try:
+            wallet = Wallet.from_string(tools.decrypt(password, encrypted_wallet_content))
+            global default_wallet_name
+            default_wallet_name = wallet.name
+            return generate_json_response({
+                "success": True,
+                "wallet": wallet
+            })
+        except Exception as e:
+            return generate_json_response({
+                "success": False,
+                "error": str(e)
+            })
+    else:
+        return generate_json_response({
+            "success": False,
+            "error": "Unidentified error occurred!"
+        })
 
 
 @app.route('/wallet/<wallet_name>', methods=['GET'])
@@ -336,7 +366,7 @@ def application():
         response['error'] = "Password missing!"
         return generate_json_response(response)
 
-    tx = {'type': 'application', 'list': _list.split(','),
+    tx = {'type': 'application', 'list': _list.split(',') if _list == '' else [],
           'version': custom.version}
 
     encrypted_wallet_content = engine.instance.clientdb.get_wallet(wallet_name)

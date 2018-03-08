@@ -411,6 +411,9 @@ class StateDatabase:
             send_account['count'] = (tx['count'] + 1)
             send_account['tx_blocks'].add(block_length)
 
+            if send_account['score'] <= 0:
+                return False
+
             auth_list = self.get_auth_list()
             for _auth in tx['list']:
                 if _auth not in auth_list:
