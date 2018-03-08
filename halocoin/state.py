@@ -272,7 +272,7 @@ class StateDatabase:
             'block': block_number,
             'address': address
         })
-        self.db.update_job(job)
+        self.update_job(job)
         self.check_worker_pool(address)
         return True
 
@@ -523,7 +523,7 @@ class StateDatabase:
                         job['status_list'].remove(status)
                     else:
                         break
-                self.db.update_job(job)
+                self.update_job(job)
 
     @lockit('kvstore')
     def known_tx_count(self, address, count_pool=False):
