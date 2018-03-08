@@ -107,8 +107,8 @@ def extract_configuration(dir):
 
 
 @action
-def start(dir=None, config=None):
-    config, working_dir = extract_configuration(dir, config)
+def start(dir=None):
+    config, working_dir = extract_configuration(dir)
     tools.init_logging(config['DEBUG'], working_dir, config['logging']['file'])
     engine.main(config, working_dir)
 
@@ -227,12 +227,15 @@ def pool_reg(wallet, pw=None, force=None):
 
 
 @action
-def application(wallet, list, pw=None):
+def application(wallet, list=None, pw=None):
     from getpass import getpass
     if pw is None:
         wallet_pw = getpass('Wallet password: ')
     else:
         wallet_pw = pw
+
+    if list is None:
+        list = ''
 
     haloprint(make_api_request("/tx/application", http_method="POST",
                                wallet_name=wallet, password=wallet_pw, list=list))

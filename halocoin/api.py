@@ -366,7 +366,7 @@ def application():
         response['error'] = "Password missing!"
         return generate_json_response(response)
 
-    tx = {'type': 'application', 'list': _list.split(',') if _list == '' else [],
+    tx = {'type': 'application', 'list': _list.split(',') if _list != '' else [],
           'version': custom.version}
 
     encrypted_wallet_content = engine.instance.clientdb.get_wallet(wallet_name)
