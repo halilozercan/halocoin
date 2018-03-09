@@ -114,7 +114,7 @@ def start(dir=None):
 
 
 @action
-def new_wallet(wallet, pw=None):
+def new_wallet(wallet, pw=None, set_default=None):
     from getpass import getpass
 
     if pw is None:
@@ -126,7 +126,9 @@ def new_wallet(wallet, pw=None):
     else:
         wallet_pw = pw
 
-    haloprint(make_api_request("/wallet/new", http_method="POST", wallet_name=wallet, password=wallet_pw))
+    haloprint(make_api_request("/wallet/new", http_method="POST",
+                               wallet_name=wallet, password=wallet_pw,
+                               set_default=set_default))
 
 
 @action
@@ -153,14 +155,15 @@ def wallets():
 
 
 @action
-def info_wallet(wallet, pw=None):
+def info_wallet(wallet=None, pw=None):
     from getpass import getpass
-    if pw is None:
+    if wallet is not None and pw is None:
         wallet_pw = getpass('Wallet password: ')
     else:
         wallet_pw = pw
 
-    information = make_api_request("/wallet/" + wallet, http_method="GET",
+    information = make_api_request("/wallet", http_method="GET",
+                                   wallet_name=wallet,
                                    password=wallet_pw)
     haloprint(information)
 
@@ -174,6 +177,19 @@ def remove_wallet(wallet, pw=None):
         wallet_pw = pw
 
     information = make_api_request("/wallet/" + wallet + '/remove', http_method="GET",
+                                   password=wallet_pw)
+    haloprint(information)
+
+
+@action
+def default_wallet(wallet, pw=None):
+    from getpass import getpass
+    if pw is None:
+        wallet_pw = getpass('Wallet password: ')
+    else:
+        wallet_pw = pw
+
+    information = make_api_request("/wallet/" + wallet + '/default', http_method="GET",
                                    password=wallet_pw)
     haloprint(information)
 
@@ -391,6 +407,8 @@ def run(argv):
                         help="Main action to perform by this CLI.")
     parser.add_argument('--force', action="store_true", dest='force',
                         help='Force something that makes trouble.')
+    parser.add_argument('--default', action="store_true", dest='set_default',
+                        help='Make new wallet default')
     args = parser.parse_args(argv[1:])
 
     config, working_dir = extract_configuration(args.dir)

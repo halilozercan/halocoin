@@ -38,9 +38,45 @@ class ComplexEncoder(json.JSONEncoder):
 app = Flask(__name__)
 socketio = SocketIO(app, async_mode='threading')
 listen_thread = None
-logged_in_wallets = {
+default_wallet = None
 
-}
+
+def get_wallet():
+    from halocoin.ntwrk import Response
+    from halocoin.model.wallet import Wallet
+    global default_wallet
+
+    wallet_name = request.values.get('wallet_name', None)
+    password = request.values.get('password', None)
+    if wallet_name is not None or password is not None:
+        encrypted_wallet_content = engine.instance.clientdb.get_wallet(wallet_name)
+        if encrypted_wallet_content is not None:
+            try:
+                wallet = Wallet.from_string(tools.decrypt(password, encrypted_wallet_content))
+                return Response(
+                    success=True,
+                    data=wallet
+                )
+            except Exception as e:
+                return Response(
+                    success=False,
+                    data=repr(e)
+                )
+        else:
+            return Response(
+                success=False,
+                data="Wallet does not exist!"
+            )
+    elif default_wallet is not None:
+        return Response(
+            success=True,
+            data=default_wallet
+        )
+    else:
+        return Response(
+            success=False,
+            data="No wallet to work with"
+        )
 
 
 def shutdown_server():
@@ -97,8 +133,8 @@ def download_wallet(wallet_name):
     return send_file(f, as_attachment=True, attachment_filename=wallet_name)
 
 
-@app.route('/wallet/<wallet_name>/login', methods=['GET'])
-def default_wallet(wallet_name):
+@app.route('/wallet/<wallet_name>/default', methods=['GET'])
+def set_default_wallet(wallet_name):
     from halocoin.model.wallet import Wallet
     password = request.values.get('password', None)
 
@@ -106,8 +142,8 @@ def default_wallet(wallet_name):
     if encrypted_wallet_content is not None:
         try:
             wallet = Wallet.from_string(tools.decrypt(password, encrypted_wallet_content))
-            global default_wallet_name
-            default_wallet_name = wallet.name
+            global default_wallet
+            default_wallet = copy.deepcopy(wallet)
             return generate_json_response({
                 "success": True,
                 "wallet": wallet
@@ -115,7 +151,7 @@ def default_wallet(wallet_name):
         except Exception as e:
             return generate_json_response({
                 "success": False,
-                "error": str(e)
+                "error": repr(e)
             })
     else:
         return generate_json_response({
@@ -124,30 +160,23 @@ def default_wallet(wallet_name):
         })
 
 
-@app.route('/wallet/<wallet_name>', methods=['GET'])
-def info_wallet(wallet_name):
-    from halocoin.model.wallet import Wallet
-    password = request.values.get('password', None)
+@app.route('/wallet', methods=['GET'])
+def info_wallet():
+    wallet_result = get_wallet()
 
-    encrypted_wallet_content = engine.instance.clientdb.get_wallet(wallet_name)
-    if encrypted_wallet_content is not None:
-        try:
-            wallet = Wallet.from_string(tools.decrypt(password, encrypted_wallet_content))
-            account = engine.instance.statedb.get_account(wallet.address)
-            return generate_json_response({
-                "success": True,
-                "wallet": wallet,
-                "account": account
-            })
-        except Exception as e:
-            return generate_json_response({
-                "success": False,
-                "error": "Password incorrect"
-            })
+    if wallet_result.getFlag():
+        wallet = wallet_result.getData()
+        account = engine.instance.statedb.get_account(wallet.address)
+        del account['tx_blocks']
+        return generate_json_response({
+            "success": True,
+            "wallet": wallet,
+            "account": account
+        })
     else:
         return generate_json_response({
             "success": False,
-            "error": "Unidentified error occurred!"
+            "error": wallet_result.getData()
         })
 
 
@@ -182,8 +211,12 @@ def new_wallet():
     from halocoin.model.wallet import Wallet
     wallet_name = request.values.get('wallet_name', None)
     pw = request.values.get('password', None)
+    set_default = request.values.get('set_default', None)
     wallet = Wallet(wallet_name)
     success = engine.instance.clientdb.new_wallet(pw, wallet)
+    if set_default and success:
+        global default_wallet
+        default_wallet = copy.deepcopy(wallet)
 
     return generate_json_response({
         "name": wallet_name,
@@ -206,6 +239,7 @@ def info_address(address):
         "balance": account['amount'],
         "score": account['score'],
         "assigned_job": account['assigned_job'],
+        "application": account['application']
     })
 
 
@@ -242,43 +276,26 @@ def jobs():
 
 @app.route('/tx/send', methods=['POST'])
 def send():
-    from halocoin.model.wallet import Wallet
     amount = int(request.values.get('amount', 0))
     address = request.values.get('address', None)
     message = request.values.get('message', '')
-    wallet_name = request.values.get('wallet_name', None)
-    password = request.values.get('password', None)
+    wallet_result = get_wallet()
 
     response = {"success": False}
-    if wallet_name is None:
-        response['error'] = "Wallet name cannot be empty"
+    if not wallet_result.getFlag():
+        response['error'] = wallet_result.getData()
         return generate_json_response(response)
-    if amount <= 0:
+    elif amount <= 0:
         response['error'] = "Amount cannot be lower than or equal to 0"
         return generate_json_response(response)
     elif address is None:
         response['error'] = "You need to specify a receiving address for transaction"
         return generate_json_response(response)
-    elif wallet_name is None:
-        response['error'] = "Wallet name is not given and there is no default wallet"
-        return generate_json_response(response)
-    elif password is None:
-        response['error'] = "Password missing!"
-        return generate_json_response(response)
 
     tx = {'type': 'spend', 'amount': int(amount),
           'to': address, 'message': message, 'version': custom.version}
 
-    encrypted_wallet_content = engine.instance.clientdb.get_wallet(wallet_name)
-    if encrypted_wallet_content is not None:
-        try:
-            wallet = Wallet.from_string(tools.decrypt(password, encrypted_wallet_content))
-        except:
-            response['error'] = "Wallet password incorrect"
-            return generate_json_response(response)
-    else:
-        response['error'] = "Error occurred"
-        return generate_json_response(response)
+    wallet = wallet_result.getData()
 
     if 'count' not in tx:
         try:
@@ -298,9 +315,6 @@ def send():
 
 @app.route('/tx/pool_reg', methods=['POST'])
 def pool_reg():
-    from halocoin.model.wallet import Wallet
-    wallet_name = request.values.get('wallet_name', None)
-    password = request.values.get('password', None)
     force = request.values.get('force', None)
 
     status = PowerService.system_status()
@@ -311,26 +325,16 @@ def pool_reg():
                        'This probably means there is a problem with Docker connection or Docker is not installed.'
         })
 
+    wallet_result = get_wallet()
+
     response = {"success": False}
-    if wallet_name is None:
-        response['error'] = "Wallet name missing!"
-        return generate_json_response(response)
-    elif password is None:
-        response['error'] = "Password missing!"
+    if not wallet_result.getFlag():
+        response['error'] = wallet_result.getData()
         return generate_json_response(response)
 
     tx = {'type': 'pool_reg', 'version': custom.version}
 
-    encrypted_wallet_content = engine.instance.clientdb.get_wallet(wallet_name)
-    if encrypted_wallet_content is not None:
-        try:
-            wallet = Wallet.from_string(tools.decrypt(password, encrypted_wallet_content))
-        except:
-            response['error'] = "Wallet password incorrect"
-            return generate_json_response(response)
-    else:
-        response['error'] = "Error occurred"
-        return generate_json_response(response)
+    wallet = wallet_result.getData()
 
     if 'count' not in tx:
         try:
@@ -350,26 +354,20 @@ def pool_reg():
 
 @app.route('/tx/application', methods=['POST'])
 def application():
-    from halocoin.model.wallet import Wallet
     _list = request.values.get('list', None)
     mode = request.values.get('mode', None)
-    wallet_name = request.values.get('wallet_name', None)
-    password = request.values.get('password', None)
+    wallet_result = get_wallet()
 
     response = {"success": False}
-    if _list is None:
+    if not wallet_result.getFlag():
+        response['error'] = wallet_result.getData()
+        return generate_json_response(response)
+    elif _list is None:
         response['error'] = "Application list is not given"
         return generate_json_response(response)
     elif mode is None or mode not in ['s', 'c']:
         response['error'] = "Application mode is not given or invalid"
         return generate_json_response(response)
-    elif wallet_name is None:
-        response['error'] = "Wallet name is not given and there is no default wallet"
-        return generate_json_response(response)
-    elif password is None:
-        response['error'] = "Password missing!"
-        return generate_json_response(response)
-
     tx = {
         'type': 'application',
         'application':
@@ -380,16 +378,7 @@ def application():
         'version': custom.version
     }
 
-    encrypted_wallet_content = engine.instance.clientdb.get_wallet(wallet_name)
-    if encrypted_wallet_content is not None:
-        try:
-            wallet = Wallet.from_string(tools.decrypt(password, encrypted_wallet_content))
-        except:
-            response['error'] = "Wallet password incorrect"
-            return generate_json_response(response)
-    else:
-        response['error'] = "Error occurred"
-        return generate_json_response(response)
+    wallet = wallet_result.getData()
 
     if 'count' not in tx:
         try:
