@@ -352,12 +352,16 @@ def pool_reg():
 def application():
     from halocoin.model.wallet import Wallet
     _list = request.values.get('list', None)
+    mode = request.values.get('mode', None)
     wallet_name = request.values.get('wallet_name', None)
     password = request.values.get('password', None)
 
     response = {"success": False}
     if _list is None:
         response['error'] = "Application list is not given"
+        return generate_json_response(response)
+    elif mode is None or mode not in ['s', 'c']:
+        response['error'] = "Application mode is not given or invalid"
         return generate_json_response(response)
     elif wallet_name is None:
         response['error'] = "Wallet name is not given and there is no default wallet"
@@ -366,8 +370,15 @@ def application():
         response['error'] = "Password missing!"
         return generate_json_response(response)
 
-    tx = {'type': 'application', 'list': _list.split(',') if _list != '' else [],
-          'version': custom.version}
+    tx = {
+        'type': 'application',
+        'application':
+            {
+                'list': _list.split(',') if _list != '' else [],
+                'mode': mode
+            },
+        'version': custom.version
+    }
 
     encrypted_wallet_content = engine.instance.clientdb.get_wallet(wallet_name)
     if encrypted_wallet_content is not None:

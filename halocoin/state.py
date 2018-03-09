@@ -22,7 +22,10 @@ class StateDatabase:
             'job_id': None
         },
         'score': 0,
-        'application': []
+        'application': {
+            'mode': 's',
+            'list': []
+        }
     }
 
     def __init__(self, engine):
@@ -121,7 +124,7 @@ class StateDatabase:
         if account is None:
             account = self.get_account(address)
 
-        if account['score'] > 0 and len(account['application']) > 0:
+        if account['score'] > 0 and len(account['application']['list']) > 0:
             self.put_address_in_worker_pool(address)
         else:
             self.remove_address_from_worker_pool(address)
@@ -294,7 +297,7 @@ class StateDatabase:
             'job_id': None
         }
         last_assigned_account['score'] -= 10
-        last_assigned_account['application'] = []
+        last_assigned_account['application'] = StateDatabase.default_account['application']
 
         self.update_job(job)
         self.update_account(last_assigned_address, last_assigned_account)
@@ -358,6 +361,9 @@ class StateDatabase:
             recv_account['score'] += 10
             recv_account['amount'] += int(job['reward'])
             recv_account['tx_blocks'].add(block_length)
+
+            if recv_account['application']['mode'] == 's':
+                recv_account['application'] = StateDatabase.default_account['application']
             self.update_account(tx['to'], recv_account)
         elif tx['type'] == 'auth_reg':
             cert_valid = tools.check_certificate_chain(tx['certificate'])
@@ -415,14 +421,11 @@ class StateDatabase:
                 return False
 
             auth_list = self.get_auth_list()
-            for _auth in tx['list']:
+            for _auth in tx['application']['list']:
                 if _auth not in auth_list:
                     return False
 
-            if send_account['application'] != tx['list_old']:
-                return False
-
-            send_account['application'] = tx['list']
+            send_account['application'] = tx['application']
 
             self.update_account(send_address, send_account)
             self.check_worker_pool(send_address, send_account)
@@ -462,7 +465,7 @@ class StateDatabase:
                               reverse=True)
 
             for (account, address) in accounts:
-                for _auth in account['application']:
+                for _auth in account['application']['list']:
                     auth_available_jobs = self.get_jobs(_auth, 'available')
                     auth_available_jobs = sorted(auth_available_jobs,
                                                  key=lambda x: (x['reward'], x['id']),

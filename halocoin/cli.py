@@ -227,7 +227,7 @@ def pool_reg(wallet, pw=None, force=None):
 
 
 @action
-def application(wallet, list=None, pw=None):
+def application(wallet, mode=None, list=None, pw=None):
     from getpass import getpass
     if pw is None:
         wallet_pw = getpass('Wallet password: ')
@@ -237,8 +237,11 @@ def application(wallet, list=None, pw=None):
     if list is None:
         list = ''
 
+    if mode is None:
+        mode = 's'
+
     haloprint(make_api_request("/tx/application", http_method="POST",
-                               wallet_name=wallet, password=wallet_pw, list=list))
+                               wallet_name=wallet, password=wallet_pw, list=list, mode=mode))
 
 
 @action
@@ -384,6 +387,8 @@ def run(argv):
                         help='Define a host address while registering an auth.')
     parser.add_argument('--list', action="store", type=str, dest='list',
                         help='Sub authority application list')
+    parser.add_argument('--mode', choices=sorted(['c', 's']), dest='mode',
+                        help="Main action to perform by this CLI.")
     parser.add_argument('--force', action="store_true", dest='force',
                         help='Force something that makes trouble.')
     args = parser.parse_args(argv[1:])

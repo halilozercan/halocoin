@@ -451,10 +451,14 @@ class BlockchainService(Service):
                 return Response(False, 'Transaction is not properly signed')
             elif 'count' not in tx or not isinstance(tx['count'], int):
                 return Response(False, 'transaction count is missing')
-            elif 'list' not in tx or not isinstance(tx['list'], list):
-                return Response(False, 'application list is missing')
-            elif 'list_old' not in tx or not isinstance(tx['list_old'], list):
-                return Response(False, 'current application list is missing')
+            elif 'application' not in tx or not isinstance(tx['application'], dict):
+                return Response(False, 'application object is missing')
+            elif 'mode' not in tx['application'] or 'list' not in tx['application']:
+                return Response(False, 'application object is invalid')
+            elif tx['application']['mode'] not in ['s', 'c']:
+                return Response(False, 'application object has invalid mode')
+            elif not isinstance(tx['application']['list'], list):
+                return Response(False, 'application object has invalid list')
 
         return Response(True, 'Everything seems fine')
 
