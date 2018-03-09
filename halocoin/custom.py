@@ -16,18 +16,18 @@ history_length = 110
 # total weight.
 inflection = Decimal('0.98')
 # How often to generate a block in seconds
-blocktime = 120
+blocktime = 30
 halve_at = (365 * 24 * 60 * 60 / blocktime)  # Approximately one year
 recalculate_target_at = (4*60*60 // blocktime)  # It's every half day
 
 # Precalculate
 memoized_weights = [inflection ** i for i in range(history_length)]
 
-assignment_period = 1  # Assign jobs at each T rounds
-unassignment_after = 40   # Unassign jobs after T*M rounds
+assignment_period = 2  # Assign jobs at each T rounds
+unassignment_after = 30   # Unassign jobs after T*M rounds
 pool_reg_amount = 1000
 
-first_target = '0' * 5 + 'f' * 59
+first_target = '0' * 4 + 'f' * 60
 
 # Coinami root certificate.
 # Everyone will accept any certificate that is signed by the root

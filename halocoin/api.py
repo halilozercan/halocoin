@@ -391,8 +391,6 @@ def application():
         response['error'] = "Error occurred"
         return generate_json_response(response)
 
-    tx['list_old'] = engine.instance.statedb.get_account(wallet.address)['application']
-
     if 'count' not in tx:
         try:
             tx['count'] = engine.instance.statedb.known_tx_count(wallet.address, count_pool=True)
