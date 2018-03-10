@@ -625,25 +625,17 @@ def stop():
 
 @app.route('/miner/start', methods=['POST'])
 def start_miner():
-    from halocoin.model.wallet import Wallet
-    wallet_name = request.values.get('wallet_name', None)
-    password = request.values.get('password', None)
+    response = {"success": False}
 
-    encrypted_wallet_content = engine.instance.clientdb.get_wallet(wallet_name)
-    if encrypted_wallet_content is not None:
-        try:
-            wallet = Wallet.from_string(tools.decrypt(password, encrypted_wallet_content))
-        except:
-            return generate_json_response("Wallet password incorrect")
-    else:
-        return generate_json_response("Error occurred")
+    wallet_result = get_wallet()
+    if not wallet_result.getFlag():
+        response['error'] = wallet_result.getData()
+        return generate_json_response(response)
 
     if engine.instance.miner.get_state() == Service.RUNNING:
         return generate_json_response('Miner is already running.')
-    elif wallet is None:
-        return generate_json_response('Given wallet is not valid.')
     else:
-        engine.instance.miner.set_wallet(wallet)
+        engine.instance.miner.set_wallet(wallet_result.getData())
         engine.instance.miner.register()
         return generate_json_response('Running miner')
 
@@ -678,25 +670,17 @@ def power_available():
 
 @app.route('/power/start', methods=['POST'])
 def start_power():
-    from halocoin.model.wallet import Wallet
-    wallet_name = request.values.get('wallet_name', None)
-    password = request.values.get('password', None)
+    response = {"success": False}
 
-    encrypted_wallet_content = engine.instance.clientdb.get_wallet(wallet_name)
-    if encrypted_wallet_content is not None:
-        try:
-            wallet = Wallet.from_string(tools.decrypt(password, encrypted_wallet_content))
-        except:
-            return generate_json_response("Wallet password incorrect")
-    else:
-        return generate_json_response("Error occurred")
+    wallet_result = get_wallet()
+    if not wallet_result.getFlag():
+        response['error'] = wallet_result.getData()
+        return generate_json_response(response)
 
     if engine.instance.power.get_state() == Service.RUNNING:
         return generate_json_response('Power is already running.')
-    elif wallet is None:
-        return generate_json_response('Given wallet is not valid.')
     else:
-        engine.instance.power.set_wallet(wallet)
+        engine.instance.power.set_wallet(wallet_result.getData())
         engine.instance.power.register()
         return generate_json_response('Running power')
 
