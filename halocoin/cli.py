@@ -302,9 +302,9 @@ def stop():
 
 
 @action
-def start_miner(wallet, pw=None):
+def start_miner(wallet=None, pw=None):
     from getpass import getpass
-    if pw is None:
+    if wallet is not None and pw is None:
         wallet_pw = getpass('Wallet password: ')
     else:
         wallet_pw = pw
@@ -323,9 +323,9 @@ def status_miner():
 
 
 @action
-def start_power(wallet, pw=None):
+def start_power(wallet=None, pw=None):
     from getpass import getpass
-    if pw is None:
+    if wallet is not None and pw is None:
         wallet_pw = getpass('Wallet password: ')
     else:
         wallet_pw = pw
