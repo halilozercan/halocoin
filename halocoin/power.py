@@ -104,6 +104,9 @@ class PowerService(Service):
         r = requests.get(job['download_url'], stream=True, data={
             'payload': payload
         })
+        if r.status_code != 200:
+            time.sleep(1)
+            return False
         downloaded = 0
         total_length = int(r.headers.get("Content-Length"))
         with open(job_file, 'wb') as f:
