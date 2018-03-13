@@ -119,48 +119,41 @@ def upload_wallet():
     })
 
 
-@app.route('/wallet/<wallet_name>/download', methods=['GET'])
-def download_wallet(wallet_name):
-    wallet_content = engine.instance.clientdb.get_wallet(wallet_name)
-    if wallet_content is None:
+@app.route('/wallet/download', methods=['GET'])
+def download_wallet():
+    wallet_name = request.values.get('wallet_name', None)
+    if wallet_name is None:
         return generate_json_response({
             "success": False,
-            "error": "Wallet doesn't exist"
+            "error": "Give wallet name"
         })
+    wallet_content = engine.instance.clientdb.get_wallet(wallet_name)
     f = tempfile.NamedTemporaryFile()
     f.write(wallet_content)
     f.seek(0)
     return send_file(f, as_attachment=True, attachment_filename=wallet_name)
 
 
-@app.route('/wallet/<wallet_name>/default', methods=['GET'])
-def set_default_wallet(wallet_name):
-    from halocoin.model.wallet import Wallet
-    password = request.values.get('password', None)
+@app.route('/wallet/default', methods=['GET'])
+def set_default_wallet():
+    wallet_result = get_wallet()
 
-    encrypted_wallet_content = engine.instance.clientdb.get_wallet(wallet_name)
-    if encrypted_wallet_content is not None:
-        try:
-            wallet = Wallet.from_string(tools.decrypt(password, encrypted_wallet_content))
-            global default_wallet
-            default_wallet = copy.deepcopy(wallet)
-            return generate_json_response({
-                "success": True,
-                "wallet": wallet
-            })
-        except Exception as e:
-            return generate_json_response({
-                "success": False,
-                "error": repr(e)
-            })
+    if wallet_result.getFlag():
+        wallet = wallet_result.getData()
+        global default_wallet
+        default_wallet = copy.deepcopy(wallet)
+        return generate_json_response({
+            "success": True,
+            "wallet": wallet
+        })
     else:
         return generate_json_response({
             "success": False,
-            "error": "Unidentified error occurred!"
+            "error": wallet_result.getData()
         })
 
 
-@app.route('/wallet', methods=['GET'])
+@app.route('/wallet/info', methods=['GET'])
 def info_wallet():
     wallet_result = get_wallet()
 
@@ -180,29 +173,21 @@ def info_wallet():
         })
 
 
-@app.route('/wallet/<wallet_name>/remove', methods=['POST'])
-def remove_wallet(wallet_name):
-    from halocoin.model.wallet import Wallet
-    password = request.values.get('password', None)
+@app.route('/wallet/remove', methods=['POST'])
+def remove_wallet():
+    wallet_result = get_wallet()
 
-    encrypted_wallet_content = engine.instance.clientdb.get_wallet(wallet_name)
-    if encrypted_wallet_content is not None:
-        try:
-            Wallet.from_string(tools.decrypt(password, encrypted_wallet_content))
-            engine.instance.clientdb.remove_wallet(wallet_name)
-            return generate_json_response({
-                "success": True,
-                "message": "Successfully removed wallet"
-            })
-        except:
-            return generate_json_response({
-                "success": False,
-                "error": "Password incorrect"
-            })
+    if wallet_result.getFlag():
+        wallet = wallet_result.getData()
+        engine.instance.clientdb.remove_wallet(wallet.name)
+        return generate_json_response({
+            "success": True,
+            "message": "Removed wallet"
+        })
     else:
         return generate_json_response({
             "success": False,
-            "error": "Unidentified error occurred!"
+            "error": wallet_result.getData()
         })
 
 
@@ -225,7 +210,7 @@ def new_wallet():
 
 
 @app.route('/wallet/list', methods=['GET'])
-def wallets():
+def wallet_list():
     return generate_json_response({
         'wallets': engine.instance.clientdb.get_wallets()
     })

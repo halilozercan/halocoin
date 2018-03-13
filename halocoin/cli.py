@@ -141,7 +141,7 @@ def upload_wallet(file, wallet):
 @action
 def download_wallet(wallet):
     # TODO: actual file download
-    haloprint(make_api_request("/wallet/" + wallet + "/download", http_method="GET"))
+    haloprint(make_api_request("/wallet/download", wallet_name=wallet, http_method="GET"))
 
 
 @action
@@ -162,7 +162,7 @@ def info_wallet(wallet=None, pw=None):
     else:
         wallet_pw = pw
 
-    information = make_api_request("/wallet", http_method="GET",
+    information = make_api_request("/wallet/info", http_method="GET",
                                    wallet_name=wallet,
                                    password=wallet_pw)
     haloprint(information)
@@ -176,7 +176,8 @@ def remove_wallet(wallet, pw=None):
     else:
         wallet_pw = pw
 
-    information = make_api_request("/wallet/" + wallet + '/remove', http_method="GET",
+    information = make_api_request("/wallet/remove", http_method="GET",
+                                   wallet_name=wallet,
                                    password=wallet_pw)
     haloprint(information)
 
@@ -189,7 +190,8 @@ def default_wallet(wallet, pw=None):
     else:
         wallet_pw = pw
 
-    information = make_api_request("/wallet/" + wallet + '/default', http_method="GET",
+    information = make_api_request("/wallet/default", http_method="GET",
+                                   wallet_name=wallet,
                                    password=wallet_pw)
     haloprint(information)
 

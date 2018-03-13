@@ -6,7 +6,6 @@ import uuid
 import docker
 import requests
 import yaml
-from docker.errors import ImageNotFound
 
 from halocoin import api
 from halocoin import tools
@@ -101,13 +100,20 @@ class PowerService(Service):
             "signature": tools.sign(tools.det_hash(secret_message), self.wallet.privkey),
             "pubkey": self.wallet.get_pubkey_str()
         })
-        r = requests.get(job['download_url'], stream=True, data={
+        r = requests.get(job['download_url'], data={
             'payload': payload
-        })
+        }, allow_redirects=False)
+
+        if r.status_code != 302:
+            time.sleep(1)
+            print('Download was unsuccessful')
+            return
+
+        r2 = requests.get(r.headers['Location'], stream=True)
         downloaded = 0
         total_length = int(r.headers.get("Content-Length"))
         with open(job_file, 'wb') as f:
-            for chunk in r.iter_content(chunk_size=1024 * 1024):
+            for chunk in r2.iter_content(chunk_size=1024 * 1024):
                 if chunk:  # filter out keep-alive new chunks
                     f.write(chunk)
                     downloaded += 1024*1024
