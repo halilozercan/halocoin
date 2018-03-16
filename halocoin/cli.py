@@ -5,11 +5,7 @@ import sys
 from functools import wraps
 from inspect import Parameter
 
-import requests
-
 from halocoin import custom
-from halocoin import engine
-from halocoin import tools
 
 # TODO
 """ 
@@ -45,6 +41,7 @@ def action(func):
 
 
 def make_api_request(method, http_method="GET", **kwargs):
+    from requests import get, post
     if not method.startswith("/"):
         raise ValueError('Method endpoints should start with backslash')
     url = "http://" + str(host) + ":" + str(connection_port) + method
@@ -52,9 +49,9 @@ def make_api_request(method, http_method="GET", **kwargs):
     kwargs = {k: v for k, v in kwargs.items() if v is not None}
 
     if http_method == "GET":
-        response = requests.get(url, params=kwargs)
+        response = get(url, params=kwargs)
     else:
-        response = requests.post(url, data=kwargs)
+        response = post(url, data=kwargs)
     if response.status_code != 200:
         return {
             'error': response.status_code,
@@ -74,6 +71,7 @@ def haloprint(text):
 
 
 def extract_configuration(dir):
+    from halocoin import tools
     if dir is None:
         working_dir = tools.get_default_dir()
     else:
@@ -108,6 +106,7 @@ def extract_configuration(dir):
 
 @action
 def start(dir=None):
+    from halocoin import engine, tools
     config, working_dir = extract_configuration(dir)
     tools.init_logging(config['DEBUG'], working_dir, config['logging']['file'])
     engine.main(config, working_dir)
