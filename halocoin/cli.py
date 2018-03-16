@@ -219,9 +219,9 @@ def node_id():
 
 
 @action
-def send(address, amount, wallet, pw=None, message=None):
+def send(address, amount, wallet=None, pw=None, message=None):
     from getpass import getpass
-    if pw is None:
+    if wallet is not None and pw is None:
         wallet_pw = getpass('Wallet password: ')
     else:
         wallet_pw = pw
@@ -232,9 +232,9 @@ def send(address, amount, wallet, pw=None, message=None):
 
 
 @action
-def pool_reg(wallet, pw=None, force=None):
+def pool_reg(wallet=None, pw=None, force=None):
     from getpass import getpass
-    if pw is None:
+    if wallet is not None and pw is None:
         wallet_pw = getpass('Wallet password: ')
     else:
         wallet_pw = pw
@@ -244,9 +244,9 @@ def pool_reg(wallet, pw=None, force=None):
 
 
 @action
-def application(wallet, mode=None, list=None, pw=None):
+def application(wallet=None, mode=None, list=None, pw=None):
     from getpass import getpass
-    if pw is None:
+    if wallet is not None and pw is None:
         wallet_pw = getpass('Wallet password: ')
     else:
         wallet_pw = pw

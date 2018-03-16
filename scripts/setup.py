@@ -28,4 +28,3 @@ default_wallet = requests.get('http://0.0.0.0:7001/wallet/info').json()
 if default_wallet['wallet']['name'] != 'test':
     print('Couldn\'t change default wallet. \nFAILED!')
     exit(1)
-
