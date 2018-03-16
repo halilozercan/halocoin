@@ -134,7 +134,7 @@ def download_wallet():
     return send_file(f, as_attachment=True, attachment_filename=wallet_name)
 
 
-@app.route('/wallet/default', methods=['GET'])
+@app.route('/wallet/default', methods=['POST'])
 def set_default_wallet():
     wallet_result = get_wallet()
 
