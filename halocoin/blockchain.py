@@ -78,12 +78,16 @@ class BlockchainService(Service):
                         break
 
                 for block in blocks:
+                    self.db.start_record()
                     add_block_result = self.add_block(block)
-                    if add_block_result == 2:  # A block that is ahead of us could not be added. No need to proceed.
-                        break
-                    elif add_block_result == 0:
+                    if add_block_result == 0:
+                        self.db.keep_record(block['length'])
                         tools.techo('add block: ' + str(block['length']))
                         total_number_of_blocks_added += 1
+                    else:
+                        self.db.discard_record()
+                        if add_block_result == 2:
+                            break
 
                 if total_number_of_blocks_added == 0 or self.db.get('length') != blocks[-1]['length']:
                     # All received blocks failed. Punish the peer by lowering rank.
@@ -262,16 +266,6 @@ class BlockchainService(Service):
 
         for tx in block['txs']:
             orphans.append(tx)
-
-        self.del_block(length)
-        length -= 1
-
-        self.db.put('length', length)
-        if length == -1:
-            self.db.put('diffLength', '0')
-        else:
-            block = self.get_block(length)
-            self.db.put('diffLength', block['diffLength'])
 
         for orphan in sorted(orphans, key=lambda x: x['count'] if 'count' in x else -1):
             self.tx_queue.put(orphan)

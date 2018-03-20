@@ -15,6 +15,8 @@ class KeyValueStore:
         self.DB = None
         self.iterator = None
         self.simulating = False
+        self.recording = False
+        self.changes_in_record = dict()
         self.simulation_owner = ''
         self.salt = None
         self.req_count = 0
@@ -50,6 +52,14 @@ class KeyValueStore:
                 raise EnvironmentError('There is a simulation going on! You cannot write to database from {}'
                                        .format(tname))
             elif tname == self.simulation_owner and self.simulating:
+                if self.recording:
+                    if str(key) in self.changes_in_record.keys():
+                        self.changes_in_record[str(key)]['new'] = value
+                    else:
+                        self.changes_in_record[str(key)] = {
+                            'old': self.get(key),
+                            'new': value
+                        }
                 self.log[str(key)] = value
             elif not self.simulating:
                 self.DB.put(str(key).encode(), pickle.dumps(value))
@@ -98,6 +108,12 @@ class KeyValueStore:
             self.DB.put(str(key).encode(), pickle.dumps(value))
         self.log = dict()
         self.simulating = False
+
+        # Remove earlier indices.
+        length = self.get('length')
+        for i in range(1000):
+            self.delete('changes_' + str(length-i-30))
+
         return True
 
     @lockit('kvstore')
@@ -108,3 +124,30 @@ class KeyValueStore:
         self.log = dict()
         self.simulating = False
         return True
+
+    @lockit('kvstore')
+    def start_record(self):
+        if not self.simulating:
+            tools.log('There isn\'t any ongoing simulation')
+            return False
+
+        self.recording = True
+
+    @lockit('kvstore')
+    def discard_record(self):
+        if not self.simulating:
+            tools.log('There isn\'t any ongoing simulation')
+            return False
+
+        self.recording = False
+        self.changes_in_record = dict()
+
+    @lockit('kvstore')
+    def keep_record(self, name):
+        if not self.simulating:
+            tools.log('There isn\'t any ongoing simulation')
+            return False
+
+        self.recording = False
+        self.put('changes_' + str(name), self.changes_in_record)
+        self.changes_in_record = dict()

@@ -501,35 +501,17 @@ class StateDatabase:
             # Block is not at the top the chain
             return False
 
-        for tx in block['txs']:
-            tx_owner_address = tools.tx_owner_address(tx)
-            owner_account = self.get_account(tx_owner_address)
-            if tx['type'] == 'mint':
-                owner_account['amount'] -= tools.block_reward(block['length'])
-                self.db.put(tx_owner_address, owner_account)
-            elif tx['type'] == 'spend':
-                owner_account['amount'] += tx['amount']
-                owner_account['count'] -= 1
-                owner_account['tx_blocks'].remove(block['length'])
+        if not self.db.exists('changes_' + str(block['length'])):
+            tools.log('Cannot delete a block because transaction index is missing')
+            return False
 
-                receiver_account = self.db.get(tx['to'])
-                receiver_account['amount'] -= tx['amount']
-                receiver_account['tx_blocks'].remove(block['length'])
+        changes = self.db.get('changes_' + str(block['length']))
+        for key, value in changes.items():
+            self.db.put(key, value['old'])
 
-                self.db.put(tx_owner_address, owner_account)
-                self.db.put(tx['to'], receiver_account)
-            elif tx['type'] == 'auth_reg':
-                self.delete_auth(tx['certificate'])
-            elif tx['type'] == 'job_dump':
-                self.delete_job(tx['auth'], tx['job']['id'])
-            elif tx['type'] == 'reward':
-                job = self.get_job(tx['auth'], tx['job_id'])
-                for status in reversed(job['status_list']):
-                    if status['block'] == block['length']:
-                        job['status_list'].remove(status)
-                    else:
-                        break
-                self.update_job(job)
+        self.db.delete('changes_' + str(block['length']))
+        tools.log('Successfully removed block %d' % block['length'])
+
 
     @lockit('kvstore')
     def known_tx_count(self, address, count_pool=False):
