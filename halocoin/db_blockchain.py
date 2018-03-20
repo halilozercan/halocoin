@@ -1,3 +1,4 @@
+import copy
 import os
 import pickle
 import sys
@@ -43,7 +44,7 @@ class KeyValueStore:
                 (tname == self.simulation_owner and self.simulating and str(key) not in self.log):
             return from_database(key)
         else:
-            return self.log[str(key)]
+            return copy.deepcopy(self.log[str(key)])
 
     def put(self, key, value):
         try:
@@ -132,6 +133,7 @@ class KeyValueStore:
             return False
 
         self.recording = True
+        self.changes_in_record = dict()
 
     @lockit('kvstore')
     def discard_record(self):

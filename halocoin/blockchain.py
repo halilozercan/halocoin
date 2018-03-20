@@ -261,6 +261,7 @@ class BlockchainService(Service):
 
         block = self.get_block(length)
         self.statedb.rollback_block(block)
+        print('Removed block %d' % length)
 
         orphans = self.tx_pool_pop_all()
 
