@@ -1,9 +1,8 @@
 import time
 
-from halocoin import blockchain
 from halocoin import ntwrk
 from halocoin import tools
-from halocoin.service import Service, threaded, sync
+from halocoin.service import Service, threaded
 
 
 class PeerCheckService(Service):
@@ -60,7 +59,6 @@ class PeerCheckService(Service):
 
         time.sleep(0.1)
 
-    @sync
     def peer_check(self, peer):
         peer_ip_port = (peer['ip'], peer['port'])
         greeted = ntwrk.command(peer_ip_port,

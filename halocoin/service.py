@@ -250,38 +250,6 @@ class Service:
             return True
 
 
-def sync(func):
-    """
-    Decorator for any service method that needs to run in the event loop.
-    Results return after execution.
-    :param func: Function to be decorated
-    :return: Decorated version of function
-    """
-
-    def wrapper(self, *args, **kwargs):
-        return self.execute(func.__name__, True, args=args, kwargs=kwargs)
-
-    wrapper._original = func
-    wrapper.thread_safe = True
-    return wrapper
-
-
-def async(func):
-    """
-    Decorator for any service method that needs to run in the event loop.
-    Results do not return after execution.
-    :param func: Function to be decorated
-    :return: Decorated version of function
-    """
-
-    def wrapper(self, *args, **kwargs):
-        return self.execute(func.__name__, False, args=args, kwargs=kwargs)
-
-    wrapper._original = func
-    wrapper.thread_safe = True
-    return wrapper
-
-
 def threaded(func):
     """
     This is just a marker decorator. It removes all the functionality but
@@ -348,19 +316,3 @@ def lockit(lock_name, timeout=-1):
         wrapper.__name__ = func.__name__
         return wrapper
     return _lockit
-
-
-def check_lock(lock_name):
-    """
-    Return true if we can acquire the lock
-    :param lock_name:
-    :return:
-    """
-    global locks
-    if '__lock_{}__'.format(lock_name) in locks:
-        mylock = locks['__lock_{}__'.format(lock_name)]
-        result = mylock.acquire(timeout=0.0000001)
-        if result:
-            mylock.release()
-        return result
-    return False

@@ -487,7 +487,6 @@ class StateDatabase:
         return valid_txs
 
     def rollback_block(self, block):
-        # TODO: 0.007-12c changes
         """
         A block rollback means removing the block from chain.
         A block is defined by its transactions. Here we rollback every object in database to the version
@@ -511,7 +510,6 @@ class StateDatabase:
 
         self.db.delete('changes_' + str(block['length']))
         tools.log('Successfully removed block %d' % block['length'])
-
 
     @lockit('kvstore')
     def known_tx_count(self, address, count_pool=False):

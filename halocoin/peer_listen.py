@@ -7,7 +7,7 @@ from halocoin import ntwrk, custom
 from halocoin import tools
 from halocoin.db_client import ClientDB
 from halocoin.ntwrk import Message
-from halocoin.service import Service, threaded, sync
+from halocoin.service import Service, threaded
 
 
 class PeerListenService(Service):
@@ -83,7 +83,6 @@ class PeerListenService(Service):
             import time
             time.sleep(0.1)
 
-    @sync
     def greetings(self, node_id, port, length, diffLength, __remote_ip__):
         """
         Called when a peer starts communicating with us.
@@ -113,7 +112,6 @@ class PeerListenService(Service):
             'diffLength': self.db.get('diffLength')
         }
 
-    @sync
     def receive_peer(self, peer):
         """
         'Friend of mine' type peer addition.
@@ -123,7 +121,6 @@ class PeerListenService(Service):
         peer.update(rank=1)  # We do not care about earlier rank.
         self.clientdb.add_peer(peer, 'friend_of_mine')
 
-    @sync
     def block_count(self):
         length = self.db.get('length')
         d = '0'
@@ -131,7 +128,6 @@ class PeerListenService(Service):
             d = self.db.get('diffLength')
         return {'length': length, 'diffLength': d}
 
-    @sync
     def range_request(self, range):
         out = []
         counter = 0
@@ -142,20 +138,16 @@ class PeerListenService(Service):
             counter += 1
         return out
 
-    @sync
     def peers(self):
         return self.clientdb.get_peers()
 
-    @sync
     def txs(self):
         return self.blockchain.tx_pool()
 
-    @sync
     def push_tx(self, tx):
         self.blockchain.tx_queue.put(tx)
         return 'success'
 
-    @sync
     def push_block(self, blocks, node_id):
         self.blockchain.blocks_queue.put((blocks, node_id))
         return 'success'

@@ -7,13 +7,13 @@ import psutil
 from halocoin import api
 from halocoin import tools
 from halocoin.blockchain import BlockchainService
-from halocoin.db_client import ClientDB
 from halocoin.db_blockchain import KeyValueStore
+from halocoin.db_client import ClientDB
 from halocoin.miner import MinerService
 from halocoin.peer_check import PeerCheckService
 from halocoin.peer_listen import PeerListenService
 from halocoin.power import PowerService
-from halocoin.service import Service, async, threaded
+from halocoin.service import Service, threaded
 from halocoin.state import StateDatabase
 
 
@@ -124,7 +124,6 @@ class Engine(Service):
             api.cpu_usage(str(value))
         time.sleep(0.1)
 
-    @async
     def stop(self):
         self.unregister_sub_services()
         self.unregister()

@@ -1,7 +1,6 @@
 # Shathra was here
 
 import copy
-import threading
 import time
 from cdecimal import Decimal
 from queue import Empty
@@ -57,65 +56,37 @@ class BlockchainService(Service):
         """
         try:
             candidate = self.blocks_queue.get(timeout=0.1)
-            if isinstance(candidate, tuple):
-                blocks = candidate[0]
-                node_id = candidate[1]
-                total_number_of_blocks_added = 0
-
-                for block in blocks:
-                    if not BlockchainService.block_integrity_check(block) and node_id != 'miner':
-                        self.peer_reported_false_blocks(node_id)
-                        return
-
-                self.db.simulate()
-                length = self.db.get('length')
-                for i in range(20):
-                    block = self.get_block(length)
-                    if self.fork_check(blocks, length, block):
-                        self.delete_block()
-                        length -= 1
-                    else:
-                        break
-
-                for block in blocks:
-                    self.db.start_record()
-                    add_block_result = self.add_block(block)
-                    if add_block_result == 0:
-                        self.db.keep_record(block['length'])
-                        tools.techo('add block: ' + str(block['length']))
-                        total_number_of_blocks_added += 1
-                    else:
-                        self.db.discard_record()
-                        if add_block_result == 2:
-                            break
-
-                if total_number_of_blocks_added == 0 or self.db.get('length') != blocks[-1]['length']:
-                    # All received blocks failed. Punish the peer by lowering rank.
-                    self.db.rollback()
-                    if node_id != 'miner':
-                        self.peer_reported_false_blocks(node_id)
-                else:
-                    self.db.commit()
-                    api.new_block()
+            self.handle_candidate_block(candidate)
             self.blocks_queue.task_done()
         except Empty:
-            # We know that queue might be empty.
-            # This exception does not need handling
+            """
+            We know that queue might be empty.
+            """
             pass
         except Exception as e:
-            tools.log('Exception occurred in ' + threading.current_thread().getName())
-            tools.log(e)
+            """
+            Wild expcetion occurred in candidate block handling.
+            Report it in logs
+            """
+            tools.log("Adding block error occurred: \n%s" % str(e))
+            self.blocks_queue.task_done()
 
         try:
             while not self.tx_queue.empty():
                 candidate_tx = self.tx_queue.get(timeout=0.1)
-                result = self.add_tx(candidate_tx)
+                self.add_tx(candidate_tx)
                 self.tx_queue.task_done()
         except Empty:
+            """
+            We know that queue might be empty.
+            """
             pass
         except Exception as e:
-            tools.log('Exception occurred in ' + threading.current_thread().getName())
-            tools.log(e)
+            """
+            Wild expcetion occurred in tx addition to the mempool.
+            Report it in logs
+            """
+            tools.log("Adding tx error occurred: \n%s" % str(e))
 
     @lockit('kvstore')
     def tx_pool(self):
@@ -177,6 +148,66 @@ class BlockchainService(Service):
         self.tx_pool_add(tx)
         return Response(True, 'Added tx into the pool: ' + str(tx))
 
+    def handle_candidate_block(self, candidate):
+        if not isinstance(candidate, tuple):
+            """
+            There is a problem. Everything that goes into queue must be a tuple.
+            However, we popped an item from queue. Task done must be called.
+            """
+            return
+
+        """
+        Start block adding process.
+        - Check integrity of new blocks.
+        - Check any soft fork.
+        - Add blocks one by one
+        - If successful, commit the changes, else rollback
+        """
+        blocks = candidate[0]
+        node_id = candidate[1]
+        total_number_of_blocks_added = 0
+
+        for block in blocks:
+            if not BlockchainService.block_integrity_check(block) and node_id != 'miner':
+                self.peer_reported_false_blocks(node_id)
+                return
+
+        self.db.simulate()
+        length = self.db.get('length')
+        for i in range(20):
+            block = self.get_block(length)
+            if self.fork_check(blocks, length, block):
+                self.delete_block()
+                length -= 1
+            else:
+                break
+
+        for block in blocks:
+            # Start a new record for changes that will be made by this block
+            self.db.start_record()
+            add_block_result = self.add_block(block)
+            if add_block_result == 0:
+                # Successful addition, keep the changes.
+                self.db.keep_record(block['length'])
+                tools.techo('add block: ' + str(block['length']))
+                total_number_of_blocks_added += 1
+            else:
+                # Failed to add new block. Discard all changes
+                self.db.discard_record()
+                if add_block_result == 2:
+                    # We started to add blocks that are ahead of us. Just ignore the rest.
+                    break
+
+        if total_number_of_blocks_added == 0 or self.db.get('length') != blocks[-1]['length']:
+            # All received blocks failed. Punish the peer by lowering rank.
+            self.db.rollback()
+            if node_id != 'miner':
+                self.peer_reported_false_blocks(node_id)
+        else:
+            # Our blockchain is changes. Commit changes.
+            self.db.commit()
+            api.new_block()
+
     def add_block(self, block):
         """Attempts adding a new block to the blockchain.
          Median is good for weeding out liars, so long as the liars don't have 51%
@@ -215,14 +246,6 @@ class BlockchainService(Service):
             tools.log('target: ' + str(self.target(block['length'])))
             tools.log('wrong target')
             return 3
-
-        """
-        recent_time_values = self.recent_blockthings('times', custom.median_block_time_limit)
-        median_block = tools.median(recent_time_values)
-        if block['time'] < median_block:
-            tools.log('Received block is generated earlier than median.')
-            return 3
-        """
 
         # Check that block includes exactly one mint transaction
         if 'txs' not in block:
@@ -463,9 +486,6 @@ class BlockchainService(Service):
         result = []
         for i in range(start, length):
             result.append(self.get_block(i)[key[:-1]])
-        # start_key = ('block_' + str(start).zfill(12)).encode()
-        # stop_key = ('block_' + str(length).zfill(12)).encode()
-        # blocks = list(self.db.iterator(start=start_key, stop=stop_key, include_stop=False))
         return result
 
     @lockit('kvstore')
