@@ -549,13 +549,6 @@ def mempool():
             pool[i]['from'] = tools.tx_owner_address(tx)
         elif tx['type'] == 'reward':
             pool[i]['from'] = tools.reward_owner_name(tx)
-        elif tx['type'] == 'job_request':
-            pool[i]['from'] = tools.tx_owner_address(tx)
-            pool[i]['to'] = tx['job_id']
-        elif tx['type'] == 'job_dump':
-            pool[i]['from'] = tools.reward_owner_name(tx)
-            pool[i]['to'] = tx['job']['id']
-            pool[i]['amount'] = 0
         elif tx['type'] == 'auth_reg':
             pool[i]['from'] = tools.reward_owner_name(tx)
             pool[i]['to'] = 'Network'
