@@ -21,7 +21,7 @@ class ChooseWallet extends Component {
   }
 
   getWallets() {
-    axiosInstance.get("/wallets").then((response) => {
+    axiosInstance.get("/wallet/list").then((response) => {
       let data = response.data;
       console.log(data);
       if(data.hasOwnProperty('wallets')) {

@@ -11,7 +11,7 @@ class Balance extends Component {
     let balance = 0;
     let name = "";
     if(this.props.wallet !== null){
-      balance = this.props.wallet.balance;
+      balance = this.props.account.amount;
       console.log(balance);
       name = this.props.wallet.name;
     }

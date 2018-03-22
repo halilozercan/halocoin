@@ -39,7 +39,7 @@ class NewWalletForm extends Component {
     data.append('password', this.state.password);
     data.append('set_default', true);
 
-    axiosInstance.post('/new_wallet', data)
+    axiosInstance.post('/wallet/new', data)
       .then((response) => {
         this.props.notify('Succesfully created the wallet ' + response.data.name, 'success');
         this.props.refresh();

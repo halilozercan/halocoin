@@ -24,7 +24,7 @@ class Miner extends Component {
   }
 
   update() {
-    axiosInstance.get("/status_miner").then((response) => {
+    axiosInstance.get("/miner").then((response) => {
       let data = response.data;
       this.setState((state) => {
         state['running'] = data.running;
@@ -41,12 +41,12 @@ class Miner extends Component {
     }
 
     if(this.state.running) {
-      axiosInstance.get("/stop_miner").then((response) => {
+      axiosInstance.post("/miner/stop").then((response) => {
         this.update();
       });
     }
     else {
-      axiosInstance.get("/start_miner").then((response) => {
+      axiosInstance.post("/miner/start").then((response) => {
         this.update();
       });
     }

@@ -47,12 +47,12 @@ class Service:
         self.name = name
         self.__state = None
         self.execution_lock = threading.Lock()
-        self.__threads = {}
+        self._threads = {}
 
     def register(self):
         def threaded_wrapper(func):
             def insider(*args, **kwargs):
-                while self.__threads[func.__name__]["running"]:
+                while self._threads[func.__name__]["running"]:
                     try:
                         func(*args, **kwargs)
                     except Exception as e:
@@ -72,12 +72,13 @@ class Service:
                 new_thread = threading.Thread(target=threaded_wrapper(clsMember._original),
                                               args=(self,),
                                               name=clsMember._original.__name__)
-                self.__threads[clsMember._original.__name__] = {
+                self._threads[clsMember._original.__name__] = {
                     "running": True,
                     "thread": new_thread
                 }
                 new_thread.start()
 
+        self.set_state(Service.RUNNING)
         return True
 
     # Lifecycle events
@@ -100,14 +101,10 @@ class Service:
         Join all side-threads and event loop in the end.
         :return: None
         """
-        for thread_dict in self.__threads.values():
+        for thread_dict in self._threads.values():
             thread_dict["thread"].join()
 
         self.into_service_queue.join()
-        # If join is called from the service instance, there is no need to join.
-        # Thread wants to destory itself
-        if threading.current_thread().name != self.event_thread.name:
-            self.event_thread.join()
 
     def unregister(self, join=False):
         """
@@ -115,7 +112,8 @@ class Service:
         Close and join all side-threads and event loop.
         :return: None
         """
-        self.execute('__shutdown_service__', True, args=(), kwargs={})
+        for name in self._threads.keys():
+            self._threads[name]['running'] = False
         if join:
             self.join()
         self.on_close()
@@ -136,8 +134,8 @@ class Service:
         """
         if state == Service.STOPPED or state == Service.TERMINATED:
             tools.log('{} got stopped'.format(self.__class__.__name__))
-            for thread_name in self.__threads.keys():
-                self.__threads[thread_name]["running"] = False
+            for thread_name in self._threads.keys():
+                self._threads[thread_name]["running"] = False
         self.__state = state
 
     def threaded_running(self):
@@ -149,9 +147,9 @@ class Service:
         thread_name = threading.current_thread().name
         is_service_running = (self.get_state() == Service.RUNNING)
         try:
-            return self.__threads[thread_name]["running"] and is_service_running
+            return self._threads[thread_name]["running"] and is_service_running
         except:
-            return True
+            return False
 
 
 def threaded(func):

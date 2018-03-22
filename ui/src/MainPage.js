@@ -16,6 +16,7 @@ class MainPage extends Component {
     super(props);
     this.state = {
       'default_wallet': null,
+      'account': null,
       'drawer_open': false,
       'page': 'main'
     }
@@ -44,10 +45,10 @@ class MainPage extends Component {
   }
 
   getDefaultWallet = () => {
-    axiosInstance.get("/info_wallet").then((response) => {
+    axiosInstance.get("/wallet/info").then((response) => {
       let data = response.data;
-      if(data.hasOwnProperty('address')) {
-        this.setState({default_wallet:data});
+      if(data.hasOwnProperty('wallet') && data.hasOwnProperty('account')) {
+        this.setState({default_wallet:data.wallet, account:data.account});
       }
       else {
         this.setState({default_wallet:null});
@@ -69,7 +70,7 @@ class MainPage extends Component {
   render() {
     let currentPage = <div />
     if(this.state.page === 'main') {
-      currentPage = <WalletManagement notify={this.props.notify} default_wallet={this.state.default_wallet} />;
+      currentPage = <WalletManagement notify={this.props.notify} default_wallet={this.state.default_wallet} account={this.state.account} />;
     }
     else if(this.state.page === 'mining') {
       currentPage = <Mining notify={this.props.notify} default_wallet={this.state.default_wallet} socket={this.props.socket} />

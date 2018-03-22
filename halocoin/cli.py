@@ -189,7 +189,7 @@ def default_wallet(wallet, pw=None):
     else:
         wallet_pw = pw
 
-    information = make_api_request("/wallet/default", http_method="GET",
+    information = make_api_request("/wallet/default", http_method="POST",
                                    wallet_name=wallet,
                                    password=wallet_pw)
     haloprint(information)

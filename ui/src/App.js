@@ -76,9 +76,9 @@ class App extends Component {
   }
 
   checkDefault() {
-    axios.get("/info_wallet").then((response) => {
+    axios.get("/wallet/info").then((response) => {
       let data = response.data;
-      if(data.hasOwnProperty('address')) {
+      if(data.hasOwnProperty('wallet')) {
         this.setState((state) => {
           state.status = 'yes_dw';
           return state;
