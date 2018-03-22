@@ -1,10 +1,8 @@
 import queue
-import sys
 import threading
 import traceback
 
 from halocoin import tools
-from halocoin.ntwrk.message import Order
 
 
 class NoExceptionQueue(queue.Queue):
@@ -52,23 +50,6 @@ class Service:
         self.__threads = {}
 
     def register(self):
-        def service_target(service):
-            service.set_state(Service.RUNNING)
-            while service.get_state() == Service.RUNNING:
-                try:
-                    order = service.into_service_queue.get(timeout=1)
-                    if isinstance(order, Order):
-                        result = Service.execute_order(service, order)
-                        self.service_responses[order.id] = result
-                        self.signals[order.id].set()
-                    service.into_service_queue.task_done()
-                except TypeError:
-                    service.set_state(Service.STOPPED)
-                    self.service_responses[order.id] = True
-                    self.signals[order.id].set()
-                except queue.Empty:
-                    pass
-
         def threaded_wrapper(func):
             def insider(*args, **kwargs):
                 while self.__threads[func.__name__]["running"]:
@@ -84,10 +65,6 @@ class Service:
         if not cont:
             tools.log("Service is not going to continue with registering!")
             return False
-
-        # Start event loop
-        self.event_thread = threading.Thread(target=service_target, args=(self,), name=self.name)
-        self.event_thread.start()
 
         # Start all side-threads
         for clsMember in self.__class__.__dict__.values():
@@ -143,68 +120,6 @@ class Service:
             self.join()
         self.on_close()
 
-    def execute(self, action, expect_result, args, kwargs):
-        """
-        Execute an order that is triggered by annotated methods.
-        This method should be treated as private.
-        :param action: Action name
-        :param expect_result: Whether to wait for result of action
-        :param args: Argument list for method
-        :param kwargs: Keyword argument list for method
-        :return: result of action or None
-        """
-        if self.get_state() != Service.RUNNING:
-            return None
-
-        result = None
-        new_order = Order(action, args, kwargs)
-
-        # This is already event thread and someone called a synced function.
-        # We can run it now.
-        if threading.current_thread().name == self.event_thread.name:
-            result = Service.execute_order(self, new_order)
-            return result
-
-        self.signals[new_order.id] = threading.Event()
-        self.into_service_queue.put(new_order)
-        if expect_result:
-            try:
-                if self.signals[new_order.id].wait():
-                    response = self.service_responses[new_order.id]
-                    del self.signals[new_order.id]
-                    del self.service_responses[new_order.id]
-                    result = response
-                else:
-                    tools.log('Service wait timed out', self.__class__.__name__)
-            except:
-                tools.log(sys.exc_info())
-                pass
-        return result
-
-    @staticmethod
-    def execute_order(service, order):
-        """
-        Directly executes the order on service instance.
-        Makes no thread checks, no synchronization attempts.
-        :param service: Service instance
-        :param order: Order object
-        :return: result of the execution
-        """
-        result = False
-        if order.action == '__close_threaded__':
-            result = True
-            service.__threads[order.args[0]]["running"] = False
-        elif order.action == '__shutdown_service__':
-            result = True
-            service.set_state(Service.STOPPED)
-        elif hasattr(service, order.action):
-            try:
-                result = getattr(service, order.action)._original(service, *order.args, **order.kwargs)
-            except:
-                result = None
-                tools.log(sys.exc_info())
-        return result
-
     def get_state(self):  # () -> (INIT|RUNNING|STOPPED|TERMINATED)
         """
         :return: State of the service
@@ -224,17 +139,6 @@ class Service:
             for thread_name in self.__threads.keys():
                 self.__threads[thread_name]["running"] = False
         self.__state = state
-
-    def close_threaded(self):
-        """
-        Close current side-thread.
-        :return: None
-        """
-        thread_name = threading.current_thread().name
-        self.execute(action='__close_threaded__',
-                     expect_result=True,
-                     args=(thread_name,),
-                     kwargs={})
 
     def threaded_running(self):
         """

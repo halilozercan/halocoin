@@ -46,6 +46,7 @@ class KeyValueStore:
         else:
             return copy.deepcopy(self.log[str(key)])
 
+    @lockit('kvstore')
     def put(self, key, value):
         try:
             tname = threading.current_thread().getName()
@@ -53,14 +54,11 @@ class KeyValueStore:
                 raise EnvironmentError('There is a simulation going on! You cannot write to database from {}'
                                        .format(tname))
             elif tname == self.simulation_owner and self.simulating:
-                if self.recording:
-                    if str(key) in self.changes_in_record.keys():
-                        self.changes_in_record[str(key)]['new'] = value
-                    else:
-                        self.changes_in_record[str(key)] = {
-                            'old': self.get(key),
-                            'new': value
-                        }
+                if self.recording and str(key) not in self.changes_in_record.keys():
+                    self.changes_in_record[str(key)] = {
+                        'old': self.get(key)
+                    }
+
                 self.log[str(key)] = value
             elif not self.simulating:
                 self.DB.put(str(key).encode(), pickle.dumps(value))
@@ -68,7 +66,6 @@ class KeyValueStore:
         except Exception as e:
             return False
 
-    @lockit('kvstore')
     def exists(self, key):
         result = self.get(key)
         return result is not None
@@ -105,8 +102,10 @@ class KeyValueStore:
         if not self.simulating:
             tools.log('There isn\'t any ongoing simulation')
             return False
-        for key, value in self.log.items():
-            self.DB.put(str(key).encode(), pickle.dumps(value))
+        with self.DB.write_batch(transaction=True) as wb:
+            for key, value in self.log.items():
+                wb.put(str(key).encode(), pickle.dumps(value))
+
         self.log = dict()
         self.simulating = False
 
