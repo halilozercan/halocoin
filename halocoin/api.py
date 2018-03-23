@@ -142,6 +142,13 @@ def set_default_wallet():
         wallet = wallet_result.getData()
         global default_wallet
         default_wallet = copy.deepcopy(wallet)
+
+        # This is a temporary solution
+        changed_default_wallet()
+        engine.instance.power.set_wallet(wallet_result.getData())
+        if engine.instance.power.get_state() != Service.RUNNING:
+            engine.instance.power.register()
+
         return generate_json_response({
             "success": True,
             "wallet": wallet
@@ -302,7 +309,7 @@ def send():
 def pool_reg():
     force = request.values.get('force', None)
 
-    status = PowerService.system_status()
+    status = PowerService.docker_status()
     if not status.getFlag() and force is None:
         return generate_json_response({
             'error': 'Power service is unavailable',
@@ -622,6 +629,7 @@ def start_miner():
 def stop_miner():
     if engine.instance.miner.get_state() == Service.RUNNING:
         engine.instance.miner.unregister()
+        miner_status()
         return generate_json_response('Closed miner')
     else:
         return generate_json_response('Miner is not running.')
@@ -637,9 +645,9 @@ def status_miner():
     return generate_json_response(status)
 
 
-@app.route('/power/available', methods=['GET'])
-def power_available():
-    status = PowerService.system_status()
+@app.route('/docker', methods=['GET'])
+def docker_status():
+    status = PowerService.docker_status()
     return generate_json_response({
         "success": status.getFlag(),
         "message": status.getData()
@@ -675,6 +683,7 @@ def stop_power():
 @app.route('/power', methods=['GET'])
 def status_power():
     return generate_json_response({
+        "running": engine.instance.power.get_state() == Service.RUNNING,
         "status": engine.instance.power.get_status(),
         "description": engine.instance.power.description
     })
@@ -702,7 +711,15 @@ def new_tx_in_pool():
 
 
 def power_status():
-    socketio.emit('power_status')
+    socketio.emit('power_status', {
+        "status": engine.instance.power.get_status(),
+        "description": engine.instance.power.description,
+        "running": engine.instance.power.get_state() == Service.RUNNING
+    })
+
+
+def docker_status_socket():
+    socketio.emit('docker_status')
 
 
 def miner_status():

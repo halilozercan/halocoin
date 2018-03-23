@@ -31,7 +31,9 @@ class Blockcount extends Component {
     this.state = {
       'length': '-',
       'known_length': '-',
-      'cpu_usage': 0
+      'cpu_usage': 0,
+      'docker_success': false,
+      'docker_message': 'Unknown'
     }
   }
 
@@ -70,6 +72,14 @@ class Blockcount extends Component {
         return state;
       });
     });
+
+    axios.get("/docker").then((response) => {
+      let data = response.data;
+      this.setState({
+        docker_success: data.success,
+        docker_message: data.message
+      });
+    });
   }
 
   render() {
@@ -86,19 +96,31 @@ class Blockcount extends Component {
         </div>
         <div style={{"float":"left"}}>
           <Chip
-            style={styles.chip}
-          >
-            <Avatar icon={<FontIcon className="material-icons">compare_arrows</FontIcon>} />
-            Cpu Usage: {this.state.cpu_usage}%
-          </Chip>
-        </div>
-        <div style={{"float":"left"}}>
-          <Chip
             onClick={() => {this.props.notify("Number of transactions that are waiting in the pool.")}}
             style={styles.chip}
           >
             <Avatar icon={<FontIcon className="material-icons">compare_arrows</FontIcon>} />
             Waiting Transactions: {this.state.tx_pool_size}
+          </Chip>
+        </div>
+        <div style={{"float":"left"}}>
+          <Chip
+            style={styles.chip}
+          >
+            <Avatar icon={<FontIcon className="material-icons">developer_board</FontIcon>} />
+            Cpu Usage: {this.state.cpu_usage}%
+          </Chip>
+        </div>
+        <div style={{"float":"left"}}>
+          <Chip
+            onClick={() => {this.props.notify("Status of Docker Daemon.")}}
+            style={styles.chip} 
+            backgroundColor={this.state.docker_success ? "#4CAF50": "#F44336"}
+          >
+            <Avatar icon={<FontIcon className="material-icons">business</FontIcon>} 
+                    backgroundColor={this.state.docker_success ? "#81C784": "#E57373"}
+            />
+            Docker: {this.state.docker_message}
           </Chip>
         </div>
       </Paper>

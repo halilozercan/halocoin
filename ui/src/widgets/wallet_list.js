@@ -60,7 +60,7 @@ class WalletList extends Component {
     data.append('wallet_name', this.state.name);
     data.append('password', password);
 
-    axios.post('/set_default_wallet', data).then((response) => {
+    axios.post('/wallet/default', data).then((response) => {
       let success = response.data.success;
       if(success) {
         this.props.notify('Successfully updated your default wallet', 'success');

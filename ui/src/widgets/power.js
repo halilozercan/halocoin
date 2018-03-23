@@ -14,10 +14,15 @@ class Power extends Component {
     this.state = {
       'status': 'Loading...',
       'description': '',
-      'available': 'Loading...'
+      'running': false
     }
-    this.props.socket.on('power_status', (socket) => {
-      this.update();
+    this.props.socket.on('power_status', (data) => {
+      this.setState((state) => {
+        state['running'] = data.running;
+        state['status'] = data.status;
+        state['description'] = data.description;
+        return state;
+      });
     });
   }
 
@@ -26,7 +31,8 @@ class Power extends Component {
   }
 
   update() {
-    axios.get('/power_available').then((response) => {
+    /*
+    axios.get('/docker').then((response) => {
       if(response.data.success) {
         this.setState({
           available: 'Power service is ready!'
@@ -34,7 +40,7 @@ class Power extends Component {
       }
       else{
         this.setState({
-          available: response.data.message
+          available: 'Power service is currently unavailable'
         })
       }
     }).catch((error) => {
@@ -42,9 +48,11 @@ class Power extends Component {
         available: 'Power service is currently unavailable'
       })
     });
-    axios.get("/status_power").then((response) => {
+    */
+    axios.get("/power").then((response) => {
       let data = response.data;
       this.setState((state) => {
+        state['running'] = data.running;
         state['status'] = data.status;
         state['description'] = data.description;
         return state;
@@ -57,8 +65,9 @@ class Power extends Component {
       <Card>
         <CardHeader
           title="Power Status"
-          subtitle={this.state.available}
-          avatar={<Avatar backgroundColor={green500} icon={<FontIcon className="material-icons">whatshot</FontIcon>} />}
+          subtitle={this.state.description}
+          avatar={<Avatar backgroundColor={this.state.running ? green500:red500} 
+                  icon={<FontIcon className="material-icons">whatshot</FontIcon>} />}
         />
         <CardActions style={{ width: '100%', textAlign: 'right' }}>
           <FlatButton onClick={() => {console.log(this.state.description);}} label={this.state.status} disabled={this.state.description == ''}/>

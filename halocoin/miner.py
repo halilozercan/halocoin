@@ -42,6 +42,7 @@ class MinerService(Service):
     def on_close(self):
         self.wallet = None
         self.close_workers()
+        Service.on_close(self)
         print('Miner is turned off')
 
     @threaded

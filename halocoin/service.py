@@ -94,6 +94,7 @@ class Service:
         Called after everything is shut down.
         :return: Irrelevant
         """
+        self.set_state(Service.STOPPED)
         return True
 
     def join(self):

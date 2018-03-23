@@ -1,4 +1,5 @@
 import signal
+import subprocess
 import sys
 import time
 
@@ -54,6 +55,7 @@ class Engine(Service):
         self.statedb = StateDatabase(self)
         self.miner = MinerService(self)
         self.power = PowerService(self)
+        self.docker_daemon = None
 
     def on_register(self):
         print('Starting halocoin')
@@ -91,6 +93,22 @@ class Engine(Service):
             self.unregister_sub_services()
             return False
 
+        if not PowerService.docker_status().getFlag():
+            sys.stdout.write("Docker daemon is missing! Starting as root\n")
+            self.docker_daemon = subprocess.Popen(["gksudo", "dockerd"], shell=False)
+            time.sleep(3)
+
+            if self.docker_daemon.poll() is None:
+                sys.stdout.write("Started Docker Daemon!\n")
+            else:
+                error_output = self.docker_daemon.stderr.read()
+                if "permission" in str(error_output):
+                    sys.stderr.write("Failed to start Docker Daemon!\nYou can try running halocoin with sudo\n")
+                else:
+                    sys.stderr.write("Failed to start Docker Daemon!\n")
+        else:
+            sys.stdout.write("Docker Daemon is already running!\n")
+
         api.run()
 
         return True
@@ -112,6 +130,10 @@ class Engine(Service):
         if self.blockchain.get_state() == Service.RUNNING:
             self.blockchain.unregister()
             running_services.add(self.blockchain)
+        if self.docker_daemon is not None:
+            self.docker_daemon.kill()
+            self.docker_daemon.wait()
+            print('Closed Docker Daemon')
 
         for service in running_services:
             service.join()

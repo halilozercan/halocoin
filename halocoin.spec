@@ -5,7 +5,7 @@ block_cipher = None
 
 a = Analysis(['halocoin/cli.py'],
              pathex=['.'],
-             binaries=[],
+             binaries=[('./dockerd', 'dockerd')],
              datas=[],
              hiddenimports=['engineio.async_gevent'],
              hookspath=[],

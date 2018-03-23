@@ -29,8 +29,8 @@ class PowerService(Service):
         self.clientdb = None
         self.statedb = None
         self.wallet = None
-        self.status = "Loading"
-        self.description = ""
+        self.status = "Not Started"
+        self.description = "Closed"
 
     def set_wallet(self, wallet):
         self.wallet = wallet
@@ -120,6 +120,8 @@ class PowerService(Service):
                     self.set_status("Downloading... {}/{}".format(
                         tools.readable_bytes(downloaded),
                         tools.readable_bytes(total_length)))
+                if not self.threaded_running():
+                    return False
         if os.path.exists(job_file):
             entry = self.clientdb.get('local_job_repo_' + job_name)
             entry['status'] = 'downloaded'
@@ -211,7 +213,7 @@ class PowerService(Service):
         own_account = self.statedb.get_account(own_address)
         assigned_job = own_account['assigned_job']
         if assigned_job['auth'] is None:
-            self.set_status("No assignment!")
+            self.set_status("No assignment!", "There is currently no assigment associated with this wallet")
             time.sleep(1)
             return
 
@@ -235,12 +237,12 @@ class PowerService(Service):
         time.sleep(0.1)
 
     @staticmethod
-    def system_status():
+    def docker_status():
         try:
             client = docker.from_env()
             if not client.ping():
-                return Response(False, "Docker daemon is not responding")
-        except:
-            return Response(False, "An expection occurred")
+                return Response(False, "Not Responding!")
+        except Exception as e:
+            return Response(False, "Closed")
 
-        return Response(True, "Ready to go!")
+        return Response(True, "Running!")
