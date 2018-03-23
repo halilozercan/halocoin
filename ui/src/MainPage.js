@@ -70,10 +70,15 @@ class MainPage extends Component {
   render() {
     let currentPage = <div />
     if(this.state.page === 'main') {
-      currentPage = <WalletManagement notify={this.props.notify} default_wallet={this.state.default_wallet} account={this.state.account} />;
+      currentPage = <WalletManagement notify={this.props.notify} 
+                                      default_wallet={this.state.default_wallet} 
+                                      account={this.state.account} />;
     }
     else if(this.state.page === 'mining') {
-      currentPage = <Mining notify={this.props.notify} default_wallet={this.state.default_wallet} socket={this.props.socket} />
+      currentPage = <Mining notify={this.props.notify} 
+                            wallet={this.state.default_wallet} 
+                            account={this.state.account}
+                            socket={this.props.socket} />
     }
     let title = "Halocoin";
     if(this.state.default_wallet !== null) {

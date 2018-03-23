@@ -4,6 +4,7 @@ import Paper from 'material-ui/Paper';
 import Chip from 'material-ui/Chip';
 import FontIcon from 'material-ui/FontIcon';
 import Avatar from 'material-ui/Avatar';
+import {getColor} from '../tools.js';
 
 const bottomBarStyle = {
   position: 'fixed', 
@@ -106,8 +107,11 @@ class Blockcount extends Component {
         <div style={{"float":"left"}}>
           <Chip
             style={styles.chip}
+            backgroundColor={getColor(this.state.cpu_usage, 35)}
           >
-            <Avatar icon={<FontIcon className="material-icons">developer_board</FontIcon>} />
+            <Avatar icon={<FontIcon className="material-icons">developer_board</FontIcon>} 
+                    backgroundColor={getColor(this.state.cpu_usage, 45)}
+            />
             Cpu Usage: {this.state.cpu_usage}%
           </Chip>
         </div>

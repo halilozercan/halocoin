@@ -78,21 +78,3 @@ class Power extends Component {
 }
 
 export default Power;
-/*
-<div className="col-lg-6 col-md-6 col-sm-6">
-        <div className="card card-stats">
-          <div className="card-header" data-background-color="green">
-            <i className="material-icons">whatshot</i>
-          </div>
-          <div className="card-content">
-            <p className="category">Power Status</p>
-            <h3 className="title">{this.state.status}</h3>
-          </div>
-          <div className="card-footer">
-            <div className="stats">
-              <i className="material-icons">local_offer</i> Updated now!
-            </div>
-          </div>
-        </div>
-      </div>
-      */

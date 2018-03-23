@@ -4,6 +4,7 @@ import {axiosInstance} from '../tools.js';
 import LinearProgress from 'material-ui/LinearProgress';
 import {Card, CardActions, CardHeader, CardMedia, CardTitle, CardText} from 'material-ui/Card';
 import Avatar from 'material-ui/Avatar';
+import Toggle from 'material-ui/Toggle';
 import FlatButton from 'material-ui/FlatButton';
 import FontIcon from 'material-ui/FontIcon';
 import {red500, green500} from 'material-ui/styles/colors';
@@ -73,21 +74,29 @@ class Miner extends Component {
     }
     return (
       <Card containerStyle={{height:"100%"}}>
-        <CardHeader
-          title="Miner"
-          subtitle={content}
-          avatar={
-            <Avatar 
-              style={{cursor:"pointer"}}
-              onClick={()=>{this.props.notify('Miner module tries to generate new blocks.')}} 
-              backgroundColor={color} 
-              icon={<FontIcon className="material-icons">build</FontIcon>} 
-            />
-          }
-        />
-        <CardActions style={{ width: '100%', textAlign: 'right' }}>
-          <FlatButton label={button_text} onClick={this.minerChangeStatus} />
-        </CardActions>
+        <table>
+          <tr>
+            <td width="100%">
+              <CardHeader
+                  title="Miner"
+                  subtitle={content}
+                  avatar={
+                    <Avatar 
+                      style={{cursor:"pointer"}}
+                      onClick={()=>{this.props.notify('Miner module tries to generate new blocks.')}} 
+                      backgroundColor={color} 
+                      icon={<FontIcon className="material-icons">build</FontIcon>} 
+                    />
+                  }
+              />
+            </td>
+            <td align="right">
+              <Toggle toggled={this.state.running} 
+                      onToggle={this.minerChangeStatus} 
+                      style={{float:"right", margin:"4px"}}/>
+            </td>
+          </tr>
+        </table>
       </Card>
     );
   }

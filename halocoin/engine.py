@@ -93,21 +93,21 @@ class Engine(Service):
             self.unregister_sub_services()
             return False
 
-        if not PowerService.docker_status().getFlag():
-            sys.stdout.write("Docker daemon is missing! Starting as root\n")
-            self.docker_daemon = subprocess.Popen(["gksudo", "dockerd"], shell=False)
-            time.sleep(3)
-
-            if self.docker_daemon.poll() is None:
-                sys.stdout.write("Started Docker Daemon!\n")
-            else:
-                error_output = self.docker_daemon.stderr.read()
-                if "permission" in str(error_output):
-                    sys.stderr.write("Failed to start Docker Daemon!\nYou can try running halocoin with sudo\n")
-                else:
-                    sys.stderr.write("Failed to start Docker Daemon!\n")
-        else:
-            sys.stdout.write("Docker Daemon is already running!\n")
+        # if not PowerService.docker_status().getFlag():
+        #     sys.stdout.write("Docker daemon is missing! Starting as root\n")
+        #     self.docker_daemon = subprocess.Popen(["gksudo", "dockerd"], shell=False)
+        #     time.sleep(3)
+        #
+        #     if self.docker_daemon.poll() is None:
+        #         sys.stdout.write("Started Docker Daemon!\n")
+        #     else:
+        #         error_output = self.docker_daemon.stderr.read()
+        #         if "permission" in str(error_output):
+        #             sys.stderr.write("Failed to start Docker Daemon!\nYou can try running halocoin with sudo\n")
+        #         else:
+        #             sys.stderr.write("Failed to start Docker Daemon!\n")
+        # else:
+        #     sys.stdout.write("Docker Daemon is already running!\n")
 
         api.run()
 

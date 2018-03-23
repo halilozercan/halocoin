@@ -22,7 +22,7 @@ class Mining extends Component {
         </div>
         <div className="row">
           <div className="col-lg-12 col-md-12 col-sm-12">
-            <Stake wallet={this.props.default_wallet} notify={this.props.notify}/>
+            <Stake wallet={this.props.wallet} account={this.props.account} notify={this.props.notify}/>
           </div>
         </div>
         <div className="row">

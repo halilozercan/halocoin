@@ -14,6 +14,47 @@ import {
   TableRowColumn,
 } from 'material-ui/Table';
 
+class RequiredActionPower extends Component {
+  constructor(props) {
+    super(props);
+  }
+
+  handleOpen = (title) => {
+    //this.setState({dialogOpen: true, dialogTitle: title});
+  };
+
+  render(){
+    console.log('Required');
+    console.log(this.props.account);
+    if(this.props.account.score <= 0) {
+      // Redirect to pool registration
+      return (
+        <div>
+          <CardActions align='right'>
+            <CardText>
+              Your score is not eligible for Power. You need to deposit 1000 coins in order to apply for Power pool.
+            </CardText>
+            <RaisedButton label="Deposit" primary={true} onClick={() => {this.handleOpen('Deposit')}} />
+          </CardActions>      
+        </div>
+      );
+    }
+    else {
+      // Modify application
+      return (
+        <div>
+          <CardText>
+            You can change your application status at any time. It will take affect when your transaction goes through.
+          </CardText>
+          <CardActions align='right'>
+            <RaisedButton label="Edit Application" primary={true} onClick={() => {this.handleOpen('Deposit')}} />
+          </CardActions>      
+        </div>
+      );
+    }
+  }
+}
+
 class Stake extends Component {
 
   constructor(props) {
@@ -75,16 +116,18 @@ class Stake extends Component {
   }
 
   render() {
-    let balance = 0;
-    let deposit = 0;
+    let score = 0;
+    let applicationMode = 'Single';
+    let applicationList = [];
     let name = "";
-    let job_assignment = "None";
-    if(this.props.wallet !== null){
-      deposit = this.props.wallet.deposit;
-      balance = this.props.wallet.balance;
+    let assignedJob = "None";
+    if(this.props.account !== null){
+      score = this.props.account.score;
+      applicationMode = this.props.account.application.mode == 's' ? 'Single':'Continous';
+      applicationList = this.props.account.application.list;
       name = this.props.wallet.name;
-      if(this.props.wallet.assigned_job !== '') {
-        job_assignment = this.props.wallet.assigned_job;
+      if(this.props.account.assigned_job.auth !== null) {
+        assignedJob = "Auth " + this.props.wallet.assigned_job.auth + " JobId " + this.props.wallet.assigned_job.job_id;
       }
     }
 
@@ -100,26 +143,37 @@ class Stake extends Component {
     return (
       <Card style={{width:"100%"}}>
         <CardHeader
-          title="Stake in Pool"
-          subtitle="Amount of coins you deposited as your stake"
+          title="Summary"
+          subtitle="Power information about your wallet on Blockchain"
           actAsExpander={true}
           showExpandableButton={true}
         />
         <CardText expandable={true}>
-          Tasks inside Coinami project are distributed according to stakes of each wallet.
-          More information is available on Coinami web page. You need to be very careful about
-          your deposit amount. When a job is assigned to an address, half of reward is taken from
-          the stake of that address. 
-          To make sure your system is ready to work on jobs, you can check the status of Power module.
+          You can find valuable information about your wallet's Power details that is registered on Blockchain.
         </CardText>
-        <CardTitle 
-          title={"Deposit " + deposit}
-          subtitle={"Balance " + balance}
-        />
-        <CardActions align='right'>
-          <RaisedButton label="Deposit" primary={true} onClick={() => {this.handleOpen('Deposit')}} />
-          <RaisedButton label="Withdraw" secondary={true} onClick={() => {this.handleOpen('Withdraw')}} />
-        </CardActions>
+        <CardText>
+          <Table selectable={false}>
+            <TableBody displayRowCheckbox={false}>
+              <TableRow>
+                <TableHeaderColumn>Score</TableHeaderColumn>
+                <TableHeaderColumn>{score}</TableHeaderColumn>
+              </TableRow>
+              <TableRow>
+                <TableHeaderColumn>Assigned Job</TableHeaderColumn>
+                <TableHeaderColumn>{assignedJob}</TableHeaderColumn>
+              </TableRow>
+              <TableRow>
+                <TableHeaderColumn>Application Mode</TableHeaderColumn>
+                <TableHeaderColumn>{applicationMode}</TableHeaderColumn>
+              </TableRow>
+              <TableRow>
+                <TableHeaderColumn>Application List</TableHeaderColumn>
+                <TableHeaderColumn>{applicationList.join(", ")}</TableHeaderColumn>
+              </TableRow>
+            </TableBody>
+          </Table>
+        </CardText>
+        <RequiredActionPower account={this.props.account} />
         <Dialog
           title={this.state.dialogTitle}
           actions={actions}

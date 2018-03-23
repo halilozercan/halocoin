@@ -209,9 +209,15 @@ class PowerService(Service):
         - Repeat
         """
 
+        if not PowerService.docker_status().getFlag():
+            self.set_status("Docker Missing!", "Power service is not able to function due to a problem with docker!")
+            time.sleep(1)
+            return
+
         own_address = self.wallet.address
         own_account = self.statedb.get_account(own_address)
         assigned_job = own_account['assigned_job']
+
         if assigned_job['auth'] is None:
             self.set_status("No assignment!", "There is currently no assigment associated with this wallet")
             time.sleep(1)
@@ -246,3 +252,12 @@ class PowerService(Service):
             return Response(False, "Closed")
 
         return Response(True, "Running!")
+
+    @staticmethod
+    def docker_images():
+        running = PowerService.docker_status()
+        if not running.getFlag():
+            return Response(False, [])
+        else:
+            client = docker.from_env()
+            return Response(True, [image.tags for image in client.images.list()])

@@ -654,6 +654,15 @@ def docker_status():
     })
 
 
+@app.route('/docker/images', methods=['GET'])
+def docker_images():
+    status = PowerService.docker_images()
+    return generate_json_response({
+        "success": status.getFlag(),
+        "message": status.getData()
+    })
+
+
 @app.route('/power/start', methods=['POST'])
 def start_power():
     response = {"success": False}
