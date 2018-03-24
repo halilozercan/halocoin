@@ -1,6 +1,7 @@
 import copy
 
 from halocoin import tools, custom
+from halocoin.ntwrk import Response
 from halocoin.service import lockit
 
 
@@ -312,7 +313,7 @@ class StateDatabase:
             self.update_account(send_address, send_account)
         elif tx['type'] == 'spend':
             if tx['count'] < self.known_tx_count(send_address):
-                return False
+                return Response(False, "Transaction count mismatch")
 
             recv_address = tx['to']
             recv_account = self.get_account(recv_address)
@@ -325,32 +326,32 @@ class StateDatabase:
             recv_account['tx_blocks'].add(block_length)
 
             if (recv_account['amount'] < 0) or (send_account['amount'] < 0):
-                return False
+                return Response(False, "Not sufficient funds in the account")
 
             self.update_account(send_address, send_account)
             self.update_account(recv_address, recv_account)
         elif tx['type'] == 'reward':
             auth = self.get_auth(tx['auth'])
             if auth is None:
-                return False
+                return Response(False, "No authority in reward transaction")
             if tx['pubkeys'] != auth['pubkeys']:
-                return False
+                return Response(False, "Authority public keys do not match")
             job = self.get_job(tx['auth'], tx['job_id'])
             last_change = job['status_list'][-1]
             # This job is not assigned to anyone right now.
             if last_change['action'] != 'assign':
-                return False
+                return Response(False, "This job is not assigned")
             # Reward address is not currently assigned to the job.
             if last_change['address'] != tx['to']:
-                return False
+                return Response(False, "Wrong recipient address")
             if job['auth'] != tx['auth']:
-                return False
+                return Response(False, "Rewarding authority did not announce the job")
 
             recv_account = self.get_account(tx['to'])
             # Receiving account does not have the same assignment
             if recv_account['assigned_job']['auth'] != tx['auth'] or \
                             recv_account['assigned_job']['job_id'] != tx['job_id']:
-                return False
+                return Response(False, "Receiving account was not assigned for this job")
 
             self.reward_job(job, tx['to'], block_length)
 
@@ -370,7 +371,7 @@ class StateDatabase:
             common_name = tools.get_commonname_from_certificate(tx['certificate'])
             early_reg = self.get_auth(common_name) is None
             if not cert_valid or not early_reg:
-                return False
+                return Response(False, "Either certification is invalid or Authority is registered earlier")
 
             self.put_auth(certificate=tx['certificate'], host=tx['host'],
                           supply=tx['supply'], block_number=block_length, description=tx['description'])
@@ -378,16 +379,16 @@ class StateDatabase:
             # Check if auth is known
             auth = self.get_auth(tx['auth'])
             if auth is None:
-                return False
-            elif tx['pubkeys'] != auth['pubkeys']:
-                return False
+                return Response(False, "No authority in reward transaction")
+            if tx['pubkeys'] != auth['pubkeys']:
+                return Response(False, "Authority public keys do not match")
             # Check if job already exists
             if self.get_job(tx['auth'], tx['job']['id']) is not None:
-                return False
+                return Response(False, "Job already exists")
 
             # Check if authority has remaining supply
             if auth['current_supply'] < tx['job']['amount']:
-                return False
+                return Response(False, "Authority does not have enough supply for this job")
             auth['current_supply'] -= tx['job']['amount']
 
             self.add_new_job(auth=tx['auth'], reward=tx['job']['amount'], id=tx['job']['id'],
@@ -397,41 +398,41 @@ class StateDatabase:
             self.update_auth(tx['auth'], auth)
         elif tx['type'] == 'pool_reg':
             if tx['count'] < self.known_tx_count(send_address):
-                return False
+                return Response(False, "Transaction count mismatch")
             send_account['amount'] -= custom.pool_reg_amount
             send_account['count'] = (tx['count'] + 1)
             send_account['tx_blocks'].add(block_length)
             send_account['score'] += 100
 
             if not (send_account['amount'] >= 0):
-                return False
+                return Response(False, "Insufficient funds")
 
             if send_account['score'] != 100:
-                return False
+                return Response(False, "You can only register for pool if your score is 0")
 
             self.update_account(send_address, send_account)
             self.check_worker_pool(send_address, send_account)
         elif tx['type'] == 'application':
             if tx['count'] < self.known_tx_count(send_address):
-                return False
+                return Response(False, "Transaction count mismatch")
             send_account['count'] = (tx['count'] + 1)
             send_account['tx_blocks'].add(block_length)
 
             if send_account['score'] <= 0:
-                return False
+                return Response(False, "Score is too low")
 
             auth_list = self.get_auth_list()
             for _auth in tx['application']['list']:
                 if _auth not in auth_list:
-                    return False
+                    return Response(False, "Authority: {} is not a valid subauth".format(_auth))
 
             send_account['application'] = tx['application']
 
             self.update_account(send_address, send_account)
             self.check_worker_pool(send_address, send_account)
         else:
-            return False
-        return True
+            return Response(False, "Transaction type is not defined")
+        return Response(True, "Fine!")
 
     def update_database_with_block(self, block):
         """

@@ -73,8 +73,15 @@ class BlockchainService(Service):
 
         try:
             while not self.tx_queue.empty():
+                api_key = None
                 candidate_tx = self.tx_queue.get(timeout=0.1)
-                self.add_tx(candidate_tx)
+                if 'api_key' in candidate_tx:
+                    api_key = candidate_tx['api_key']
+                    del candidate_tx['api_key']
+                result = self.add_tx(candidate_tx)
+                if api_key is not None:
+                    api.responses[api_key] = result
+                    api.signals[api_key].set()
                 self.tx_queue.task_done()
         except Empty:
             """

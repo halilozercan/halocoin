@@ -3,6 +3,7 @@ import json
 import os
 import tempfile
 import threading
+import uuid
 
 import psutil as psutil
 # WARNING! Do not remove below import line. PyInstaller depends on it
@@ -39,6 +40,8 @@ app = Flask(__name__)
 socketio = SocketIO(app, async_mode='threading')
 listen_thread = None
 default_wallet = None
+signals = dict()
+responses = dict()
 
 
 def get_wallet():
@@ -298,10 +301,9 @@ def send():
         tx['pubkeys'] = [wallet.get_pubkey_str()]  # We use pubkey as string
     if 'signatures' not in tx:
         tx['signatures'] = [tools.sign(tools.det_hash(tx), wallet.privkey)]
-    engine.instance.blockchain.tx_queue.put(tx)
-    response["success"] = True
-    response["message"] = "Your transaction is successfully added to the queue"
-    response["tx"] = tx
+
+    response = send_to_blockchain(tx)
+
     return generate_json_response(response)
 
 
@@ -337,10 +339,9 @@ def pool_reg():
         tx['pubkeys'] = [wallet.get_pubkey_str()]  # We use pubkey as string
     if 'signatures' not in tx:
         tx['signatures'] = [tools.sign(tools.det_hash(tx), wallet.privkey)]
-    engine.instance.blockchain.tx_queue.put(tx)
-    response["success"] = True
-    response["message"] = "Your transaction is successfully added to the queue"
-    response["tx"] = tx
+
+    response = send_to_blockchain(tx)
+
     return generate_json_response(response)
 
 
@@ -381,10 +382,9 @@ def application():
         tx['pubkeys'] = [wallet.get_pubkey_str()]  # We use pubkey as string
     if 'signatures' not in tx:
         tx['signatures'] = [tools.sign(tools.det_hash(tx), wallet.privkey)]
-    engine.instance.blockchain.tx_queue.put(tx)
-    response["success"] = True
-    response["message"] = "Your transaction is successfully added to the queue"
-    response["tx"] = tx
+
+    response = send_to_blockchain(tx)
+
     return generate_json_response(response)
 
 
@@ -418,10 +418,9 @@ def reward():
 
     tx['pubkeys'] = [privkey.get_verifying_key().to_string()]  # We use pubkey as string
     tx['signatures'] = [tools.sign(tools.det_hash(tx), privkey)]
-    engine.instance.blockchain.tx_queue.put(tx)
-    response["success"] = True
-    response["message"] = "Your transaction is successfully added to the queue"
-    response["tx"] = tx
+
+    response = send_to_blockchain(tx)
+
     return generate_json_response(response)
 
 
@@ -477,11 +476,35 @@ def job_dump():
 
     tx['pubkeys'] = [privkey.get_verifying_key().to_string()]  # We use pubkey as string
     tx['signatures'] = [tools.sign(tools.det_hash(tx), privkey)]
-    engine.instance.blockchain.tx_queue.put(tx)
-    response["success"] = True
-    response["message"] = "Your transaction is successfully added to the queue"
-    response["tx"] = tx
+
+    response = send_to_blockchain(tx)
+
     return generate_json_response(response)
+
+
+def send_to_blockchain(tx):
+    response = dict()
+    api_key = str(uuid.uuid4())
+    tx['api_key'] = api_key
+    signals[api_key] = threading.Event()
+    engine.instance.blockchain.tx_queue.put(tx)
+    signals[api_key].wait()
+    if api_key in responses and responses[api_key].getFlag():
+        response["success"] = True
+        response["message"] = "Your transaction is successfully added to the queue"
+        response["tx"] = tx
+    elif api_key in responses:
+        response["success"] = False
+        response["message"] = responses[api_key].getData()
+        response["tx"] = tx
+    else:
+        response["success"] = False
+        response["message"] = "Failed to add transaction"
+        response["tx"] = tx
+
+    del signals[api_key]
+    del responses[api_key]
+    return response
 
 
 @app.route('/tx/auth_reg', methods=['POST'])
@@ -530,10 +553,9 @@ def auth_reg():
 
     tx['pubkeys'] = [privkey.get_verifying_key().to_string()]  # We use pubkey as string
     tx['signatures'] = [tools.sign(tools.det_hash(tx), privkey)]
-    engine.instance.blockchain.tx_queue.put(tx)
-    response["success"] = True
-    response["message"] = "Your transaction is successfully added to the queue"
-    response["tx"] = tx
+
+    response = send_to_blockchain(tx)
+
     return generate_json_response(response)
 
 
