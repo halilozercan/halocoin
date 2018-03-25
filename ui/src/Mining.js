@@ -21,11 +21,6 @@ class Mining extends Component {
           </div>
         </div>
         <div className="row">
-          <div className="col-lg-12 col-md-12 col-sm-12">
-            <Stake wallet={this.props.wallet} account={this.props.account} notify={this.props.notify}/>
-          </div>
-        </div>
-        <div className="row">
           <JobListing notify={this.props.notify}/>
         </div>
       </div>

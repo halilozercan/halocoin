@@ -7,6 +7,7 @@ import Avatar from 'material-ui/Avatar';
 import FlatButton from 'material-ui/FlatButton';
 import FontIcon from 'material-ui/FontIcon';
 import {red500, green500} from 'material-ui/styles/colors';
+import Toggle from 'material-ui/Toggle';
 
 class Power extends Component {
   constructor(props) {
@@ -31,24 +32,6 @@ class Power extends Component {
   }
 
   update() {
-    /*
-    axios.get('/docker').then((response) => {
-      if(response.data.success) {
-        this.setState({
-          available: 'Power service is ready!'
-        })
-      }
-      else{
-        this.setState({
-          available: 'Power service is currently unavailable'
-        })
-      }
-    }).catch((error) => {
-      this.setState({
-        available: 'Power service is currently unavailable'
-      })
-    });
-    */
     axios.get("/power").then((response) => {
       let data = response.data;
       this.setState((state) => {
@@ -60,19 +43,47 @@ class Power extends Component {
     });
   }
 
+  powerChangeStatus = () => {
+    if(this.state.running === null) {
+      return;
+    }
+
+    if(this.state.running) {
+      axios.post("/power/stop").then((response) => {
+        this.update();
+      });
+    }
+    else {
+      axios.post("/power/start").then((response) => {
+        this.update();
+      });
+    }
+  }
+
   render() {
     return (
-      <Card>
-        <CardHeader
-          title="Power Status"
-          subtitle={this.state.description}
-          avatar={<Avatar backgroundColor={this.state.running ? green500:red500} 
-                  icon={<FontIcon className="material-icons">whatshot</FontIcon>} />}
-        />
-        <CardActions style={{ width: '100%', textAlign: 'right' }}>
-          <FlatButton onClick={() => {console.log(this.state.description);}} label={this.state.status} disabled={this.state.description == ''}/>
-        </CardActions>
-      </Card>
+      <table>
+        <tr>
+          <td width="100%">
+            <CardHeader
+                title="Power"
+                subtitle={this.state.running ? "Running":"Closed"}
+                avatar={
+                  <Avatar 
+                    style={{cursor:"pointer"}}
+                    backgroundColor={this.state.running ? green500:red500} 
+                    icon={<FontIcon className="material-icons">build</FontIcon>} 
+                  />
+                }
+            />
+          </td>
+          <td align="right">
+            <Toggle toggled={this.state.running} 
+                    onToggle={this.powerChangeStatus} 
+                    style={{float:"right", margin:"4px"}}/>
+          </td>
+        </tr>
+      </table>
     );
   }
 }

@@ -1,5 +1,5 @@
 import React, { Component } from 'react';
-import {axiosInstance} from './tools.js';
+import axios from 'axios';
 import WalletManagement from './WalletManagement.js';
 import Mining from './Mining.js';
 import AppBar from 'material-ui/AppBar';
@@ -15,21 +15,9 @@ class MainPage extends Component {
   constructor(props){
     super(props);
     this.state = {
-      'default_wallet': null,
-      'account': null,
       'drawer_open': false,
       'page': 'main'
     }
-  }
-
-  componentDidMount() {
-    this.getDefaultWallet();
-    this.props.socket.on('new_block', (socket) => {
-      this.getDefaultWallet();
-    });
-    this.props.socket.on('new_tx_in_pool', (socket) => {
-      this.getDefaultWallet();
-    });
   }
 
   drawerToggle = () => this.setState((state) => {
@@ -44,23 +32,11 @@ class MainPage extends Component {
     })
   }
 
-  getDefaultWallet = () => {
-    axiosInstance.get("/wallet/info").then((response) => {
-      let data = response.data;
-      if(data.hasOwnProperty('wallet') && data.hasOwnProperty('account')) {
-        this.setState({default_wallet:data.wallet, account:data.account});
-      }
-      else {
-        this.setState({default_wallet:null});
-      }
-    });
-  }
-
   onLogout = () => {
     let data = new FormData()
     data.append('delete', true);
 
-    axiosInstance.post('/set_default_wallet', data).then((response) => {
+    axios.post('/set_default_wallet', data).then((response) => {
       
     }).catch((error) => {
       this.props.notify('Failed to logout', 'error');
@@ -70,19 +46,21 @@ class MainPage extends Component {
   render() {
     let currentPage = <div />
     if(this.state.page === 'main') {
+      console.log('Account: ' + this.state.account);
       currentPage = <WalletManagement notify={this.props.notify} 
-                                      default_wallet={this.state.default_wallet} 
-                                      account={this.state.account} />;
+                                      wallet={this.props.wallet} 
+                                      account={this.props.account}
+                                      socket={this.props.socket} />;
     }
     else if(this.state.page === 'mining') {
       currentPage = <Mining notify={this.props.notify} 
-                            wallet={this.state.default_wallet} 
-                            account={this.state.account}
+                            wallet={this.props.wallet} 
+                            account={this.props.account}
                             socket={this.props.socket} />
     }
     let title = "Halocoin";
-    if(this.state.default_wallet !== null) {
-      title += " - " + this.state.default_wallet.name;
+    if(this.props.wallet !== null) {
+      title += " - " + this.props.wallet.name;
     }
     return (
       <div>

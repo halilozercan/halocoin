@@ -65,8 +65,7 @@ class BlockchainService(Service):
             pass
         except Exception as e:
             """
-            Wild expcetion occurred in candidate block handling.
-            Report it in logs
+            Wild expcetion occurred during candidate block handling.
             """
             tools.log("Adding block error occurred: \n%s" % str(e))
             self.blocks_queue.task_done()
@@ -76,7 +75,9 @@ class BlockchainService(Service):
                 api_key = None
                 candidate_tx = self.tx_queue.get(timeout=0.1)
                 if 'api_key' in candidate_tx:
+                    # This transaction is added via API. We need to return an acknowledgement
                     api_key = candidate_tx['api_key']
+                    # Remove the unnecessary api_key from actual transaction
                     del candidate_tx['api_key']
                 result = self.add_tx(candidate_tx)
                 if api_key is not None:
@@ -90,8 +91,7 @@ class BlockchainService(Service):
             pass
         except Exception as e:
             """
-            Wild expcetion occurred in tx addition to the mempool.
-            Report it in logs
+            Wild expcetion occurred while adding tx to the mempool.
             """
             tools.log("Adding tx error occurred: \n%s" % str(e))
 
@@ -146,8 +146,8 @@ class BlockchainService(Service):
         _tx = copy.deepcopy(tx)
         current_state_check = self.statedb.update_database_with_tx(_tx, self.db.get('length') + 1)
         self.db.rollback()
-        if not current_state_check:
-            return Response(False, 'Transaction failed current state check')
+        if not current_state_check.getFlag():
+            return Response(False, 'Transaction failed current state check: {}' + current_state_check.getData())
         integrity_check = BlockchainService.tx_integrity_check(tx)
         if not integrity_check.getFlag():
             return Response(False, 'Transaction failed integrity check: ' + integrity_check.getData())

@@ -16,8 +16,8 @@ function createWindow() {
     // Create the browser window.
     mainWindow = new BrowserWindow({
       title: 'Halocoin', 
-      width: 900, 
-      height: 660, 
+      width: 950, 
+      height: 680, 
       webPreferences: {webSecurity: false},
       icon: path.join(__dirname, '/../public/coins.png')
     });

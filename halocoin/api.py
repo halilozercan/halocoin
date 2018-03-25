@@ -269,6 +269,31 @@ def jobs():
     return generate_json_response(result)
 
 
+def send_to_blockchain(tx):
+    response = dict()
+    api_key = str(uuid.uuid4())
+    tx['api_key'] = api_key
+    signals[api_key] = threading.Event()
+    engine.instance.blockchain.tx_queue.put(tx)
+    signals[api_key].wait()
+    if api_key in responses and responses[api_key].getFlag():
+        response["success"] = True
+        response["message"] = "Your transaction is successfully added to the queue"
+        response["tx"] = tx
+    elif api_key in responses:
+        response["success"] = False
+        response["message"] = responses[api_key].getData()
+        response["tx"] = tx
+    else:
+        response["success"] = False
+        response["message"] = "Failed to add transaction"
+        response["tx"] = tx
+
+    del signals[api_key]
+    del responses[api_key]
+    return response
+
+
 @app.route('/tx/send', methods=['POST'])
 def send():
     amount = int(request.values.get('amount', 0))
@@ -480,31 +505,6 @@ def job_dump():
     response = send_to_blockchain(tx)
 
     return generate_json_response(response)
-
-
-def send_to_blockchain(tx):
-    response = dict()
-    api_key = str(uuid.uuid4())
-    tx['api_key'] = api_key
-    signals[api_key] = threading.Event()
-    engine.instance.blockchain.tx_queue.put(tx)
-    signals[api_key].wait()
-    if api_key in responses and responses[api_key].getFlag():
-        response["success"] = True
-        response["message"] = "Your transaction is successfully added to the queue"
-        response["tx"] = tx
-    elif api_key in responses:
-        response["success"] = False
-        response["message"] = responses[api_key].getData()
-        response["tx"] = tx
-    else:
-        response["success"] = False
-        response["message"] = "Failed to add transaction"
-        response["tx"] = tx
-
-    del signals[api_key]
-    del responses[api_key]
-    return response
 
 
 @app.route('/tx/auth_reg', methods=['POST'])

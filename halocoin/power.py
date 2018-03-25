@@ -48,6 +48,7 @@ class PowerService(Service):
     def on_close(self):
         self.wallet = None
         print('Power is turned off')
+        Service.on_close(self)
 
     def get_job_status(self, job):
         job_name = job['auth'] + '_' + job['id']

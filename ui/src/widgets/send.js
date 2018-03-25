@@ -57,7 +57,7 @@ class Send extends Component {
 
   render() {
     return (
-      <Card style={{"margin":16}}>
+      <Card>
         <CardHeader
           avatar={<Avatar backgroundColor={yellow800} icon={<FontIcon className="material-icons">credit_card</FontIcon>} />}
           title="Send coins"

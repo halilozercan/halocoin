@@ -39,7 +39,9 @@ class App extends Component {
   constructor(props) {
     super(props);
     this.state = {
-      "status": null
+      "status": null,
+      "wallet": null,
+      "account": null
     }
     this.pageChanged = this.pageChanged.bind(this);
     this.checkDefault = this.checkDefault.bind(this);
@@ -52,6 +54,14 @@ class App extends Component {
 
     this.socket.on('new_tx_in_pool', (socket) => {
 
+    });
+
+    this.socket.on('new_block', (socket) => {
+      this.checkDefault();
+    });
+
+    this.socket.on('new_tx_in_pool', (socket) => {
+      this.checkDefault();
     });
   }
 
@@ -81,6 +91,8 @@ class App extends Component {
       if(data.hasOwnProperty('wallet')) {
         this.setState((state) => {
           state.status = 'yes_dw';
+          state.wallet = data.wallet;
+          state.account = data.account;
           return state;
         });
       }
@@ -133,7 +145,8 @@ class App extends Component {
       page = <div>Could not connect to Coinami Engine :(</div>;
     }
     else if(this.state.status === "yes_dw") {
-      page = <MainPage socket={this.socket} notify={this.notify}/>;
+      //console.log("Wallet: " + this.state.wallet);
+      page = <MainPage socket={this.socket} notify={this.notify} wallet={this.state.wallet} account={this.state.account}/>;
     }
     else if(this.state.status === "no_dw") {
       page = <ChooseWallet socket={this.socket} notify={this.notify}/>;

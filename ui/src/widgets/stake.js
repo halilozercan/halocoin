@@ -13,47 +13,10 @@ import {
   TableRow,
   TableRowColumn,
 } from 'material-ui/Table';
-
-class RequiredActionPower extends Component {
-  constructor(props) {
-    super(props);
-  }
-
-  handleOpen = (title) => {
-    //this.setState({dialogOpen: true, dialogTitle: title});
-  };
-
-  render(){
-    console.log('Required');
-    console.log(this.props.account);
-    if(this.props.account.score <= 0) {
-      // Redirect to pool registration
-      return (
-        <div>
-          <CardActions align='right'>
-            <CardText>
-              Your score is not eligible for Power. You need to deposit 1000 coins in order to apply for Power pool.
-            </CardText>
-            <RaisedButton label="Deposit" primary={true} onClick={() => {this.handleOpen('Deposit')}} />
-          </CardActions>      
-        </div>
-      );
-    }
-    else {
-      // Modify application
-      return (
-        <div>
-          <CardText>
-            You can change your application status at any time. It will take affect when your transaction goes through.
-          </CardText>
-          <CardActions align='right'>
-            <RaisedButton label="Edit Application" primary={true} onClick={() => {this.handleOpen('Deposit')}} />
-          </CardActions>      
-        </div>
-      );
-    }
-  }
-}
+import Avatar from 'material-ui/Avatar';
+import FontIcon from 'material-ui/FontIcon';
+import {yellow800} from 'material-ui/styles/colors';
+import Power from '../widgets/power.js';
 
 class Stake extends Component {
 
@@ -142,38 +105,26 @@ class Stake extends Component {
 
     return (
       <Card style={{width:"100%"}}>
+        <Power socket={this.props.socket}/>
         <CardHeader
-          title="Summary"
-          subtitle="Power information about your wallet on Blockchain"
-          actAsExpander={true}
-          showExpandableButton={true}
+          title="Score"
+          subtitle={score}
         />
-        <CardText expandable={true}>
-          You can find valuable information about your wallet's Power details that is registered on Blockchain.
-        </CardText>
-        <CardText>
-          <Table selectable={false}>
-            <TableBody displayRowCheckbox={false}>
-              <TableRow>
-                <TableHeaderColumn>Score</TableHeaderColumn>
-                <TableHeaderColumn>{score}</TableHeaderColumn>
-              </TableRow>
-              <TableRow>
-                <TableHeaderColumn>Assigned Job</TableHeaderColumn>
-                <TableHeaderColumn>{assignedJob}</TableHeaderColumn>
-              </TableRow>
-              <TableRow>
-                <TableHeaderColumn>Application Mode</TableHeaderColumn>
-                <TableHeaderColumn>{applicationMode}</TableHeaderColumn>
-              </TableRow>
-              <TableRow>
-                <TableHeaderColumn>Application List</TableHeaderColumn>
-                <TableHeaderColumn>{applicationList.join(", ")}</TableHeaderColumn>
-              </TableRow>
-            </TableBody>
-          </Table>
-        </CardText>
-        <RequiredActionPower account={this.props.account} />
+        <CardHeader
+          title="Assigned Job"
+          subtitle={assignedJob}
+        />
+        <CardHeader
+          title="Application Mode"
+          subtitle={applicationMode}
+        />
+        <CardHeader
+          title="Application List"
+          subtitle={applicationList.length != 0 ? applicationList.join(", ") : "Empty"}
+        />
+        <CardActions align='right'>
+          <RaisedButton label="Edit Application" primary={true} onClick={() => {this.handleOpen('Deposit')}} />
+        </CardActions>
         <Dialog
           title={this.state.dialogTitle}
           actions={actions}
