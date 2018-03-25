@@ -1,5 +1,5 @@
 import React, { Component } from 'react';
-import {axiosInstance} from '../tools.js';
+import axios from 'axios';
 import {Card, CardActions, CardHeader, CardText} from 'material-ui/Card';
 import RaisedButton from 'material-ui/RaisedButton';
 import TextField from 'material-ui/TextField';
@@ -38,10 +38,10 @@ class Send extends Component {
     data.append('password', this.state.password);
     data.append('amount', this.state.amount);
 
-    axiosInstance.post('/send', data)
+    axios.post('/tx/send', data)
       .then((response) => {
         if(response.data.success)
-          this.props.notify('Your transaction is successfully added to the pool', 'success');
+          this.props.notify('Your transaction is successfully added to the mempool', 'success');
         else
           this.props.notify(response.data.message, 'error');
       })

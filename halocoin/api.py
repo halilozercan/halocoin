@@ -51,7 +51,7 @@ def get_wallet():
 
     wallet_name = request.values.get('wallet_name', None)
     password = request.values.get('password', None)
-    if wallet_name is not None or password is not None:
+    if wallet_name is not None and password is not None:
         encrypted_wallet_content = engine.instance.clientdb.get_wallet(wallet_name)
         if encrypted_wallet_content is not None:
             try:

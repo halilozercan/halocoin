@@ -16,9 +16,6 @@ class Mining extends Component {
           <div className="col-lg-6 col-md-6 col-sm-6">
             <Miner notify={this.props.notify} />
           </div>
-          <div className="col-lg-6 col-md-6 col-sm-6">
-            <Power socket={this.props.socket}/>
-          </div>
         </div>
         <div className="row">
           <JobListing notify={this.props.notify}/>
