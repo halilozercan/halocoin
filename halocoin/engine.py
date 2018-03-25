@@ -59,12 +59,12 @@ class Engine(Service):
     def on_register(self):
         print('Starting halocoin')
 
+        # Test if blockchain database is working
         if not test_database(self.db):
             tools.log("Database service is not working.")
             return False
 
-        b = self.db.get('init')
-        if not b:
+        if not self.db.get('init'):
             print("Initializing records")
             self.db.put('init', True)
             self.db.put('length', -1)
@@ -72,9 +72,7 @@ class Engine(Service):
             self.db.put('targets', {})
             self.db.put('times', {})
             self.db.put('diffLength', '0')
-            self.db.put('accounts', {})
             self.db.put('auth_list', [])
-            self.db.put('job_list', [])
             self.clientdb.put('known_length', -1)
 
         if not self.blockchain.register():

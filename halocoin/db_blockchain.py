@@ -1,4 +1,3 @@
-import copy
 import os
 import pickle
 import sys
@@ -44,7 +43,7 @@ class KeyValueStore:
                 (tname == self.simulation_owner and self.simulating and str(key) not in self.log):
             return from_database(key)
         else:
-            return copy.deepcopy(self.log[str(key)])
+            return pickle.loads(self.log[str(key)])
 
     @lockit('kvstore')
     def put(self, key, value):
@@ -59,7 +58,7 @@ class KeyValueStore:
                         'old': self.get(key)
                     }
 
-                self.log[str(key)] = value
+                self.log[str(key)] = pickle.dumps(value)
             elif not self.simulating:
                 self.DB.put(str(key).encode(), pickle.dumps(value))
             return True
@@ -104,7 +103,7 @@ class KeyValueStore:
             return False
         with self.DB.write_batch(transaction=True) as wb:
             for key, value in self.log.items():
-                wb.put(str(key).encode(), pickle.dumps(value))
+                wb.put(str(key).encode(), value)
 
         self.log = dict()
         self.simulating = False

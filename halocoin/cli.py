@@ -7,12 +7,6 @@ from inspect import Parameter
 
 from halocoin import custom
 
-# TODO
-""" 
-@app.route('/tx/application', methods=['POST'])
-@app.route('/power/available', methods=['GET'])
-"""
-
 
 class Colors:
     HEADER = '\033[95m'
