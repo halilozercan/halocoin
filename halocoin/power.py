@@ -10,7 +10,7 @@ import yaml
 from halocoin import api
 from halocoin import tools
 from halocoin.ntwrk import Response
-from halocoin.service import Service, threaded, lockit
+from halocoin.service import Service, lockit
 
 
 class PowerService(Service):
@@ -121,7 +121,7 @@ class PowerService(Service):
                     self.set_status("Downloading... {}/{}".format(
                         tools.readable_bytes(downloaded),
                         tools.readable_bytes(total_length)))
-                if not self.threaded_running():
+                if not self.get_state() == Service.RUNNING:
                     return False
         if os.path.exists(job_file):
             entry = self.clientdb.get('local_job_repo_' + job_name)
@@ -150,7 +150,7 @@ class PowerService(Service):
         while client.containers.get(container.id).status == 'running' or \
                         client.containers.get(container.id).status == 'created':
             self.set_status('Executing...', client.containers.get(container.id).logs().decode())
-            if not self.threaded_running():
+            if not self.get_state() == Service.RUNNING:
                 client.containers.get(container.id).kill()
             time.sleep(1)
         if os.path.exists(result_file):
@@ -196,8 +196,7 @@ class PowerService(Service):
         entry['status'] = 'done'
         self.clientdb.put('local_job_repo_' + job_name, entry)
 
-    @threaded
-    def worker(self):
+    def loop(self):
         """
         - Find our assigned task.
         - Query Job repository for the task.

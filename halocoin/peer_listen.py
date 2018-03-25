@@ -7,7 +7,7 @@ from halocoin import ntwrk, custom
 from halocoin import tools
 from halocoin.db_client import ClientDB
 from halocoin.ntwrk import Message
-from halocoin.service import Service, threaded
+from halocoin.service import Service
 
 
 class PeerListenService(Service):
@@ -48,9 +48,9 @@ class PeerListenService(Service):
             self.s.close()
         except:
             pass
+        Service.on_close(self)
 
-    @threaded
-    def listen(self):
+    def loop(self):
         try:
             client_sock, address = self.s.accept()
             response, leftover = ntwrk.receive(client_sock)

@@ -9,7 +9,8 @@ class NoExceptionQueue(queue.Queue):
     """
     In some cases, queue overflow is ignored. Necessary try, except blocks
     make the code less readable. This is a special queue class that
-    simply ignores overflow.
+    simply ignores overflow. It is not a safe method and should never be used
+    in production.
     """
 
     def __init__(self, maxsize=0):
@@ -23,40 +24,26 @@ class NoExceptionQueue(queue.Queue):
 
 
 class Service:
-    """
-    Service is a background job synchronizer.
-    It consists of an event loop, side threads and annotation helpers.
-    Event loop starts listening for upcoming events after registration.
-    If service is alive, all annotated methods are run in background
-    thread and results return depending on annotation type.
-
-    Side threads are executed repeatedly until service shuts down or
-    thread is forcefully closed from another thread. Each side-thread should
-    also check for infinite loops.
-    """
     INIT = 0
     RUNNING = 1
     STOPPED = 2
     TERMINATED = 3
 
     def __init__(self, name):
-        self.event_thread = threading.Thread()
-        self.into_service_queue = NoExceptionQueue(1000)
-        self.signals = {}
-        self.service_responses = {}
+        self.loop_thread = threading.Thread()
         self.name = name
         self.__state = None
-        self.execution_lock = threading.Lock()
-        self._threads = {}
+        self.set_state(Service.INIT)
 
     def register(self):
         def threaded_wrapper(func):
             def insider(*args, **kwargs):
-                while self._threads[func.__name__]["running"]:
+                while self.get_state() == Service.RUNNING:
                     try:
                         func(*args, **kwargs)
                     except Exception as e:
                         tools.log('Exception occurred at thread {}\n{}'.format(func.__name__, traceback.format_exc()))
+                        self.set_state(Service.TERMINATED)
                 return 0
 
             return insider
@@ -67,18 +54,11 @@ class Service:
             return False
 
         # Start all side-threads
-        for clsMember in self.__class__.__dict__.values():
-            if hasattr(clsMember, "decorator") and clsMember.decorator == threaded.__name__:
-                new_thread = threading.Thread(target=threaded_wrapper(clsMember._original),
-                                              args=(self,),
-                                              name=clsMember._original.__name__)
-                self._threads[clsMember._original.__name__] = {
-                    "running": True,
-                    "thread": new_thread
-                }
-                new_thread.start()
-
         self.set_state(Service.RUNNING)
+        self.loop_thread = threading.Thread(target=threaded_wrapper(self.loop),
+                                            args=(),
+                                            name=self.__class__.__name__ + "-" + self.loop.__name__)
+        self.loop_thread.start()
         return True
 
     # Lifecycle events
@@ -88,6 +68,14 @@ class Service:
         :return: bool indicating whether registration should continue
         """
         return True
+
+    def loop(self):
+        """
+        Implemented by the extending class. This function is called repeatedly until service is
+        shut down. Works the same as old "threaded" decorator.
+        :return:
+        """
+        pass
 
     def on_close(self):
         """
@@ -99,24 +87,17 @@ class Service:
 
     def join(self):
         """
-        Join all side-threads and event loop in the end.
+        Join the loop thread
         :return: None
         """
-        for thread_dict in self._threads.values():
-            thread_dict["thread"].join()
+        self.loop_thread.join()
 
-        self.into_service_queue.join()
-
-    def unregister(self, join=False):
+    def unregister(self):
         """
         Disconnect the service background operations.
-        Close and join all side-threads and event loop.
         :return: None
         """
-        for name in self._threads.keys():
-            self._threads[name]['running'] = False
-        if join:
-            self.join()
+        self.set_state(Service.STOPPED)
         self.on_close()
 
     def get_state(self):  # () -> (INIT|RUNNING|STOPPED|TERMINATED)
@@ -133,48 +114,7 @@ class Service:
         :param state: New state
         :return: None
         """
-        if state == Service.STOPPED or state == Service.TERMINATED:
-            tools.log('{} got stopped'.format(self.__class__.__name__))
-            for thread_name in self._threads.keys():
-                self._threads[thread_name]["running"] = False
         self.__state = state
-
-    def threaded_running(self):
-        """
-        Should only be used by side-threads to check if it is
-        still alive. Any inner loop can be cancelled.
-        :return: is current side-thread should continue to run
-        """
-        thread_name = threading.current_thread().name
-        is_service_running = (self.get_state() == Service.RUNNING)
-        try:
-            return self._threads[thread_name]["running"] and is_service_running
-        except:
-            return False
-
-
-def threaded(func):
-    """
-    This is just a marker decorator. It removes all the functionality but
-    adds a decorator marker so that it can be registered as a new thread
-
-    Given method assumed to be running indefinitely until a closing signal is given.
-    That's why threaded methods should define their own while or for loop. Instead,
-    signal close by using an if condition at the start of the method.
-    Close signal can be given out by Service.close_threaded()
-    :param func: Function to be marked
-    :return: useless function that is marked
-    """
-
-    def wrapper(self, *args, **kwargs):
-        import warnings
-        warnings.warn('Threaded methods should not be executed directly.')
-        return None
-
-    wrapper.decorator = threaded.__name__
-    wrapper._original = func
-    return wrapper
-
 
 locks = {}
 
@@ -218,4 +158,5 @@ def lockit(lock_name, timeout=-1):
         wrapper.thread_safe = True
         wrapper.__name__ = func.__name__
         return wrapper
+
     return _lockit

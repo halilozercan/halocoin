@@ -2,7 +2,7 @@ import time
 
 from halocoin import ntwrk
 from halocoin import tools
-from halocoin.service import Service, threaded
+from halocoin.service import Service
 
 
 class PeerCheckService(Service):
@@ -28,8 +28,7 @@ class PeerCheckService(Service):
         print("Started Peers Check")
         return True
 
-    @threaded
-    def listen(self):
+    def loop(self):
         """
         Pseudorandomly select a peer to check.
         If blockchain is synchronizing, don't check anyone.

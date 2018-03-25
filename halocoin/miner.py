@@ -5,7 +5,7 @@ from multiprocessing import Process
 
 from halocoin import custom, api
 from halocoin import tools
-from halocoin.service import Service, threaded, lockit
+from halocoin.service import Service, lockit
 
 
 class MinerService(Service):
@@ -45,15 +45,14 @@ class MinerService(Service):
         Service.on_close(self)
         print('Miner is turned off')
 
-    @threaded
-    def worker(self):
+    def loop(self):
         print('Miner preparing block %d' % (self.db.get('length') + 1))
         candidate_block = self.get_candidate_block()
         print('Miner starting to work for block %d' % (candidate_block['length']))
         self.start_workers(candidate_block)
 
         possible_blocks = []
-        while self.threaded_running() and (self.db.get('length')+1) == candidate_block['length']:
+        while self.get_state() == Service.RUNNING and (self.db.get('length')+1) == candidate_block['length']:
             api.miner_status()
             while not self.queue.empty():
                 possible_blocks.append(self.queue.get(timeout=0.01))

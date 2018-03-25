@@ -1,5 +1,4 @@
 import signal
-import subprocess
 import sys
 import time
 
@@ -14,7 +13,7 @@ from halocoin.miner import MinerService
 from halocoin.peer_check import PeerCheckService
 from halocoin.peer_listen import PeerListenService
 from halocoin.power import PowerService
-from halocoin.service import Service, threaded
+from halocoin.service import Service
 from halocoin.state import StateDatabase
 
 
@@ -139,8 +138,7 @@ class Engine(Service):
             service.join()
             print('Closed {}'.format(service.name))
 
-    @threaded
-    def stats(self):
+    def loop(self):
         value = psutil.cpu_percent()
         if int(psutil.cpu_percent()) > 0:
             api.cpu_usage(str(value))

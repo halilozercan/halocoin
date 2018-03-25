@@ -8,7 +8,7 @@ from queue import Empty
 from halocoin import custom, api
 from halocoin import tools
 from halocoin.ntwrk import Response
-from halocoin.service import Service, threaded, NoExceptionQueue, lockit
+from halocoin.service import Service, NoExceptionQueue, lockit
 
 
 class BlockchainService(Service):
@@ -42,9 +42,8 @@ class BlockchainService(Service):
         print("Started Blockchain")
         return True
 
-    @threaded
     @lockit('write_kvstore')
-    def blockchain_process(self):
+    def loop(self):
         """
         In this thread we check blocks queue for possible additions to blockchain.
         Following type is expected to come out of the queue. Any other type will be rejected.
