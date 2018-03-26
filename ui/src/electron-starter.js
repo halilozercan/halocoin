@@ -69,7 +69,7 @@ const createPyProc = () => {
 }
 
 const exitPyProc = () => {
-  pyProc.kill('SIGINT')
+  pyProc.kill('SIGKILL')
   pyProc = null
   pyPort = null
 }

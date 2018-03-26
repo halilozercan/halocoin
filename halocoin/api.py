@@ -574,14 +574,10 @@ def mempool():
         engine.instance.blockchain.tx_pool_pop_all()
     pool = copy.deepcopy(engine.instance.blockchain.tx_pool())
     for i, tx in enumerate(pool):
-        if tx['type'] == 'spend':
-            pool[i]['from'] = tools.tx_owner_address(tx)
-        elif tx['type'] == 'reward':
-            pool[i]['from'] = tools.reward_owner_name(tx)
-        elif tx['type'] == 'auth_reg':
-            pool[i]['from'] = tools.reward_owner_name(tx)
-            pool[i]['to'] = 'Network'
-            pool[i]['amount'] = 0
+        if tx['type'] == 'spend' or tx['type'] == 'application' or tx['type'] == 'pool_reg':
+            pool[i]['issuer'] = tools.tx_owner_address(tx)
+        elif tx['type'] == 'reward' or tx['type'] == 'auth_reg' or tx['type'] == 'job_dump':
+            pool[i]['issuer'] = tools.reward_owner_name(tx)
 
     return generate_json_response(pool)
 
@@ -610,6 +606,11 @@ def blocks():
             break
         mint_tx = list(filter(lambda t: t['type'] == 'mint', block['txs']))[0]
         block['miner'] = tools.tx_owner_address(mint_tx)
+        for i, tx in enumerate(block['txs']):
+            if tx['type'] == 'spend' or tx['type'] == 'application' or tx['type'] == 'pool_reg':
+                block['txs'][i]['issuer'] = tools.tx_owner_address(tx)
+            elif tx['type'] == 'reward' or tx['type'] == 'auth_reg' or tx['type'] == 'job_dump':
+                block['txs'][i]['issuer'] = tools.reward_owner_name(tx)
         result["blocks"].append(block)
     result["blocks"] = list(reversed(result["blocks"]))
     return generate_json_response(result)

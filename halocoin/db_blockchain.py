@@ -101,7 +101,7 @@ class KeyValueStore:
         if not self.simulating:
             tools.log('There isn\'t any ongoing simulation')
             return False
-        with self.DB.write_batch(transaction=True) as wb:
+        with self.DB.write_batch(transaction=True, sync=True) as wb:
             for key, value in self.log.items():
                 wb.put(str(key).encode(), value)
 

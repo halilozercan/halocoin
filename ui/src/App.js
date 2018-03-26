@@ -13,6 +13,7 @@ import ChooseWallet from './ChooseWallet.js';
 import io from 'socket.io-client';
 import axios from 'axios';
 import Snackbar from 'material-ui/Snackbar';
+import {Card, CardActions, CardHeader, CardText} from 'material-ui/Card';
 
 const muiTheme = getMuiTheme({
   palette: {
@@ -43,10 +44,16 @@ class App extends Component {
       "wallet": null,
       "account": null
     }
-    this.pageChanged = this.pageChanged.bind(this);
-    this.checkDefault = this.checkDefault.bind(this);
-    this.notify = this.notify.bind(this);
+    
     this.socket = io('http://0.0.0.0:7001');
+
+    this.socket.on('connect', (socket => {
+      this.checkDefault();
+    }));
+
+    this.socket.on('disconnect', (socket => {
+      this.checkDefault();
+    }));
 
     this.socket.on('changed_default_wallet', (socket) => {
       this.checkDefault();
@@ -81,11 +88,11 @@ class App extends Component {
     });
   }
 
-  pageChanged(newPage) {
+  pageChanged = (newPage) => {
     this.setState({"page": newPage});
   }
 
-  checkDefault() {
+  checkDefault = () => {
     axios.get("/wallet/info").then((response) => {
       let data = response.data;
       if(data.hasOwnProperty('wallet')) {
@@ -136,13 +143,25 @@ class App extends Component {
   render() {
     let page = <div />;
     if(this.state.status === null) {
-      page = <div>Connecting to Coinami Engine</div>;
+      page = <Card style={{margin:"32px"}}>
+              <CardText>
+                Connecting to Halocoin Engine
+              </CardText>
+            </Card>;
     }
     else if(this.state.status === "running") {
-      page = <div>Checking your wallet</div>;
+      page = <Card style={{margin:"32px"}}>
+              <CardText>
+                Checking your wallet
+              </CardText>
+            </Card>;
     }
     else if(this.state.status === "closed") {
-      page = <div>Could not connect to Coinami Engine :(</div>;
+      page = <Card style={{margin:"32px"}}>
+              <CardText>
+                Could not connect to Halocoin engine :(
+              </CardText>
+            </Card>;
     }
     else if(this.state.status === "yes_dw") {
       //console.log("Wallet: " + this.state.wallet);
@@ -155,7 +174,7 @@ class App extends Component {
     return (
       <MuiThemeProvider muiTheme={muiTheme}>
         <div className="wrapper">
-          <div className="content">
+          <div className="content" style={{overflowY:"hidden", overflowX:"hidden"}}>
             {page}
           </div>
           <Snackbar

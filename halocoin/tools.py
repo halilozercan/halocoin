@@ -70,6 +70,9 @@ def init_logging(DEBUG, working_dir, log_file):
     log = logging.getLogger('werkzeug')
     log.setLevel(logging.ERROR)
 
+    log = logging.getLogger('docker')
+    log.setLevel(logging.ERROR)
+
 
 def get_default_dir():
     from os.path import expanduser
