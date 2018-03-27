@@ -146,10 +146,10 @@ class BlockchainService(Service):
         current_state_check = self.statedb.update_database_with_tx(_tx, self.db.get('length') + 1)
         self.db.rollback()
         if not current_state_check.getFlag():
-            return Response(False, 'Transaction failed current state check: {}' + current_state_check.getData())
+            return Response(False, 'Transaction failed current state check: {}'.format(current_state_check.getData()))
         integrity_check = BlockchainService.tx_integrity_check(tx)
         if not integrity_check.getFlag():
-            return Response(False, 'Transaction failed integrity check: ' + integrity_check.getData())
+            return Response(False, 'Transaction failed integrity check: {}'.format(integrity_check.getData()))
 
         self.tx_pool_add(tx)
         return Response(True, 'Added tx into the pool: ' + str(tx))

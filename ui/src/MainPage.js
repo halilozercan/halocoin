@@ -34,9 +34,9 @@ class MainPage extends Component {
 
   onLogout = () => {
     let data = new FormData()
-    data.append('delete', true);
+    data.append('remove', true);
 
-    axios.post('/set_default_wallet', data).then((response) => {
+    axios.post('/wallet/default', data).then((response) => {
       
     }).catch((error) => {
       this.props.notify('Failed to logout', 'error');

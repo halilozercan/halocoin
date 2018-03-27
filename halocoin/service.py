@@ -100,10 +100,19 @@ class Service:
         self.set_state(Service.STOPPED)
         self.on_close()
 
-    def get_state(self):  # () -> (INIT|RUNNING|STOPPED|TERMINATED)
+    def get_state(self, readable=False):  # () -> (INIT|RUNNING|STOPPED|TERMINATED)
         """
         :return: State of the service
         """
+        if readable:
+            if self.__state == Service.RUNNING:
+                return "RUNNING"
+            if self.__state == Service.INIT:
+                return "INIT"
+            if self.__state == Service.STOPPED:
+                return "STOPPED"
+            if self.__state == Service.TERMINATED:
+                return "TERMINATED"
         return self.__state
 
     def set_state(self, state):  # (INIT|RUNNING|STOPPED|TERMINATED) -> ()

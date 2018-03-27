@@ -139,6 +139,14 @@ def download_wallet():
 
 @app.route('/wallet/default', methods=['POST'])
 def set_default_wallet():
+    remove = request.values.get('remove', None)
+    if remove is not None:
+        default_wallet = None
+        changed_default_wallet()
+        return generate_json_response({
+            "success": True,
+            "message": "Unset the default wallet"
+        })
     wallet_result = get_wallet()
 
     if wallet_result.getFlag():
@@ -212,6 +220,7 @@ def new_wallet():
     if set_default and success:
         global default_wallet
         default_wallet = copy.deepcopy(wallet)
+        changed_default_wallet()
 
     return generate_json_response({
         "name": wallet_name,
@@ -719,6 +728,71 @@ def status_power():
         "status": engine.instance.power.get_status(),
         "description": engine.instance.power.description
     })
+
+
+@app.route('/engine', methods=['GET'])
+def engine_status():
+    return generate_json_response({
+        "blockchain": engine.instance.blockchain.get_state(readable=True),
+        "peer_receive": engine.instance.peer_receive.get_state(readable=True),
+        "peers_check": engine.instance.peers_check.get_state(readable=True),
+        "power": engine.instance.power.get_state(readable=True),
+        "miner": engine.instance.miner.get_state(readable=True)
+    })
+
+
+@app.route('/service/<service_name>/start', methods=['POST'])
+def service_start(service_name):
+    corresponding_service = None
+    if service_name == "blockchain":
+        corresponding_service = engine.instance.blockchain
+    elif service_name == "peers_check":
+        corresponding_service = engine.instance.peers_check
+    elif service_name == "peer_receive":
+        corresponding_service = engine.instance.peer_receive
+    elif service_name == "power":
+        corresponding_service = engine.instance.power
+    elif service_name == "miner":
+        corresponding_service = engine.instance.miner
+
+    if corresponding_service is None:
+        return generate_json_response({
+            "success": False,
+            "message": "There is no such service"
+        })
+
+    if corresponding_service.get_state() == Service.RUNNING:
+        return generate_json_response('{} is already running.'.format(corresponding_service.name))
+    else:
+        corresponding_service.register()
+        return generate_json_response('Started {}'.format(corresponding_service.name))
+
+
+@app.route('/service/<service_name>/stop', methods=['POST'])
+def service_stop(service_name):
+    corresponding_service = None
+    if service_name == "blockchain":
+        corresponding_service = engine.instance.blockchain
+    elif service_name == "peers_check":
+        corresponding_service = engine.instance.peers_check
+    elif service_name == "peer_receive":
+        corresponding_service = engine.instance.peer_receive
+    elif service_name == "power":
+        corresponding_service = engine.instance.power
+    elif service_name == "miner":
+        corresponding_service = engine.instance.miner
+
+    if corresponding_service is None:
+        return generate_json_response({
+            "success": False,
+            "message": "There is no such service"
+        })
+
+    if corresponding_service.get_state() == Service.RUNNING:
+        corresponding_service.unregister()
+        return generate_json_response('Stopped {}'.format(corresponding_service.name))
+    else:
+        return generate_json_response('{} is already stopped.'.format(corresponding_service.name))
 
 
 def generate_json_response(obj):

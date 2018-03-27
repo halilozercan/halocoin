@@ -16,7 +16,6 @@ import {
 import Avatar from 'material-ui/Avatar';
 import FontIcon from 'material-ui/FontIcon';
 import {yellow800} from 'material-ui/styles/colors';
-import Power from '../widgets/power.js';
 
 class Stake extends Component {
 
@@ -25,16 +24,31 @@ class Stake extends Component {
     this.state = {
       "dialogOpen": false,
       "dialogTitle": "Deposit Amount",
-      "amount": 0,
-      "password": ""
+      "dialogText": "",
+      "dialogForm": false
     }
   }
 
-  handleOpen = (title) => {
-    this.setState({dialogOpen: true, dialogTitle: title});
+  openDialog = (title) => {
+    if(this.props.account.score <= 0) {
+        this.setState({
+            dialogOpen: true, 
+            dialogTitle: "Pool Registration",
+            dialogText: "Deposit 1000 HLC to register for Farming Pool?",
+            dialogForm: false
+        });
+    }
+    else {
+      this.setState({
+        dialogOpen: true,
+        dialogTitle: "Edit Application",
+        dialogText: "You can edit your application list and mode",
+        dialogForm: true
+      })
+    }
   };
 
-  handleClose = () => {
+  closeDialog = () => {
     this.setState({dialogOpen: false});
   };
 
@@ -51,31 +65,44 @@ class Stake extends Component {
   }
 
   stakeAction = () => {
-    let password = this.state.password;
-    let amount = this.state.amount;
-    let data = new FormData();
-    let address = "";
-    if(this.state.dialogTitle === 'Deposit') {
-      address = "/deposit";  
+    if(!this.state.dialogForm) {
+      axios.post('/tx/pool_reg').then((response) => {
+        let success = response.data.success;
+        if(success) {
+          this.props.notify(response.data.message, 'success');
+        }
+        else {
+          this.props.notify(response.data.message, 'error');
+        }
+      })  
     }
-    else{
-      address = "/withdraw";
+    else {
+      let password = this.state.password;
+      let amount = this.state.amount;
+      let data = new FormData();
+      let address = "";
+      if(this.state.dialogTitle === 'Deposit') {
+        address = "/deposit";  
+      }
+      else{
+        address = "/withdraw";
+      }
+      
+      data.append('amount', amount);
+      data.append('password', password);
+  
+      axios.post(address, data).then((response) => {
+        let success = response.data.success;
+        if(success) {
+          this.props.notify(response.data.message, 'success');
+        }
+        else {
+          this.props.notify(response.data.message, 'error');
+        }
+      })
     }
-    
-    data.append('amount', amount);
-    data.append('password', password);
 
-    axios.post(address, data).then((response) => {
-      let success = response.data.success;
-      if(success) {
-        this.props.notify(response.data.message, 'success');
-      }
-      else {
-        this.props.notify(response.data.message, 'error');
-      }
-    })
-
-    this.setState({dialogOpen: false, amount:0, password:""});
+    this.setState({dialogOpen: false});
   }
 
   render() {
@@ -103,9 +130,28 @@ class Stake extends Component {
       />,
     ];
 
+    let form = <div></div>;
+    if(this.state.dialogForm) {
+        form = <div>
+                    <TextField
+                        fullWidth={true}
+                        floatingLabelText="Amount"
+                        name="amount"
+                        type="text"
+                        onChange={this.onAmountChange}
+                    />
+                    <TextField
+                        fullWidth={true}
+                        floatingLabelText="Password"
+                        name="password"
+                        type="password"
+                        onChange={this.onPasswordChange}
+                    />
+                </div>;
+    } 
+
     return (
       <Card style={{width:"100%"}}>
-        <Power socket={this.props.socket}/>
         <CardHeader
           title="Score"
           subtitle={score}
@@ -123,29 +169,17 @@ class Stake extends Component {
           subtitle={applicationList.length != 0 ? applicationList.join(", ") : "Empty"}
         />
         <CardActions align='right'>
-          <RaisedButton label="Edit Application" primary={true} onClick={() => {this.handleOpen('Deposit')}} />
+          <RaisedButton label="Edit Application" primary={true} onClick={() => {this.openDialog()}} />
         </CardActions>
         <Dialog
           title={this.state.dialogTitle}
           actions={actions}
           modal={false}
           open={this.state.dialogOpen}
-          onRequestClose={this.handleClose}
+          onRequestClose={this.closeDialog}
         >
-          <TextField
-              fullWidth={true}
-              floatingLabelText="Amount"
-              name="amount"
-              type="text"
-              onChange={this.onAmountChange}
-            />
-         <TextField
-              fullWidth={true}
-              floatingLabelText="Password"
-              name="password"
-              type="password"
-              onChange={this.onPasswordChange}
-            />
+          {this.state.dialogText}
+          {form}
         </Dialog>
       </Card>
     );
