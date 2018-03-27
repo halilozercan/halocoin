@@ -55,6 +55,7 @@ class Engine(Service):
         self.miner = MinerService(self)
         self.power = PowerService(self)
         self.docker_daemon = None
+        self.interrupted = False
 
     def on_register(self):
         print('Starting halocoin')
@@ -143,13 +144,13 @@ class Engine(Service):
         time.sleep(0.1)
 
     def stop(self):
+        self.interrupted = True
         self.unregister_sub_services()
         self.unregister()
 
 
 def signal_handler(signal, frame):
-    sys.stderr.write('Detected interrupt, initiating shutdown\n')
-    if instance is not None:
+    if instance is not None and not instance.interrupted:
         instance.stop()
 
 

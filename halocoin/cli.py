@@ -2,7 +2,9 @@
 import argparse
 import os
 import sys
+import time
 from functools import wraps
+from getpass import getpass
 from inspect import Parameter
 
 from halocoin import custom
@@ -108,7 +110,6 @@ def start(dir=None):
 
 @action
 def new_wallet(wallet, pw=None, set_default=None):
-    from getpass import getpass
 
     if pw is None:
         wallet_pw = 'w'
@@ -149,7 +150,6 @@ def wallets():
 
 @action
 def info_wallet(wallet=None, pw=None):
-    from getpass import getpass
     if wallet is not None and pw is None:
         wallet_pw = getpass('Wallet password: ')
     else:
@@ -163,7 +163,6 @@ def info_wallet(wallet=None, pw=None):
 
 @action
 def remove_wallet(wallet, pw=None):
-    from getpass import getpass
     if pw is None:
         wallet_pw = getpass('Wallet password: ')
     else:
@@ -177,7 +176,6 @@ def remove_wallet(wallet, pw=None):
 
 @action
 def default_wallet(wallet, pw=None):
-    from getpass import getpass
     if pw is None:
         wallet_pw = getpass('Wallet password: ')
     else:
@@ -214,7 +212,6 @@ def node_id():
 
 @action
 def send(address, amount, wallet=None, pw=None, message=None):
-    from getpass import getpass
     if wallet is not None and pw is None:
         wallet_pw = getpass('Wallet password: ')
     else:
@@ -227,7 +224,6 @@ def send(address, amount, wallet=None, pw=None, message=None):
 
 @action
 def pool_reg(wallet=None, pw=None, force=None):
-    from getpass import getpass
     if wallet is not None and pw is None:
         wallet_pw = getpass('Wallet password: ')
     else:
@@ -239,7 +235,6 @@ def pool_reg(wallet=None, pw=None, force=None):
 
 @action
 def application(wallet=None, mode=None, list=None, pw=None):
-    from getpass import getpass
     if wallet is not None and pw is None:
         wallet_pw = getpass('Wallet password: ')
     else:
@@ -265,7 +260,6 @@ def reward(certificate, privkey, job_id, address):
 
 @action
 def job_dump(certificate, privkey, job_id, amount, download_url, upload_url, hashsum, image):
-    import time
     certificate = open(certificate, 'rb').read()
     privkey = open(privkey, 'rb').read()
     haloprint(make_api_request("/tx/job_dump", http_method="POST", id=job_id, timestamp=time.time(), amount=amount,
@@ -298,7 +292,6 @@ def stop():
 
 @action
 def start_miner(wallet=None, pw=None):
-    from getpass import getpass
     if wallet is not None and pw is None:
         wallet_pw = getpass('Wallet password: ')
     else:
@@ -319,7 +312,6 @@ def status_miner():
 
 @action
 def start_power(wallet=None, pw=None):
-    from getpass import getpass
     if wallet is not None and pw is None:
         wallet_pw = getpass('Wallet password: ')
     else:

@@ -1,11 +1,18 @@
 import multiprocessing
 import random
+import signal
 import time
 from multiprocessing import Process
 
 from halocoin import custom, api
 from halocoin import tools
 from halocoin.service import Service, lockit
+
+
+def preexec_function():
+    # Ignore the SIGINT signal by setting the handler to the standard
+    # signal handler SIG_IGN.
+    signal.signal(signal.SIGINT, signal.SIG_IGN)
 
 
 class MinerService(Service):
@@ -128,6 +135,7 @@ class MinerService(Service):
 
     @staticmethod
     def target(_candidate_block, queue):
+        signal.signal(signal.SIGINT, signal.SIG_IGN)
         # Miner registered but no work is sent yet.
         import copy
         candidate_block = copy.deepcopy(_candidate_block)
