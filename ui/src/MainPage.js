@@ -1,7 +1,7 @@
 import React, { Component } from 'react';
 import axios from 'axios';
 import WalletManagement from './WalletManagement.js';
-import Mining from './Mining.js';
+import Status from './Status.js';
 import AppBar from 'material-ui/AppBar';
 import Drawer from 'material-ui/Drawer';
 import MenuItem from 'material-ui/MenuItem';
@@ -52,8 +52,8 @@ class MainPage extends Component {
                                       account={this.props.account}
                                       socket={this.props.socket} />;
     }
-    else if(this.state.page === 'mining') {
-      currentPage = <Mining notify={this.props.notify} 
+    else if(this.state.page === 'status') {
+      currentPage = <Status notify={this.props.notify} 
                             wallet={this.props.wallet} 
                             account={this.props.account}
                             socket={this.props.socket} />
@@ -71,7 +71,7 @@ class MainPage extends Component {
         />
         <Drawer open={this.state.drawer_open} docked={false} onRequestChange={(drawer_open) => this.setState({drawer_open})}>
           <MenuItem leftIcon={<Home />} onClick={() => {this.changePage('main')}} >Home</MenuItem>
-          <MenuItem leftIcon={<Settings />} onClick={() => {this.changePage('mining')}}>Mining</MenuItem>
+          <MenuItem leftIcon={<Settings />} onClick={() => {this.changePage('status')}}>Status</MenuItem>
           <MenuItem leftIcon={<Lock />} onClick={this.onLogout}>Logout</MenuItem>
         </Drawer>
         {currentPage}

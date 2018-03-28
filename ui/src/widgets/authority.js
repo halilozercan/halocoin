@@ -23,7 +23,7 @@ class Authority extends Component {
   render() {
 
     return (
-      <Card style={{margin:"16px"}}>
+      <Card>
         <CardHeader
           title={this.props.name}
           subtitle={"Work Description: " + this.props.description}
