@@ -16,18 +16,6 @@ class Status extends Component {
             <EngineStatus notify={this.props.notify} />
           </div>
         </div>
-        <div className="row" style={{marginBottom:16}}>
-          <div className="col-lg-6 col-md-6 col-sm-6">
-            <Authority 
-              name="Can Alkan"
-              description="Do my laundry"
-              avatar="https://pbs.twimg.com/profile_images/723891323095388161/Oy-FbFUn_400x400.jpg"
-              supply="125000"
-              rewardPool="2000"
-              rewardDistributed="24365"
-            />
-          </div>
-        </div>
       </div>
     );
   }

@@ -2,6 +2,7 @@ import React, { Component } from 'react';
 import axios from 'axios';
 import WalletManagement from './WalletManagement.js';
 import Status from './Status.js';
+import Auths from './Auths.js';
 import AppBar from 'material-ui/AppBar';
 import Drawer from 'material-ui/Drawer';
 import MenuItem from 'material-ui/MenuItem';
@@ -58,6 +59,12 @@ class MainPage extends Component {
                             account={this.props.account}
                             socket={this.props.socket} />
     }
+    else if(this.state.page === 'auths') {
+      currentPage = <Auths notify={this.props.notify} 
+                            wallet={this.props.wallet} 
+                            account={this.props.account}
+                            socket={this.props.socket} />
+    }
     let title = "Halocoin";
     if(this.props.wallet !== null) {
       title += " - " + this.props.wallet.name;
@@ -72,6 +79,7 @@ class MainPage extends Component {
         <Drawer open={this.state.drawer_open} docked={false} onRequestChange={(drawer_open) => this.setState({drawer_open})}>
           <MenuItem leftIcon={<Home />} onClick={() => {this.changePage('main')}} >Home</MenuItem>
           <MenuItem leftIcon={<Settings />} onClick={() => {this.changePage('status')}}>Status</MenuItem>
+          <MenuItem leftIcon={<Settings />} onClick={() => {this.changePage('auths')}}>Authorities</MenuItem>
           <MenuItem leftIcon={<Lock />} onClick={this.onLogout}>Logout</MenuItem>
         </Drawer>
         {currentPage}

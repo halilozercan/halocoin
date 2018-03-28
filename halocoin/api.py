@@ -261,6 +261,12 @@ def node_id():
 def auth_list():
     _list = engine.instance.statedb.get_auth_list()
     response = [engine.instance.statedb.get_auth(auth_name) for auth_name in _list]
+    for i, auth in enumerate(response):
+        available_jobs = engine.instance.statedb.get_jobs(auth=auth['name'], type='available')
+        auth['available_reward'] = 0
+        for job in available_jobs:
+            auth['available_reward'] += job['reward']
+        response[i] = auth
     return generate_json_response(response)
 
 
