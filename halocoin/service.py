@@ -53,11 +53,11 @@ class Service:
             tools.log("Service is not going to continue with registering!")
             return False
 
-        # Start all side-threads
-        self.set_state(Service.RUNNING)
         self.loop_thread = threading.Thread(target=threaded_wrapper(self.loop),
                                             args=(),
                                             name=self.__class__.__name__ + "-" + self.loop.__name__)
+
+        self.set_state(Service.RUNNING)
         self.loop_thread.start()
         return True
 
@@ -82,7 +82,6 @@ class Service:
         Called after everything is shut down.
         :return: Irrelevant
         """
-        self.set_state(Service.STOPPED)
         return True
 
     def join(self):
@@ -113,7 +112,8 @@ class Service:
                 return "STOPPED"
             if self.__state == Service.TERMINATED:
                 return "TERMINATED"
-        return self.__state
+        else:
+            return self.__state
 
     def set_state(self, state):  # (INIT|RUNNING|STOPPED|TERMINATED) -> ()
         """
