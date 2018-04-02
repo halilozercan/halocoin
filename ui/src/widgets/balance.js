@@ -10,9 +10,8 @@ class Balance extends Component {
   render() {
     let balance = 0;
     let name = "";
-    if(this.props.wallet !== null){
+    if(this.props.account !== null){
       balance = this.props.account.amount;
-      name = this.props.wallet.name;
     }
     return (
       <Card>

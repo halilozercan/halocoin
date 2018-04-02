@@ -37,7 +37,7 @@ class NewWalletForm extends Component {
     let data = new FormData();
     data.append('wallet_name', this.state.name);
     data.append('password', this.state.password);
-    data.append('set_default', true);
+    data.append('login', true);
 
     axiosInstance.post('/wallet/new', data)
       .then((response) => {

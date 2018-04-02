@@ -8,7 +8,7 @@ import uuid
 import psutil as psutil
 # WARNING! Do not remove below import line. PyInstaller depends on it
 from engineio import async_threading
-from flask import Flask, request, Response, send_file
+from flask import Flask, request, Response, send_file, g
 from flask_socketio import SocketIO
 
 from halocoin import tools, engine, custom
@@ -39,18 +39,42 @@ class ComplexEncoder(json.JSONEncoder):
 app = Flask(__name__)
 socketio = SocketIO(app, async_mode='threading')
 listen_thread = None
-default_wallet = None
 signals = dict()
 responses = dict()
+_login_info = None
+
+
+def get_login_info():
+    global _login_info
+    if _login_info is None:
+        return {
+            "name": None,
+            "address": None
+        }
+    else:
+        return copy.deepcopy(_login_info)
+
+
+def set_login_info(info):
+    global _login_info
+    _login_info = copy.deepcopy(info)
+    changed_login_info()
 
 
 def get_wallet():
+    # If wallet_name is not given, use default_wallet instead.
+    # If default_wallet is also missing, raise an error.
+    # default_wallet should just be a name. Every single action that requires private key,
+    # must provide wallet password.
     from halocoin.ntwrk import Response
     from halocoin.model.wallet import Wallet
-    global default_wallet
 
+    login_name = get_login_info()['name']
     wallet_name = request.values.get('wallet_name', None)
     password = request.values.get('password', None)
+    if wallet_name is None:
+        wallet_name = login_name
+
     if wallet_name is not None and password is not None:
         encrypted_wallet_content = engine.instance.clientdb.get_wallet(wallet_name)
         if encrypted_wallet_content is not None:
@@ -70,11 +94,6 @@ def get_wallet():
                 success=False,
                 data="Wallet does not exist!"
             )
-    elif default_wallet is not None:
-        return Response(
-            success=True,
-            data=default_wallet
-        )
     else:
         return Response(
             success=False,
@@ -137,28 +156,16 @@ def download_wallet():
     return send_file(f, as_attachment=True, attachment_filename=wallet_name)
 
 
-@app.route('/wallet/default', methods=['POST'])
-def set_default_wallet():
-    remove = request.values.get('remove', None)
-    if remove is not None:
-        default_wallet = None
-        changed_default_wallet()
-        return generate_json_response({
-            "success": True,
-            "message": "Unset the default wallet"
-        })
+@app.route('/login', methods=['POST'])
+def login():
     wallet_result = get_wallet()
 
     if wallet_result.getFlag():
         wallet = wallet_result.getData()
-        global default_wallet
-        default_wallet = copy.deepcopy(wallet)
-
-        # This is a temporary solution
-        changed_default_wallet()
-        engine.instance.power.set_wallet(wallet_result.getData())
-        if engine.instance.power.get_state() != Service.RUNNING:
-            engine.instance.power.register()
+        set_login_info({
+            "name": wallet.name,
+            "address": wallet.address
+        })
 
         return generate_json_response({
             "success": True,
@@ -168,6 +175,32 @@ def set_default_wallet():
         return generate_json_response({
             "success": False,
             "error": wallet_result.getData()
+        })
+
+
+@app.route('/logout', methods=['POST'])
+def logout():
+    set_login_info(None)
+    return generate_json_response({
+        "success": True,
+        "message": "Unset the default wallet"
+    })
+
+
+@app.route('/login/info', methods=['GET'])
+def account():
+    login_info = get_login_info()
+    if login_info['name'] is None:
+        return generate_json_response({
+            "success": False,
+            "wallet_name": None,
+            "account": None
+        })
+    else:
+        return generate_json_response({
+            "success": True,
+            "wallet_name": login_info['name'],
+            "account": engine.instance.statedb.get_account(login_info['address'])
         })
 
 
@@ -214,13 +247,14 @@ def new_wallet():
     from halocoin.model.wallet import Wallet
     wallet_name = request.values.get('wallet_name', None)
     pw = request.values.get('password', None)
-    set_default = request.values.get('set_default', None)
+    login = request.values.get('login', None)
     wallet = Wallet(wallet_name)
     success = engine.instance.clientdb.new_wallet(pw, wallet)
-    if set_default and success:
-        global default_wallet
-        default_wallet = copy.deepcopy(wallet)
-        changed_default_wallet()
+    if login and success:
+        set_login_info({
+            'name': wallet.name,
+            'address': wallet.address
+        })
 
     return generate_json_response({
         "name": wallet_name,
@@ -646,31 +680,31 @@ def stop():
     return generate_json_response('Shutting down')
 
 
-@app.route('/miner/start', methods=['POST'])
-def start_miner():
-    response = {"success": False}
-
-    wallet_result = get_wallet()
-    if not wallet_result.getFlag():
-        response['error'] = wallet_result.getData()
-        return generate_json_response(response)
-
-    if engine.instance.miner.get_state() == Service.RUNNING:
-        return generate_json_response('Miner is already running.')
-    else:
-        engine.instance.miner.set_wallet(wallet_result.getData())
-        engine.instance.miner.register()
-        return generate_json_response('Running miner')
-
-
-@app.route('/miner/stop', methods=['POST'])
-def stop_miner():
-    if engine.instance.miner.get_state() == Service.RUNNING:
-        engine.instance.miner.unregister()
-        miner_status()
-        return generate_json_response('Closed miner')
-    else:
-        return generate_json_response('Miner is not running.')
+# @app.route('/miner/start', methods=['POST'])
+# def start_miner():
+#     response = {"success": False}
+#
+#     wallet_result = get_wallet()
+#     if not wallet_result.getFlag():
+#         response['error'] = wallet_result.getData()
+#         return generate_json_response(response)
+#
+#     if engine.instance.miner.get_state() == Service.RUNNING:
+#         return generate_json_response('Miner is already running.')
+#     else:
+#         engine.instance.miner.set_wallet(wallet_result.getData())
+#         engine.instance.miner.register()
+#         return generate_json_response('Running miner')
+#
+#
+# @app.route('/miner/stop', methods=['POST'])
+# def stop_miner():
+#     if engine.instance.miner.get_state() == Service.RUNNING:
+#         engine.instance.miner.unregister()
+#         miner_status()
+#         return generate_json_response('Closed miner')
+#     else:
+#         return generate_json_response('Miner is not running.')
 
 
 @app.route('/miner', methods=['GET'])
@@ -699,32 +733,6 @@ def docker_images():
         "success": status.getFlag(),
         "message": status.getData()
     })
-
-
-@app.route('/power/start', methods=['POST'])
-def start_power():
-    response = {"success": False}
-
-    wallet_result = get_wallet()
-    if not wallet_result.getFlag():
-        response['error'] = wallet_result.getData()
-        return generate_json_response(response)
-
-    if engine.instance.power.get_state() == Service.RUNNING:
-        return generate_json_response('Power is already running.')
-    else:
-        engine.instance.power.set_wallet(wallet_result.getData())
-        engine.instance.power.register()
-        return generate_json_response('Running power')
-
-
-@app.route('/power/stop', methods=['POST'])
-def stop_power():
-    if engine.instance.power.get_state() == Service.RUNNING:
-        engine.instance.power.unregister()
-        return 'Closed power'
-    else:
-        return 'Power is not running.'
 
 
 @app.route('/power', methods=['GET'])
@@ -758,8 +766,24 @@ def service_start(service_name):
         corresponding_service = engine.instance.peer_receive
     elif service_name == "power":
         corresponding_service = engine.instance.power
+        wallet = get_wallet()
+        if wallet.getFlag():
+            corresponding_service.set_wallet(wallet.getData())
+        else:
+            return generate_json_response({
+                "success": False,
+                "message": "This service requires a valid wallet"
+            })
     elif service_name == "miner":
         corresponding_service = engine.instance.miner
+        wallet = get_wallet()
+        if wallet.getFlag():
+            corresponding_service.set_wallet(wallet.getData())
+        else:
+            return generate_json_response({
+                "success": False,
+                "message": "This service requires a valid wallet"
+            })
 
     if corresponding_service is None:
         return generate_json_response({
@@ -801,12 +825,35 @@ def service_stop(service_name):
         return generate_json_response('{} is already stopped.'.format(corresponding_service.name))
 
 
+@app.route('/service/<service_name>/status', methods=['GET'])
+def service_status(service_name):
+    corresponding_service = None
+    if service_name == "blockchain":
+        corresponding_service = engine.instance.blockchain
+    elif service_name == "peers_check":
+        corresponding_service = engine.instance.peers_check
+    elif service_name == "peer_receive":
+        corresponding_service = engine.instance.peer_receive
+    elif service_name == "power":
+        corresponding_service = engine.instance.power
+    elif service_name == "miner":
+        corresponding_service = engine.instance.miner
+
+    if corresponding_service is None:
+        return generate_json_response({
+            "success": False,
+            "message": "There is no such service"
+        })
+
+    return generate_json_response(corresponding_service.get_status())
+
+
 def generate_json_response(obj):
     result_text = json.dumps(obj, cls=ComplexEncoder, sort_keys=True)
     return Response(response=result_text, headers={"Content-Type": "application/json"})
 
 
-def changed_default_wallet():
+def changed_login_info():
     socketio.emit('changed_default_wallet')
 
 

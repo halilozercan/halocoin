@@ -258,7 +258,7 @@ class ClientDB:
                     "wallet_name": wallet_name,
                     "password": password
                 })
-                api.changed_default_wallet()
+                api.changed_login_info()
                 return True
             else:
                 return False
@@ -269,5 +269,5 @@ class ClientDB:
     @lockit('wallets')
     def delete_default_wallet(self):
         self.delete('default_wallet')
-        api.changed_default_wallet()
+        api.changed_login_info()
         return True

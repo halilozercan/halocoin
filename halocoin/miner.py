@@ -32,6 +32,7 @@ class MinerService(Service):
         self.core_count = multiprocessing.cpu_count() if config_cores == -1 else config_cores
         self.pool = []
         self.queue = multiprocessing.Queue()
+        self.status_description = "Initialized"
 
     def set_wallet(self, wallet):
         self.wallet = wallet
@@ -42,20 +43,32 @@ class MinerService(Service):
         self.statedb = self.engine.statedb
 
         if self.wallet is not None and hasattr(self.wallet, 'privkey'):
+            self.status_description = "Registered"
             return True
         else:
             return False
 
     def on_close(self):
+        self.status_description = "Closed"
         self.wallet = None
         self.close_workers()
         Service.on_close(self)
         print('Miner is turned off')
 
+    def get_status(self):
+        status = Service.get_status(self)
+        status['description'] = self.status_description
+        return status
+
     def loop(self):
-        print('Miner preparing block %d' % (self.db.get('length') + 1))
+        self.status_description = 'Miner preparing block %d' % (self.db.get('length') + 1)
+        print(self.status_description)
+
         candidate_block = self.get_candidate_block()
-        print('Miner starting to work for block %d' % (candidate_block['length']))
+
+        self.status_description = 'Miner starting to work for block %d' % (candidate_block['length'])
+        print(self.status_description)
+
         self.start_workers(candidate_block)
 
         possible_blocks = []

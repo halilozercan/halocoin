@@ -11,10 +11,10 @@ class WalletManagement extends Component {
       <div className="container-fluid" style={{marginTop:16, marginBottom:64}}>
         <div className="row">
           <div className="col-lg-6 col-md-6 col-sm-6">
-            <Balance wallet={this.props.wallet} account={this.props.account} notify={this.props.notify} />
+            <Balance account={this.props.account} notify={this.props.notify} />
           </div>
           <div className="col-lg-6 col-md-6 col-sm-6">
-            <Address wallet={this.props.wallet} notify={this.props.notify} />
+            <Address account={this.props.account} notify={this.props.notify} />
           </div>
         </div>
         <div className="row" style={{marginTop:"16px"}}>
@@ -22,7 +22,7 @@ class WalletManagement extends Component {
             <Send notify={this.props.notify} refresh={this.forceUpdate}/>
           </div>
           <div className="col-lg-6 col-md-6 col-sm-6">
-            <Stake wallet={this.props.wallet} socket={this.props.socket} account={this.props.account} notify={this.props.notify}/>
+            <Stake socket={this.props.socket} account={this.props.account} notify={this.props.notify}/>
           </div>
         </div>
       </div>

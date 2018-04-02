@@ -10,7 +10,7 @@ class Address extends Component {
 
   copyToClipboard = () => {
     var textField = document.createElement('textarea');
-    textField.innerText = this.props.wallet.address;
+    textField.innerText = this.props.account.address;
     document.body.appendChild(textField);
     textField.select();
     document.execCommand('copy');
@@ -19,8 +19,7 @@ class Address extends Component {
   }
 
   render() {
-    if(this.props.wallet !== null) {
-      console.log('not null');
+    if(this.props.account !== null) {
       return (
         <Card>
           <CardHeader
@@ -29,7 +28,7 @@ class Address extends Component {
               this.props.notify("Copied to Clipboard!");
             }}
             title="Address"
-            subtitle={this.props.wallet.address}
+            subtitle={this.props.account.address}
             avatar={
               <Avatar 
                 style={{cursor:"pointer"}} 
@@ -42,7 +41,6 @@ class Address extends Component {
       );
     }
     else {
-      console.log(' null');
       return <div />;
     }
   }

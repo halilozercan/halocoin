@@ -1,7 +1,8 @@
 import React, { Component } from 'react';
-import {axiosInstance} from './tools.js';
+import axios from 'axios';
 import WalletManagement from './WalletManagement.js';
-import Mining from './Mining.js';
+import Status from './Status.js';
+import Auths from './Auths.js';
 import AppBar from 'material-ui/AppBar';
 import Drawer from 'material-ui/Drawer';
 import MenuItem from 'material-ui/MenuItem';
@@ -15,20 +16,9 @@ class MainPage extends Component {
   constructor(props){
     super(props);
     this.state = {
-      'default_wallet': null,
       'drawer_open': false,
       'page': 'main'
     }
-  }
-
-  componentDidMount() {
-    this.refreshWalletInfo();
-    this.props.socket.on('new_block', (socket) => {
-      this.refreshWalletInfo();
-    });
-    this.props.socket.on('new_tx_in_pool', (socket) => {
-      this.refreshWalletInfo();
-    });
   }
 
   drawerToggle = () => this.setState((state) => {
@@ -43,23 +33,8 @@ class MainPage extends Component {
     })
   }
 
-  refreshWalletInfo = () => {
-    axiosInstance.get("/info_wallet").then((response) => {
-      let data = response.data;
-      if(data.hasOwnProperty('address')) {
-        this.setState({default_wallet:data});
-      }
-      else {
-        this.setState({default_wallet:null});
-      }
-    });
-  }
-
   onLogout = () => {
-    let data = new FormData()
-    data.append('delete', true);
-
-    axiosInstance.post('/set_default_wallet', data).then((response) => {
+    axios.post('/logout').then((response) => {
       
     }).catch((error) => {
       this.props.notify('Failed to logout', 'error');
@@ -69,14 +44,25 @@ class MainPage extends Component {
   render() {
     let currentPage = <div />
     if(this.state.page === 'main') {
-      currentPage = <WalletManagement notify={this.props.notify} default_wallet={this.state.default_wallet} />;
+      console.log('Account: ' + this.state.account);
+      currentPage = <WalletManagement notify={this.props.notify} 
+                                      wallet_name={this.props.wallet_name} 
+                                      account={this.props.account}
+                                      socket={this.props.socket} />;
     }
-    else if(this.state.page === 'mining') {
-      currentPage = <Mining notify={this.props.notify} default_wallet={this.state.default_wallet} socket={this.props.socket} />
+    else if(this.state.page === 'status') {
+      currentPage = <Status notify={this.props.notify} 
+                            account={this.props.account}
+                            socket={this.props.socket} />
+    }
+    else if(this.state.page === 'auths') {
+      currentPage = <Auths notify={this.props.notify}
+                            account={this.props.account}
+                            socket={this.props.socket} />
     }
     let title = "Halocoin";
-    if(this.state.default_wallet !== null) {
-      title += " - " + this.state.default_wallet.name;
+    if(this.props.wallet_name !== null) {
+      title += " - " + this.props.wallet_name;
     }
     return (
       <div>
@@ -87,7 +73,8 @@ class MainPage extends Component {
         />
         <Drawer open={this.state.drawer_open} docked={false} onRequestChange={(drawer_open) => this.setState({drawer_open})}>
           <MenuItem leftIcon={<Home />} onClick={() => {this.changePage('main')}} >Home</MenuItem>
-          <MenuItem leftIcon={<Settings />} onClick={() => {this.changePage('mining')}}>Mining</MenuItem>
+          <MenuItem leftIcon={<Settings />} onClick={() => {this.changePage('status')}}>Status</MenuItem>
+          <MenuItem leftIcon={<Settings />} onClick={() => {this.changePage('auths')}}>Authorities</MenuItem>
           <MenuItem leftIcon={<Lock />} onClick={this.onLogout}>Logout</MenuItem>
         </Drawer>
         {currentPage}

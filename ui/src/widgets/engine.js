@@ -9,6 +9,9 @@ import FlatButton from 'material-ui/FlatButton';
 import FontIcon from 'material-ui/FontIcon';
 import {red500, green500} from 'material-ui/styles/colors';
 import TouchRipple from 'material-ui/internal/TouchRipple';
+import Dialog from 'material-ui/Dialog';
+import TextField from 'material-ui/TextField';
+import RaisedButton from 'material-ui/RaisedButton';
 
 class ServiceToggle extends Component {
   constructor(props) {
@@ -57,7 +60,10 @@ class EngineStatus extends Component {
       'power': null,
       'peers_check': null,
       'peer_receive': null,
-      'blockchain': null
+      'blockchain': null,
+      'dialogTitle': '',
+      'dialogOpen': false,
+      'password': ''
     }
   }
 
@@ -79,22 +85,57 @@ class EngineStatus extends Component {
     });
   }
 
+  handleOpen = (dialog_title) => {
+    this.setState({dialogOpen: true, dialogTitle: dialog_title});
+  };
+
+  handleClose = () => {
+    this.setState({dialogOpen: false, password:'', dialogTitle:''});
+  };
+
+  onPasswordChange = (e) => {
+    this.setState({password: e.target.value});
+  }
+
   changeStatus = (service_name) => {
     if(this.state[service_name]) {
-      console.log('Stoppping ' + service_name);
       axiosInstance.post("/service/" + service_name + "/stop").then((response) => {
         this.update();
       });
     }
     else {
-      console.log('Starting ' + service_name);
-      axiosInstance.post("/service/" + service_name + "/start").then((response) => {
-        this.update();
-      });
+      if(service_name == "power" || service_name == "miner") {
+        this.handleOpen(service_name);
+      }
+      else{
+        axiosInstance.post("/service/" + service_name + "/start").then((response) => {
+          this.update();
+        });
+      }
     }
   }
 
+  startWithPassword = () => {
+    let data = new FormData();
+    data.append('password', this.state.password);
+    axiosInstance.post("/service/" + this.state.dialogTitle + "/start", data).then((response) => {
+      this.handleClose();
+      this.update();
+    }).catch((error) => {
+      this.handleClose();
+    });
+  }
+
   render() {
+    const actions = [
+      <RaisedButton
+        label="Ok"
+        primary={true}
+        keyboardFocused={true}
+        onClick={this.startWithPassword}
+      />,
+    ];
+
     return (
       <Card containerStyle={{height:"100%"}}>
         <ServiceToggle 
@@ -122,6 +163,21 @@ class EngineStatus extends Component {
           avatarColor={this.state.power ? green500:red500} toggled={this.state.power} 
           changeStatus={() => {this.changeStatus('power')}}
         />
+        <Dialog
+          title="Enter Password"
+          actions={actions}
+          modal={false}
+          open={this.state.dialogOpen}
+          onRequestClose={this.handleClose}
+        >
+          <TextField
+              fullWidth={true}
+              floatingLabelText="Password"
+              name="password"
+              type="password"
+              onChange={this.onPasswordChange}
+            />
+        </Dialog>
       </Card>
     );
   }

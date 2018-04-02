@@ -125,6 +125,15 @@ class Service:
         """
         self.__state = state
 
+    def get_status(self):
+        """
+        To be implemented by child class
+        :return:
+        """
+        return {
+            "status": self.get_state(readable=True)
+        }
+
 
 locks = {}
 

@@ -40,6 +40,7 @@ class StateDatabase:
             account = self.db.get(address)
         else:
             account = copy.deepcopy(StateDatabase.default_account)
+        account['address'] = copy.deepcopy(address)
         return account
 
     def update_account(self, address, new_account):

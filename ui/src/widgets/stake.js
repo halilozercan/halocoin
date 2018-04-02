@@ -109,15 +109,13 @@ class Stake extends Component {
     let score = 0;
     let applicationMode = 'Single';
     let applicationList = [];
-    let name = "";
     let assignedJob = "None";
     if(this.props.account !== null){
       score = this.props.account.score;
       applicationMode = this.props.account.application.mode == 's' ? 'Single':'Continous';
       applicationList = this.props.account.application.list;
-      name = this.props.wallet.name;
       if(this.props.account.assigned_job.auth !== null) {
-        assignedJob = "Auth " + this.props.wallet.assigned_job.auth + " JobId " + this.props.wallet.assigned_job.job_id;
+        assignedJob = "Auth " + this.props.account.assigned_job.auth + " JobId " + this.props.account.assigned_job.job_id;
       }
     }
 

@@ -73,13 +73,14 @@ class PowerService(Service):
 
     @lockit('power')
     def get_status(self):
-        return self.status
+        status = Service.get_status(self)
+        status['title'] = self.status
+        status['description'] = self.description
 
     @lockit('power')
     def set_status(self, status, description=""):
         self.status = status
         self.description = description
-        api.power_status()
 
     def initiate_job(self, job):
         job_name = job['auth'] + '_' + job['id']

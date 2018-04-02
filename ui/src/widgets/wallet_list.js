@@ -54,13 +54,13 @@ class WalletList extends Component {
     this.setState({password: e.target.value});
   }
 
-  setDefaultWallet = () => {
+  login = () => {
     let password = this.state.password;
     let data = new FormData();
     data.append('wallet_name', this.state.name);
     data.append('password', password);
 
-    axios.post('/wallet/default', data).then((response) => {
+    axios.post('/login', data).then((response) => {
       let success = response.data.success;
       if(success) {
         this.props.notify('Successfully updated your default wallet', 'success');
@@ -86,7 +86,7 @@ class WalletList extends Component {
         label="Ok"
         primary={true}
         keyboardFocused={true}
-        onClick={this.setDefaultWallet}
+        onClick={this.login}
       />,
     ];
 

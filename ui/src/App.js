@@ -41,7 +41,7 @@ class App extends Component {
     super(props);
     this.state = {
       "status": null,
-      "wallet": null,
+      "wallet_name": null,
       "account": null
     }
     
@@ -93,19 +93,18 @@ class App extends Component {
   }
 
   checkDefault = () => {
-    axios.get("/wallet/info").then((response) => {
+    axios.get("/login/info").then((response) => {
       let data = response.data;
-      if(data.hasOwnProperty('wallet')) {
+      if(data.success) {
         this.setState((state) => {
-          state.status = 'yes_dw';
-          state.wallet = data.wallet;
+          state.status = 'logged_in';
           state.account = data.account;
           return state;
         });
       }
       else {
         this.setState((state) => {
-          state.status = 'no_dw';
+          state.status = 'no_login';
           return state;
         });
       }
@@ -123,11 +122,6 @@ class App extends Component {
   }
 
   notify = (message, type, pos='bc') => {
-    /*this._notificationSystem.addNotification({
-      message: message,
-      level: type,
-      position: pos
-    });*/
     this.setState({
       notificationOpen: true,
       notificationMessage: message
@@ -163,12 +157,15 @@ class App extends Component {
               </CardText>
             </Card>;
     }
-    else if(this.state.status === "yes_dw") {
-      //console.log("Wallet: " + this.state.wallet);
-      page = <MainPage socket={this.socket} notify={this.notify} wallet={this.state.wallet} account={this.state.account}/>;
+    else if(this.state.status === "logged_in") {
+      page = <MainPage  socket={this.socket} 
+                        notify={this.notify} 
+                        wallet_name={this.state.wallet_name} 
+                        account={this.state.account}/>;
     }
-    else if(this.state.status === "no_dw") {
-      page = <ChooseWallet socket={this.socket} notify={this.notify}/>;
+    else if(this.state.status === "no_login") {
+      page = <ChooseWallet  socket={this.socket} 
+                            notify={this.notify}/>;
     }
 
     return (
