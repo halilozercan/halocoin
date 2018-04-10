@@ -8,11 +8,10 @@ import uuid
 import psutil as psutil
 # WARNING! Do not remove below import line. PyInstaller depends on it
 from engineio import async_threading
-from flask import Flask, request, Response, send_file, g
+from flask import Flask, request, Response, send_file
 from flask_socketio import SocketIO
 
 from halocoin import tools, engine, custom
-from halocoin.power import PowerService
 from halocoin.service import Service
 
 async_threading  # PyCharm automatically removes unused imports. This prevents it
@@ -291,33 +290,6 @@ def node_id():
     return generate_json_response(engine.instance.db.get('node_id'))
 
 
-@app.route('/subauths', methods=['GET'])
-def auth_list():
-    _list = engine.instance.statedb.get_auth_list()
-    response = [engine.instance.statedb.get_auth(auth_name) for auth_name in _list]
-    for i, auth in enumerate(response):
-        available_jobs = engine.instance.statedb.get_jobs(auth=auth['name'], type='available')
-        auth['available_reward'] = 0
-        for job in available_jobs:
-            auth['available_reward'] += job['reward']
-        response[i] = auth
-    return generate_json_response(response)
-
-
-@app.route('/job/list', methods=['GET'])
-def jobs():
-    type = request.values.get('type', 'available')
-    page = int(request.values.get('page', 1))
-    auth = request.values.get('auth', None)
-    rows_per_page = int(request.values.get('rows_per_page', 5))
-    result = {'total': 0, 'page': page, 'rows_per_page': rows_per_page, 'jobs': []}
-    jobs = engine.instance.statedb.get_jobs(auth=auth, type=type)
-    result['total'] = len(jobs)
-    result['jobs'] = jobs[((page - 1) * rows_per_page):(page * rows_per_page)]
-
-    return generate_json_response(result)
-
-
 def send_to_blockchain(tx):
     response = dict()
     api_key = str(uuid.uuid4())
@@ -375,233 +347,6 @@ def send():
         tx['pubkeys'] = [wallet.get_pubkey_str()]  # We use pubkey as string
     if 'signatures' not in tx:
         tx['signatures'] = [tools.sign(tools.det_hash(tx), wallet.privkey)]
-
-    response = send_to_blockchain(tx)
-
-    return generate_json_response(response)
-
-
-@app.route('/tx/pool_reg', methods=['POST'])
-def pool_reg():
-    force = request.values.get('force', None)
-
-    status = PowerService.docker_status()
-    if not status.getFlag() and force is None:
-        return generate_json_response({
-            'error': 'Power service is unavailable',
-            'message': 'Power service cannot seem to function right now. '
-                       'This probably means there is a problem with Docker connection or Docker is not installed.'
-        })
-
-    wallet_result = get_wallet()
-
-    response = {"success": False}
-    if not wallet_result.getFlag():
-        response['error'] = wallet_result.getData()
-        return generate_json_response(response)
-
-    tx = {'type': 'pool_reg', 'version': custom.version}
-
-    wallet = wallet_result.getData()
-
-    if 'count' not in tx:
-        try:
-            tx['count'] = engine.instance.statedb.known_tx_count(wallet.address, count_pool=True)
-        except:
-            tx['count'] = 0
-    if 'pubkeys' not in tx:
-        tx['pubkeys'] = [wallet.get_pubkey_str()]  # We use pubkey as string
-    if 'signatures' not in tx:
-        tx['signatures'] = [tools.sign(tools.det_hash(tx), wallet.privkey)]
-
-    response = send_to_blockchain(tx)
-
-    return generate_json_response(response)
-
-
-@app.route('/tx/application', methods=['POST'])
-def application():
-    _list = request.values.get('list', None)
-    mode = request.values.get('mode', None)
-    wallet_result = get_wallet()
-
-    response = {"success": False}
-    if not wallet_result.getFlag():
-        response['error'] = wallet_result.getData()
-        return generate_json_response(response)
-    elif _list is None:
-        response['error'] = "Application list is not given"
-        return generate_json_response(response)
-    elif mode is None or mode not in ['s', 'c']:
-        response['error'] = "Application mode is not given or invalid"
-        return generate_json_response(response)
-    tx = {
-        'type': 'application',
-        'application':
-            {
-                'list': _list.split(',') if _list != '' else [],
-                'mode': mode
-            },
-        'version': custom.version
-    }
-
-    wallet = wallet_result.getData()
-
-    if 'count' not in tx:
-        try:
-            tx['count'] = engine.instance.statedb.known_tx_count(wallet.address, count_pool=True)
-        except:
-            tx['count'] = 0
-    if 'pubkeys' not in tx:
-        tx['pubkeys'] = [wallet.get_pubkey_str()]  # We use pubkey as string
-    if 'signatures' not in tx:
-        tx['signatures'] = [tools.sign(tools.det_hash(tx), wallet.privkey)]
-
-    response = send_to_blockchain(tx)
-
-    return generate_json_response(response)
-
-
-@app.route('/tx/reward', methods=['POST'])
-def reward():
-    from ecdsa import SigningKey
-    job_id = request.values.get('job_id', None)
-    address = request.values.get('address', None)
-    certificate = request.values.get('certificate', None)
-    privkey = request.values.get('privkey', None)
-
-    response = {"success": False}
-    if job_id is None:
-        response['error'] = "You need to specify a job id for the reward"
-        return generate_json_response(response)
-    elif address is None:
-        response['error'] = "You need to specify a receiving address for the reward"
-        return generate_json_response(response)
-    elif privkey is None:
-        response['error'] = "Reward transactions need to be signed by private key belonging to certificate"
-        return generate_json_response(response)
-    elif certificate is None:
-        response['error'] = "To reward, you must specify a common name or certificate that is granted by root"
-        return generate_json_response(response)
-
-    tx = {'type': 'reward', 'job_id': job_id, 'to': address, 'version': custom.version}
-
-    privkey = SigningKey.from_pem(privkey)
-    common_name = tools.get_commonname_from_certificate(certificate)
-    tx['auth'] = common_name
-
-    tx['pubkeys'] = [privkey.get_verifying_key().to_string()]  # We use pubkey as string
-    tx['signatures'] = [tools.sign(tools.det_hash(tx), privkey)]
-
-    response = send_to_blockchain(tx)
-
-    return generate_json_response(response)
-
-
-@app.route('/tx/job_dump', methods=['POST'])
-def job_dump():
-    from ecdsa import SigningKey
-    job = {
-        'id': request.values.get('id', None),
-        'timestamp': request.values.get('timestamp', None),
-        'amount': int(request.values.get('amount', 0)),
-        'download_url': request.values.get('download_url', None),
-        'upload_url': request.values.get('upload_url', None),
-        'hashsum': request.values.get('hashsum', None),
-        'image': request.values.get('image', None),
-    }
-    certificate = request.values.get('certificate', None)
-    privkey = request.values.get('privkey', None)
-
-    response = {"success": False}
-    if job['id'] is None:
-        response['error'] = "Job id missing"
-        return generate_json_response(response)
-    elif job['timestamp'] is None:
-        response['error'] = "Job timestamp missing"
-        return generate_json_response(response)
-    elif job['amount'] == 0:
-        response['error'] = "Reward amount is missing"
-        return generate_json_response(response)
-    elif job['download_url'] is None:
-        response['error'] = "Job download url missing"
-        return generate_json_response(response)
-    elif job['upload_url'] is None:
-        response['error'] = "Job upload url missing"
-        return generate_json_response(response)
-    elif job['hashsum'] is None:
-        response['error'] = "Job hashsum missing"
-        return generate_json_response(response)
-    elif job['image'] is None:
-        response['error'] = "Job image missing"
-        return generate_json_response(response)
-    elif privkey is None:
-        response['error'] = "Job dumps need to be signed by private key belonging to certificate"
-        return generate_json_response(response)
-    elif certificate is None:
-        response['error'] = "To give jobs, you must specify a certificate that is granted by root"
-        return generate_json_response(response)
-
-    tx = {'type': 'job_dump', 'job': job, 'version': custom.version}
-
-    privkey = SigningKey.from_pem(privkey)
-    common_name = tools.get_commonname_from_certificate(certificate)
-    tx['auth'] = common_name
-
-    tx['pubkeys'] = [privkey.get_verifying_key().to_string()]  # We use pubkey as string
-    tx['signatures'] = [tools.sign(tools.det_hash(tx), privkey)]
-
-    response = send_to_blockchain(tx)
-
-    return generate_json_response(response)
-
-
-@app.route('/tx/auth_reg', methods=['POST'])
-def auth_reg():
-    from ecdsa import SigningKey
-    certificate = request.values.get('certificate', None)
-    privkey = request.values.get('privkey', None)
-    host = request.values.get('host', None)
-    description = request.values.get('description', None)
-    supply = int(request.values.get('supply', 0))
-
-    response = {"success": False}
-    if privkey is None:
-        response['error'] = "Auth registration transactions need to be signed by private key belonging to certificate"
-        return generate_json_response(response)
-    elif certificate is None:
-        response['error'] = "Certificate is required for registration"
-        return generate_json_response(response)
-    elif host is None:
-        response['error'] = "Authorities must provide a hosting address"
-        return generate_json_response(response)
-    elif description is None:
-        response['error'] = "Authorities must provide a description"
-        return generate_json_response(response)
-    elif supply == 0:
-        response['error'] = "Authorities must register with an initial supply"
-        return generate_json_response(response)
-
-    tx = {'type': 'auth_reg',
-          'version': custom.version,
-          'host': host,
-          'supply': supply,
-          'description': description}
-
-    privkey = SigningKey.from_pem(privkey)
-
-    common_name = tools.get_commonname_from_certificate(certificate)
-    if engine.instance.statedb.get_auth(common_name) is not None:
-        response['error'] = "An authority with common name {} is already registered.".format(common_name)
-        return generate_json_response(response)
-    if not tools.check_certificate_chain(certificate):
-        response['error'] = "Given certificate is not granted by root"
-        return generate_json_response(response)
-
-    tx['certificate'] = certificate
-
-    tx['pubkeys'] = [privkey.get_verifying_key().to_string()]  # We use pubkey as string
-    tx['signatures'] = [tools.sign(tools.det_hash(tx), privkey)]
 
     response = send_to_blockchain(tx)
 
@@ -680,33 +425,6 @@ def stop():
     return generate_json_response('Shutting down')
 
 
-# @app.route('/miner/start', methods=['POST'])
-# def start_miner():
-#     response = {"success": False}
-#
-#     wallet_result = get_wallet()
-#     if not wallet_result.getFlag():
-#         response['error'] = wallet_result.getData()
-#         return generate_json_response(response)
-#
-#     if engine.instance.miner.get_state() == Service.RUNNING:
-#         return generate_json_response('Miner is already running.')
-#     else:
-#         engine.instance.miner.set_wallet(wallet_result.getData())
-#         engine.instance.miner.register()
-#         return generate_json_response('Running miner')
-#
-#
-# @app.route('/miner/stop', methods=['POST'])
-# def stop_miner():
-#     if engine.instance.miner.get_state() == Service.RUNNING:
-#         engine.instance.miner.unregister()
-#         miner_status()
-#         return generate_json_response('Closed miner')
-#     else:
-#         return generate_json_response('Miner is not running.')
-
-
 @app.route('/miner', methods=['GET'])
 def status_miner():
     status = {
@@ -717,40 +435,12 @@ def status_miner():
     return generate_json_response(status)
 
 
-@app.route('/docker', methods=['GET'])
-def docker_status():
-    status = PowerService.docker_status()
-    return generate_json_response({
-        "success": status.getFlag(),
-        "message": status.getData()
-    })
-
-
-@app.route('/docker/images', methods=['GET'])
-def docker_images():
-    status = PowerService.docker_images()
-    return generate_json_response({
-        "success": status.getFlag(),
-        "message": status.getData()
-    })
-
-
-@app.route('/power', methods=['GET'])
-def status_power():
-    return generate_json_response({
-        "running": engine.instance.power.get_state() == Service.RUNNING,
-        "status": engine.instance.power.get_status(),
-        "description": engine.instance.power.description
-    })
-
-
 @app.route('/engine', methods=['GET'])
 def engine_status():
     return generate_json_response({
         "blockchain": engine.instance.blockchain.get_state(readable=True),
         "peer_receive": engine.instance.peer_receive.get_state(readable=True),
         "peers_check": engine.instance.peers_check.get_state(readable=True),
-        "power": engine.instance.power.get_state(readable=True),
         "miner": engine.instance.miner.get_state(readable=True)
     })
 
@@ -764,16 +454,6 @@ def service_start(service_name):
         corresponding_service = engine.instance.peers_check
     elif service_name == "peer_receive":
         corresponding_service = engine.instance.peer_receive
-    elif service_name == "power":
-        corresponding_service = engine.instance.power
-        wallet = get_wallet()
-        if wallet.getFlag():
-            corresponding_service.set_wallet(wallet.getData())
-        else:
-            return generate_json_response({
-                "success": False,
-                "message": "This service requires a valid wallet"
-            })
     elif service_name == "miner":
         corresponding_service = engine.instance.miner
         wallet = get_wallet()
@@ -807,8 +487,6 @@ def service_stop(service_name):
         corresponding_service = engine.instance.peers_check
     elif service_name == "peer_receive":
         corresponding_service = engine.instance.peer_receive
-    elif service_name == "power":
-        corresponding_service = engine.instance.power
     elif service_name == "miner":
         corresponding_service = engine.instance.miner
 
@@ -834,8 +512,6 @@ def service_status(service_name):
         corresponding_service = engine.instance.peers_check
     elif service_name == "peer_receive":
         corresponding_service = engine.instance.peer_receive
-    elif service_name == "power":
-        corresponding_service = engine.instance.power
     elif service_name == "miner":
         corresponding_service = engine.instance.miner
 
@@ -867,18 +543,6 @@ def peer_update():
 
 def new_tx_in_pool():
     socketio.emit('new_tx_in_pool')
-
-
-def power_status():
-    socketio.emit('power_status', {
-        "status": engine.instance.power.get_status(),
-        "description": engine.instance.power.description,
-        "running": engine.instance.power.get_state() == Service.RUNNING
-    })
-
-
-def docker_status_socket():
-    socketio.emit('docker_status')
 
 
 def miner_status():

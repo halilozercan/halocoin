@@ -139,11 +139,6 @@ def download_wallet(wallet):
 
 
 @action
-def auth_list():
-    haloprint(make_api_request("/subauths", http_method="GET"))
-
-
-@action
 def wallets():
     haloprint(make_api_request("/wallet/list", http_method="GET"))
 
@@ -223,63 +218,6 @@ def send(address, amount, wallet=None, pw=None, message=None):
 
 
 @action
-def pool_reg(wallet=None, pw=None, force=None):
-    if wallet is not None and pw is None:
-        wallet_pw = getpass('Wallet password: ')
-    else:
-        wallet_pw = pw
-
-    haloprint(make_api_request("/tx/pool_reg", http_method="POST",
-                               wallet_name=wallet, password=wallet_pw, force=force))
-
-
-@action
-def application(wallet=None, mode=None, list=None, pw=None):
-    if wallet is not None and pw is None:
-        wallet_pw = getpass('Wallet password: ')
-    else:
-        wallet_pw = pw
-
-    if list is None:
-        list = ''
-
-    if mode is None:
-        mode = 's'
-
-    haloprint(make_api_request("/tx/application", http_method="POST",
-                               wallet_name=wallet, password=wallet_pw, list=list, mode=mode))
-
-
-@action
-def reward(certificate, privkey, job_id, address):
-    certificate = open(certificate, 'rb').read()
-    privkey = open(privkey, 'rb').read()
-    haloprint(make_api_request("/tx/reward", http_method="POST", address=address, job_id=job_id,
-                               certificate=certificate, privkey=privkey))
-
-
-@action
-def job_dump(certificate, privkey, job_id, amount, download_url, upload_url, hashsum, image):
-    certificate = open(certificate, 'rb').read()
-    privkey = open(privkey, 'rb').read()
-    haloprint(make_api_request("/tx/job_dump", http_method="POST", id=job_id, timestamp=time.time(), amount=amount,
-                               certificate=certificate, privkey=privkey, download_url=download_url,
-                               upload_url=upload_url, hashsum=hashsum, image=image))
-
-
-@action
-def auth_reg(certificate, privkey, host, amount, description):
-    certificate = open(certificate, 'rb').read()
-    privkey = open(privkey, 'rb').read()
-    haloprint(make_api_request("/tx/auth_reg", http_method="POST", certificate=certificate, privkey=privkey, host=host,
-                               supply=amount, description=description))
-
-
-@action
-def jobs():
-    haloprint(make_api_request("/job/list", http_method="GET"))
-
-@action
 def peers():
     peers = make_api_request("/peers", http_method="GET")
     haloprint(peers)
@@ -297,37 +235,17 @@ def start_miner(wallet=None, pw=None):
     else:
         wallet_pw = pw
 
-    haloprint(make_api_request("/miner/start", http_method="POST", wallet_name=wallet, password=wallet_pw))
+    haloprint(make_api_request("/service/miner/start", http_method="POST", wallet_name=wallet, password=wallet_pw))
 
 
 @action
 def stop_miner():
-    haloprint(make_api_request("/miner/stop", http_method="POST"))
+    haloprint(make_api_request("/service/miner/stop", http_method="POST"))
 
 
 @action
 def status_miner():
-    haloprint(make_api_request("/miner", http_method="GET"))
-
-
-@action
-def start_power(wallet=None, pw=None):
-    if wallet is not None and pw is None:
-        wallet_pw = getpass('Wallet password: ')
-    else:
-        wallet_pw = pw
-
-    haloprint(make_api_request("/power/start", http_method="POST", wallet_name=wallet, password=wallet_pw))
-
-
-@action
-def stop_power():
-    haloprint(make_api_request("/miner/power", http_method="POST"))
-
-
-@action
-def status_power():
-    haloprint(make_api_request("/power", http_method="GET"))
+    haloprint(make_api_request("/service/miner/status", http_method="GET"))
 
 
 @action
@@ -364,20 +282,6 @@ def run(argv):
                         help='File path for wallet upload')
     parser.add_argument('--wallet', metavar='my_wallet', action="store", type=str, dest='wallet',
                         help='Wallet name')
-    parser.add_argument('--certificate', action="store", type=str, dest='certificate',
-                        help='Rewarding sub-auth certificate file in pem format')
-    parser.add_argument('--download-url', action="store", type=str, dest='download_url',
-                        help='Job dump download address')
-    parser.add_argument('--upload-url', action="store", type=str, dest='upload_url',
-                        help='Job dump upload address')
-    parser.add_argument('--image', action="store", type=str, dest='image',
-                        help='Job dump docker image tag')
-    parser.add_argument('--hashsum', action="store", type=str, dest='hashsum',
-                        help='Job dump file hashsum')
-    parser.add_argument('--description', action="store", type=str, dest='description',
-                        help='Required at sub-auth registration')
-    parser.add_argument('--job-id', action="store", type=str, dest='job_id',
-                        help='While dumping, requesting, or rewarding, necessary job id.')
     parser.add_argument('--privkey', action="store", type=str, dest='privkey',
                         help='Rewarding sub-auth private key file in pem format')
     parser.add_argument('--pw', action="store", type=str, dest='pw',
@@ -386,10 +290,6 @@ def run(argv):
                         help='Directory for halocoin to use.')
     parser.add_argument('--port', action="store", type=int, dest='port',
                         help='Override API port defined in config file.')
-    parser.add_argument('--host', action="store", type=str, dest='host',
-                        help='Define a host address while registering an auth.')
-    parser.add_argument('--list', action="store", type=str, dest='list',
-                        help='Sub authority application list')
     parser.add_argument('--mode', choices=sorted(['c', 's']), dest='mode',
                         help="Main action to perform by this CLI.")
     parser.add_argument('--force', action="store_true", dest='force',

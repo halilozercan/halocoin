@@ -94,13 +94,6 @@ def tx_owner_address(tx):
     return make_address(tx['pubkeys'], len(tx['signatures']))
 
 
-def reward_owner_name(tx):
-    if 'auth' in tx:
-        return tx['auth']
-    else:
-        return get_commonname_from_certificate(tx['certificate'])
-
-
 def custom_verify(r, s, msg, Q):
     from fastecdsa import _ecdsa
     from fastecdsa.ecdsa import EcdsaError
@@ -352,36 +345,6 @@ def validate_uuid4(uuid_string):
     # valid uuid4. This is bad for validation purposes.
 
     return val.hex == uuid_string.replace('-', '')
-
-
-def check_certificate_chain(intermediate_cert_pem):
-    from halocoin import custom
-    from OpenSSL.crypto import load_certificate, FILETYPE_PEM, X509Store, X509StoreContext
-    root_cert = load_certificate(FILETYPE_PEM, custom.root_cert_pem)
-    intermediate_cert = load_certificate(FILETYPE_PEM, intermediate_cert_pem)
-    try:
-        store = X509Store()
-        store.add_cert(root_cert)
-        store_ctx = X509StoreContext(store, intermediate_cert)
-        store_ctx.verify_certificate()
-        return True
-    except:
-        return False
-
-
-def get_pubkey_from_certificate(intermediate_cert_pem):
-    from OpenSSL.crypto import load_certificate, FILETYPE_PEM, dump_publickey
-    from ecdsa import VerifyingKey
-    intermediate_cert = load_certificate(FILETYPE_PEM, intermediate_cert_pem)
-    pubkey_pem = dump_publickey(FILETYPE_PEM, intermediate_cert.get_pubkey())
-    return VerifyingKey.from_pem(pubkey_pem)
-
-
-def get_commonname_from_certificate(intermediate_cert_pem):
-    from OpenSSL.crypto import load_certificate, FILETYPE_PEM
-    from slugify import slugify
-    intermediate_cert = load_certificate(FILETYPE_PEM, intermediate_cert_pem)
-    return slugify(intermediate_cert.get_subject().commonName)
 
 
 last = 0

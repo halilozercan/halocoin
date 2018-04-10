@@ -21,7 +21,7 @@ class BlockchainService(Service):
     job_dump: Announcing jobs that are prepared and ready to be downloaded
     job_request: Entering a pool for a job request.
     """
-    tx_types = ['spend', 'mint', 'reward', 'auth_reg', 'job_dump', 'pool_reg', 'application']
+    tx_types = ['spend', 'mint']
     IDLE = 1
     SYNCING = 2
 
@@ -430,59 +430,6 @@ class BlockchainService(Service):
                 return Response(False, 'Transaction amount is not given or not a proper integer')
             if 'count' not in tx or not isinstance(tx['count'], int):
                 return Response(False, 'transaction count is missing')
-        elif tx['type'] == 'reward':
-            if not BlockchainService.tx_signature_check(tx):
-                return Response(False, 'Transaction is not properly signed')
-            if 'auth' not in tx:
-                return Response(False, 'Reward transactions must include auth name')
-            if 'job_id' not in tx:
-                return Response(False, 'Reward must be addressed to a job id')
-            if 'to' not in tx or not tools.is_address_valid(tx['to']):
-                return Response(False, 'There must be a receiver of the reward.')
-        elif tx['type'] == 'auth_reg':
-            if 'certificate' not in tx:
-                return Response(False, 'Auth must register with a valid certificate')
-            elif tx['pubkeys'] != [tools.get_pubkey_from_certificate(tx['certificate']).to_string()]:
-                return Response(False, 'pubkeys do not match with certificate')
-            elif not BlockchainService.tx_signature_check(tx):
-                return Response(False, 'Transaction is not properly signed')
-            elif 'host' not in tx or not isinstance(tx['host'], str):
-                return Response(False, 'Authorities require to provide a hosting address')
-            elif 'supply' not in tx or not isinstance(tx['supply'], int):
-                return Response(False, 'Initial supply is not found')
-        elif tx['type'] == 'job_dump':
-            if 'auth' not in tx:
-                return Response(False, 'Job dump transactions must include auth name')
-            elif not BlockchainService.tx_signature_check(tx):
-                return Response(False, 'Transaction is not properly signed')
-            elif 'job' not in tx or not isinstance(tx['job'], dict):
-                return Response(False, 'Job dump transactions must include a job in it. Makes sense right?')
-            elif 'id' not in tx['job'] or \
-                            'timestamp' not in tx['job'] or \
-                            'amount' not in tx['job'] or \
-                            'image' not in tx['job'] or \
-                            'download_url' not in tx['job'] or \
-                            'upload_url' not in tx['job'] or \
-                            'hashsum' not in tx['job']:
-                return Response(False, 'Job dump transaction includes an invalid job description')
-        elif tx['type'] == 'pool_reg':
-            if not BlockchainService.tx_signature_check(tx):
-                return Response(False, 'Transaction is not properly signed')
-            if 'count' not in tx or not isinstance(tx['count'], int):
-                return Response(False, 'transaction count is missing')
-        elif tx['type'] == 'application':
-            if not BlockchainService.tx_signature_check(tx):
-                return Response(False, 'Transaction is not properly signed')
-            elif 'count' not in tx or not isinstance(tx['count'], int):
-                return Response(False, 'transaction count is missing')
-            elif 'application' not in tx or not isinstance(tx['application'], dict):
-                return Response(False, 'application object is missing')
-            elif 'mode' not in tx['application'] or 'list' not in tx['application']:
-                return Response(False, 'application object is invalid')
-            elif tx['application']['mode'] not in ['s', 'c']:
-                return Response(False, 'application object has invalid mode')
-            elif not isinstance(tx['application']['list'], list):
-                return Response(False, 'application object has invalid list')
 
         return Response(True, 'Everything seems fine')
 

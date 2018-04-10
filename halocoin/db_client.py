@@ -242,32 +242,3 @@ class ClientDB:
             return True
         except Exception as e:
             return False
-
-    @lockit('wallets')
-    def get_default_wallet(self):
-        return self.get('default_wallet')
-
-    @lockit('wallets')
-    def set_default_wallet(self, wallet_name, password):
-        try:
-            from halocoin.model.wallet import Wallet
-            encrypted_wallet_content = self.get_wallet(wallet_name)
-            wallet = Wallet.from_string(tools.decrypt(password, encrypted_wallet_content))
-            if wallet.name == wallet_name:
-                self.put('default_wallet', {
-                    "wallet_name": wallet_name,
-                    "password": password
-                })
-                api.changed_login_info()
-                return True
-            else:
-                return False
-        except Exception as e:
-            tools.log(e)
-            return False
-
-    @lockit('wallets')
-    def delete_default_wallet(self):
-        self.delete('default_wallet')
-        api.changed_login_info()
-        return True
