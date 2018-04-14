@@ -16,6 +16,10 @@ import {
 import Avatar from 'material-ui/Avatar';
 import FontIcon from 'material-ui/FontIcon';
 import {yellow800} from 'material-ui/styles/colors';
+import SelectField from 'material-ui/SelectField';
+import MenuItem from 'material-ui/MenuItem';
+import { WithContext as ReactTags } from 'react-tag-input';
+import './tags.css'
 
 class Stake extends Component {
 
@@ -25,8 +29,25 @@ class Stake extends Component {
       "dialogOpen": false,
       "dialogTitle": "Deposit Amount",
       "dialogText": "",
-      "dialogForm": false
+      "dialogForm": false,
+      "applicationMode": "s",
+      "password": "",
+      "applicationAuths": [{ id: "0", text: "Calkan" }],
+      "suggestions": [{id: 'Coinami', text: 'Coinami'}, {id: 'Calkan', text:'Calkan'}]
     }
+  }
+
+  componentDidMount(){
+    /*
+    axios.get('/subauths').then((response) => {
+      let auths = response.data
+      let suggestions = auths.map((auth) => {
+        return auth.name
+      });
+      this.setState({suggestions:suggestions})
+    }).catch((error) => {
+
+    })*/
   }
 
   openDialog = (title) => {
@@ -64,34 +85,15 @@ class Stake extends Component {
     this.props.notify('There will be a summary here!', 'success')
   }
 
+  handleApplicationModeChange = (event, index, value) => {
+    this.setState({applicationMode: value})
+  }
+
   stakeAction = () => {
     if(!this.state.dialogForm) {
-      axios.post('/tx/pool_reg').then((response) => {
-        let success = response.data.success;
-        if(success) {
-          this.props.notify(response.data.message, 'success');
-        }
-        else {
-          this.props.notify(response.data.message, 'error');
-        }
-      })  
-    }
-    else {
-      let password = this.state.password;
-      let amount = this.state.amount;
       let data = new FormData();
-      let address = "";
-      if(this.state.dialogTitle === 'Deposit') {
-        address = "/deposit";  
-      }
-      else{
-        address = "/withdraw";
-      }
-      
-      data.append('amount', amount);
-      data.append('password', password);
-  
-      axios.post(address, data).then((response) => {
+      data.append('password', this.state.password)
+      axios.post('/tx/pool_reg', data).then((response) => {
         let success = response.data.success;
         if(success) {
           this.props.notify(response.data.message, 'success');
@@ -101,8 +103,34 @@ class Stake extends Component {
         }
       })
     }
+    else {
+      
+    }
 
     this.setState({dialogOpen: false});
+  }
+
+  handleAuthDelete = (i) => {
+    let tags = this.state.applicationAuths
+    tags.splice(i, 1)
+    this.setState({
+      applicationAuths: tags
+    });
+  }
+
+  handleAuthAddition = (tag) => {
+    this.setState({ applicationAuths: [...this.state.applicationAuths, { id: this.state.applicationAuths.length + 1 + "", text: tag.text }] });
+  }
+
+  handleAuthDrag = (tag, currPos, newPos) => {
+    const applicationAuths = [...this.state.applicationAuths];
+
+    // mutate array
+    applicationAuths.splice(currPos, 1);
+    applicationAuths.splice(newPos, 0, tag);
+
+    // re-render
+    this.setState({ applicationAuths });
   }
 
   render() {
@@ -112,7 +140,7 @@ class Stake extends Component {
     let assignedJob = "None";
     if(this.props.account !== null){
       score = this.props.account.score;
-      applicationMode = this.props.account.application.mode == 's' ? 'Single':'Continous';
+      applicationMode = this.props.account.application.mode == 's' ? 'Single':'Continuous';
       applicationList = this.props.account.application.list;
       if(this.props.account.assigned_job.auth !== null) {
         assignedJob = "Auth " + this.props.account.assigned_job.auth + " JobId " + this.props.account.assigned_job.job_id;
@@ -131,12 +159,21 @@ class Stake extends Component {
     let form = <div></div>;
     if(this.state.dialogForm) {
         form = <div>
-                    <TextField
-                        fullWidth={true}
-                        floatingLabelText="Amount"
-                        name="amount"
-                        type="text"
-                        onChange={this.onAmountChange}
+                    <SelectField
+                      floatingLabelText="Application Mode"
+                      value={this.state.applicationMode}
+                      onChange={this.handleApplicationModeChange}
+                      autoWidth={true}
+                    >
+                      <MenuItem value={'s'} primaryText="Single" />
+                      <MenuItem value={'c'} primaryText="Continuous" />
+                    </SelectField>
+                    <ReactTags
+                      tags={this.state.applicationAuths}
+                      suggestions={this.state.suggestions}
+                      handleDelete={this.handleAuthDelete}
+                      handleAddition={this.handleAuthAddition}
+                      handleDrag={this.handleAuthDrag}
                     />
                     <TextField
                         fullWidth={true}
@@ -146,7 +183,17 @@ class Stake extends Component {
                         onChange={this.onPasswordChange}
                     />
                 </div>;
-    } 
+    } else {
+      form = <div>
+                <TextField
+                    fullWidth={true}
+                    floatingLabelText="Password"
+                    name="password"
+                    type="password"
+                    onChange={this.onPasswordChange}
+                />
+            </div>;
+    }
 
     return (
       <Card style={{width:"100%"}}>

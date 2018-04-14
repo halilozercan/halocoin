@@ -297,17 +297,17 @@ def start_miner(wallet=None, pw=None):
     else:
         wallet_pw = pw
 
-    haloprint(make_api_request("/miner/start", http_method="POST", wallet_name=wallet, password=wallet_pw))
+    haloprint(make_api_request("service/miner/start", http_method="POST", wallet_name=wallet, password=wallet_pw))
 
 
 @action
 def stop_miner():
-    haloprint(make_api_request("/miner/stop", http_method="POST"))
+    haloprint(make_api_request("service/miner/stop", http_method="POST"))
 
 
 @action
 def status_miner():
-    haloprint(make_api_request("/miner", http_method="GET"))
+    haloprint(make_api_request("service/miner/status", http_method="GET"))
 
 
 @action
@@ -317,17 +317,17 @@ def start_power(wallet=None, pw=None):
     else:
         wallet_pw = pw
 
-    haloprint(make_api_request("/power/start", http_method="POST", wallet_name=wallet, password=wallet_pw))
+    haloprint(make_api_request("service/power/start", http_method="POST", wallet_name=wallet, password=wallet_pw))
 
 
 @action
 def stop_power():
-    haloprint(make_api_request("/miner/power", http_method="POST"))
+    haloprint(make_api_request("service/power/stop", http_method="POST"))
 
 
 @action
 def status_power():
-    haloprint(make_api_request("/power", http_method="GET"))
+    haloprint(make_api_request("service/power/status", http_method="GET"))
 
 
 @action

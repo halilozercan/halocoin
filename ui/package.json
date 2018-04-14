@@ -8,6 +8,7 @@
     "material-ui": "^0.20.0",
     "react": "^16.2.0",
     "react-dom": "^16.2.0",
+    "react-tag-input": "^5.0.1",
     "socket.io-client": "^2.0.4"
   },
   "main": "src/electron-starter.js",
