@@ -23,12 +23,12 @@ if 'test' not in wallets:
     exit(1)
 
 print('Making test wallet default')
-requests.post('http://0.0.0.0:7001/wallet/default', data={'wallet_name': 'test', 'password': '3'})
-default_wallet = requests.get('http://0.0.0.0:7001/wallet/info').json()
-if default_wallet['wallet']['name'] != 'test':
+requests.post('http://0.0.0.0:7001/login', data={'wallet_name': 'test', 'password': '3'})
+default_wallet = requests.get('http://0.0.0.0:7001/login/info').json()
+if default_wallet['wallet_name'] != 'test':
     print('Couldn\'t change default wallet. \nFAILED!')
     exit(1)
 
 print('Starting power')
-result = requests.post('http://0.0.0.0:7001/power/start').text
+result = requests.post('http://0.0.0.0:7001/service/power/start', data={'password': '3'}).text
 print(result)

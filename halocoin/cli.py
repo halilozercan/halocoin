@@ -101,11 +101,16 @@ def extract_configuration(dir):
 
 
 @action
-def start(dir=None):
+def start(dir=None, daemon=False):
+    from halocoin.daemon import Daemon
     from halocoin import engine, tools
     config, working_dir = extract_configuration(dir)
     tools.init_logging(config['DEBUG'], working_dir, config['logging']['file'])
-    engine.main(config, working_dir)
+    if daemon:
+        myDaemon = Daemon(pidfile='/tmp/halocoin', run_func=lambda: engine.main(config, working_dir))
+        myDaemon.start()
+    else:
+        engine.main(config, working_dir)
 
 
 @action
@@ -394,6 +399,8 @@ def run(argv):
                         help="Main action to perform by this CLI.")
     parser.add_argument('--force', action="store_true", dest='force',
                         help='Force something that makes trouble.')
+    parser.add_argument('--daemon', action="store_true", dest='daemon',
+                        help='Start in daemon mode.')
     parser.add_argument('--default', action="store_true", dest='set_default',
                         help='Make new wallet default')
     args = parser.parse_args(argv[1:])

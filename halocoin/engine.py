@@ -42,7 +42,6 @@ instance = None
 
 class Engine(Service):
     def __init__(self, config, working_dir):
-        print("Initing Engine")
         Service.__init__(self, 'engine')
         self.config = config
         self.working_dir = working_dir
@@ -56,7 +55,6 @@ class Engine(Service):
         self.miner = MinerService(self)
         self.power = PowerService(self)
         self.interrupted = False
-        print("Done Engine")
 
     def on_register(self):
         print('Starting halocoin')

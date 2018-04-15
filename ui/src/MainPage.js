@@ -10,6 +10,7 @@ import Home from 'material-ui/svg-icons/action/home';
 import Settings from 'material-ui/svg-icons/action/settings';
 import Lock from 'material-ui/svg-icons/action/lock';
 import Blockcount from './widgets/blockcount.js';
+import FontIcon from 'material-ui/FontIcon';
 
 class MainPage extends Component {
 
@@ -73,8 +74,8 @@ class MainPage extends Component {
         />
         <Drawer open={this.state.drawer_open} docked={false} onRequestChange={(drawer_open) => this.setState({drawer_open})}>
           <MenuItem leftIcon={<Home />} onClick={() => {this.changePage('main')}} >Home</MenuItem>
-          <MenuItem leftIcon={<Settings />} onClick={() => {this.changePage('status')}}>Status</MenuItem>
-          <MenuItem leftIcon={<Settings />} onClick={() => {this.changePage('auths')}}>Authorities</MenuItem>
+          <MenuItem leftIcon={<Settings />} onClick={() => {this.changePage('status')}}>Services</MenuItem>
+          <MenuItem leftIcon={<FontIcon className="material-icons">beenhere</FontIcon>} onClick={() => {this.changePage('auths')}}>Authorities</MenuItem>
           <MenuItem leftIcon={<Lock />} onClick={this.onLogout}>Logout</MenuItem>
         </Drawer>
         {currentPage}

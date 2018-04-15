@@ -32,22 +32,21 @@ class Stake extends Component {
       "dialogForm": false,
       "applicationMode": "s",
       "password": "",
-      "applicationAuths": [{ id: "0", text: "Calkan" }],
-      "suggestions": [{id: 'Coinami', text: 'Coinami'}, {id: 'Calkan', text:'Calkan'}]
+      "applicationAuths": [],
+      "suggestions": []
     }
   }
 
   componentDidMount(){
-    /*
     axios.get('/subauths').then((response) => {
       let auths = response.data
       let suggestions = auths.map((auth) => {
-        return auth.name
+        return {id: auth.name, text:auth.name}
       });
       this.setState({suggestions:suggestions})
     }).catch((error) => {
 
-    })*/
+    })
   }
 
   openDialog = (title) => {
@@ -64,7 +63,9 @@ class Stake extends Component {
         dialogOpen: true,
         dialogTitle: "Edit Application",
         dialogText: "You can edit your application list and mode",
-        dialogForm: true
+        dialogForm: true,
+        applicationMode: this.props.account.application.mode,
+        applicationAuths: this.props.account.application.list.map((name) => {return {id:name, text:name}})
       })
     }
   };
@@ -104,7 +105,19 @@ class Stake extends Component {
       })
     }
     else {
-      
+      let data = new FormData();
+      data.append('mode', this.state.applicationMode)
+      data.append('list', this.state.applicationAuths.map(auth => auth.text).join(","))
+      data.append('password', this.state.password)
+      axios.post('/tx/application', data).then((response) => {
+        let success = response.data.success;
+        if(success) {
+          this.props.notify(response.data.message, 'success');
+        }
+        else {
+          this.props.notify(response.data.message, 'error');
+        }
+      })
     }
 
     this.setState({dialogOpen: false});
@@ -164,11 +177,13 @@ class Stake extends Component {
                       value={this.state.applicationMode}
                       onChange={this.handleApplicationModeChange}
                       autoWidth={true}
+                      style={{marginBottom:"32px"}}
                     >
                       <MenuItem value={'s'} primaryText="Single" />
                       <MenuItem value={'c'} primaryText="Continuous" />
                     </SelectField>
                     <ReactTags
+                      placeholder={"Add new Authority"}
                       tags={this.state.applicationAuths}
                       suggestions={this.state.suggestions}
                       handleDelete={this.handleAuthDelete}
