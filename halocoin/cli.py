@@ -167,19 +167,6 @@ def info_wallet(wallet=None, pw=None):
 
 
 @action
-def remove_wallet(wallet, pw=None):
-    if pw is None:
-        wallet_pw = getpass('Wallet password: ')
-    else:
-        wallet_pw = pw
-
-    information = make_api_request("/wallet/remove", http_method="GET",
-                                   wallet_name=wallet,
-                                   password=wallet_pw)
-    haloprint(information)
-
-
-@action
 def default_wallet(wallet, pw=None):
     if pw is None:
         wallet_pw = getpass('Wallet password: ')

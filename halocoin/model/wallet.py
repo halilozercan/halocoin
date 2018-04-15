@@ -29,13 +29,24 @@ class Wallet:
     def get_privkey_str(self):
         return self.privkey.to_string()
 
+    def as_dict(self):
+        import base64
+        encoded = base64.encodebytes(self.get_privkey_str()).decode('ascii')
+        return {
+            "name": self.name,
+            "privkey": encoded
+        }
+
+    @staticmethod
+    def from_dict(_dict):
+        import base64
+        decoded = base64.decodebytes(_dict['privkey'].encode())
+        return Wallet(_dict['name'], SigningKey.from_string(decoded, curve=SECP256k1))
+
     def to_string(self):
-        return pickle.dumps({
-            'name': self.name,
-            'privkey': self.get_privkey_str()
-        })
+        return pickle.dumps(self.as_dict())
 
     @staticmethod
     def from_string(wallet_string):
         wallet_dict = pickle.loads(wallet_string)
-        return Wallet(wallet_dict['name'], SigningKey.from_string(wallet_dict['privkey'], curve=SECP256k1))
+        return Wallet.from_dict(wallet_dict)

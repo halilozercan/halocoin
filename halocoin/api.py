@@ -1,6 +1,8 @@
 import copy
 import json
 import os
+import random
+import string
 import tempfile
 import threading
 import uuid
@@ -9,9 +11,11 @@ import psutil as psutil
 # WARNING! Do not remove below import line. PyInstaller depends on it
 from engineio import async_threading
 from flask import Flask, request, Response, send_file, g
+from flask_jwt_simple import jwt_required, get_jwt_identity, JWTManager, jwt_optional
 from flask_socketio import SocketIO
 
 from halocoin import tools, engine, custom
+from halocoin.model.wallet import Wallet
 from halocoin.power import PowerService
 from halocoin.service import Service
 
@@ -20,7 +24,7 @@ async_threading  # PyCharm automatically removes unused imports. This prevents i
 
 class ComplexEncoder(json.JSONEncoder):
     def default(self, obj):
-        from halocoin.model.wallet import Wallet
+
         if isinstance(obj, (bytes, bytearray)):
             return obj.hex()
         elif isinstance(obj, Wallet):
@@ -37,68 +41,12 @@ class ComplexEncoder(json.JSONEncoder):
 
 
 app = Flask(__name__)
+app.config['JWT_SECRET_KEY'] = ''.join(random.choice(string.ascii_uppercase + string.digits) for _ in range(16))
+jwt = JWTManager(app)
 socketio = SocketIO(app, async_mode='threading')
 listen_thread = None
 signals = dict()
 responses = dict()
-_login_info = None
-
-
-def get_login_info():
-    global _login_info
-    if _login_info is None:
-        return {
-            "name": None,
-            "address": None
-        }
-    else:
-        return copy.deepcopy(_login_info)
-
-
-def set_login_info(info):
-    global _login_info
-    _login_info = copy.deepcopy(info)
-    changed_login_info()
-
-
-def get_wallet():
-    # If wallet_name is not given, use default_wallet instead.
-    # If default_wallet is also missing, raise an error.
-    # default_wallet should just be a name. Every single action that requires private key,
-    # must provide wallet password.
-    from halocoin.ntwrk import Response
-    from halocoin.model.wallet import Wallet
-
-    login_name = get_login_info()['name']
-    wallet_name = request.values.get('wallet_name', None)
-    password = request.values.get('password', None)
-    if wallet_name is None:
-        wallet_name = login_name
-
-    if wallet_name is not None and password is not None:
-        encrypted_wallet_content = engine.instance.clientdb.get_wallet(wallet_name)
-        if encrypted_wallet_content is not None:
-            try:
-                wallet = Wallet.from_string(tools.decrypt(password, encrypted_wallet_content))
-                return Response(
-                    success=True,
-                    data=wallet
-                )
-            except Exception as e:
-                return Response(
-                    success=False,
-                    data=repr(e)
-                )
-        else:
-            return Response(
-                success=False,
-                data="Wallet does not exist!"
-            )
-    else:
-        return Response(
-            success=False,
-            data="No wallet to work with"
-        )
 
 
 def shutdown_server():
@@ -156,104 +104,66 @@ def download_wallet():
     return send_file(f, as_attachment=True, attachment_filename=wallet_name)
 
 
-@app.route('/login', methods=['POST'])
+@app.route('/login', methods=['GET', 'POST'])
 def login():
-    wallet_result = get_wallet()
-
-    if wallet_result.getFlag():
-        wallet = wallet_result.getData()
-        set_login_info({
-            "name": wallet.name,
-            "address": wallet.address
-        })
-
-        return generate_json_response({
-            "success": True,
-            "wallet": wallet
-        })
+    from flask_jwt_simple import create_jwt
+    wallet_name = request.values.get('wallet_name', None)
+    password = request.values.get('password', None)
+    if wallet_name is not None and password is not None:
+        encrypted_wallet_content = engine.instance.clientdb.get_wallet(wallet_name)
+        if encrypted_wallet_content is not None:
+            try:
+                wallet = Wallet.from_string(tools.decrypt(password, encrypted_wallet_content))
+                return generate_json_response(dict(
+                    success=True,
+                    jwt=create_jwt(identity={
+                        "wallet": wallet.as_dict(),
+                    })
+                ))
+            except Exception as e:
+                return generate_json_response(dict(
+                    success=False,
+                    message=repr(e)
+                ))
+        else:
+            return generate_json_response(dict(
+                success=False,
+                message="Wallet %s does not exist!" % wallet_name
+            ))
     else:
-        return generate_json_response({
-            "success": False,
-            "error": wallet_result.getData()
-        })
-
-
-@app.route('/logout', methods=['POST'])
-def logout():
-    set_login_info(None)
-    return generate_json_response({
-        "success": True,
-        "message": "Unset the default wallet"
-    })
+        return generate_json_response(dict(
+            success=False,
+            message="You must provide wallet name and password"
+        ))
 
 
 @app.route('/login/info', methods=['GET'])
+@jwt_required
 def account():
-    login_info = get_login_info()
-    if login_info['name'] is None:
-        return generate_json_response({
-            "success": False,
-            "wallet_name": None,
-            "account": None
-        })
-    else:
-        return generate_json_response({
-            "success": True,
-            "wallet_name": login_info['name'],
-            "account": engine.instance.statedb.get_account(login_info['address'])
-        })
-
-
-@app.route('/wallet/info', methods=['GET'])
-def info_wallet():
-    wallet_result = get_wallet()
-
-    if wallet_result.getFlag():
-        wallet = wallet_result.getData()
-        account = engine.instance.statedb.get_account(wallet.address)
-        del account['tx_blocks']
-        return generate_json_response({
-            "success": True,
-            "wallet": wallet,
-            "account": account
-        })
-    else:
-        return generate_json_response({
-            "success": False,
-            "error": wallet_result.getData()
-        })
-
-
-@app.route('/wallet/remove', methods=['POST'])
-def remove_wallet():
-    wallet_result = get_wallet()
-
-    if wallet_result.getFlag():
-        wallet = wallet_result.getData()
-        engine.instance.clientdb.remove_wallet(wallet.name)
-        return generate_json_response({
-            "success": True,
-            "message": "Removed wallet"
-        })
-    else:
-        return generate_json_response({
-            "success": False,
-            "error": wallet_result.getData()
-        })
+    wallet = Wallet.from_dict(get_jwt_identity()['wallet'])
+    return generate_json_response({
+        "success": True,
+        "wallet": wallet.as_dict(),
+        "account": engine.instance.statedb.get_account(wallet.address)
+    })
 
 
 @app.route('/wallet/new', methods=['POST'])
 def new_wallet():
-    from halocoin.model.wallet import Wallet
+    from flask_jwt_simple import create_jwt
     wallet_name = request.values.get('wallet_name', None)
     pw = request.values.get('password', None)
     login = request.values.get('login', None)
     wallet = Wallet(wallet_name)
     success = engine.instance.clientdb.new_wallet(pw, wallet)
     if login and success:
-        set_login_info({
-            'name': wallet.name,
-            'address': wallet.address
+        jwt = create_jwt(identity={
+            "wallet": wallet.as_dict(),
+        })
+        return generate_json_response({
+            "name": wallet_name,
+            "jwt": jwt,
+            "success": success
         })
 
     return generate_json_response({
@@ -344,17 +254,16 @@ def send_to_blockchain(tx):
 
 
 @app.route('/tx/send', methods=['POST'])
+@jwt_required
 def send():
+    wallet = Wallet.from_dict(get_jwt_identity()['wallet'])
+
     amount = int(request.values.get('amount', 0))
     address = request.values.get('address', None)
     message = request.values.get('message', '')
-    wallet_result = get_wallet()
 
     response = {"success": False}
-    if not wallet_result.getFlag():
-        response['error'] = wallet_result.getData()
-        return generate_json_response(response)
-    elif amount <= 0:
+    if amount <= 0:
         response['error'] = "Amount cannot be lower than or equal to 0"
         return generate_json_response(response)
     elif address is None:
@@ -363,8 +272,6 @@ def send():
 
     tx = {'type': 'spend', 'amount': int(amount),
           'to': address, 'message': message, 'version': custom.version}
-
-    wallet = wallet_result.getData()
 
     if 'count' not in tx:
         try:
@@ -382,6 +289,7 @@ def send():
 
 
 @app.route('/tx/pool_reg', methods=['POST'])
+@jwt_required
 def pool_reg():
     force = request.values.get('force', None)
 
@@ -393,16 +301,9 @@ def pool_reg():
                        'This probably means there is a problem with Docker connection or Docker is not installed.'
         })
 
-    wallet_result = get_wallet()
-
-    response = {"success": False}
-    if not wallet_result.getFlag():
-        response['error'] = wallet_result.getData()
-        return generate_json_response(response)
+    wallet = Wallet.from_dict(get_jwt_identity()['wallet'])
 
     tx = {'type': 'pool_reg', 'version': custom.version}
-
-    wallet = wallet_result.getData()
 
     if 'count' not in tx:
         try:
@@ -420,16 +321,14 @@ def pool_reg():
 
 
 @app.route('/tx/application', methods=['POST'])
+@jwt_required
 def application():
     _list = request.values.get('list', None)
     mode = request.values.get('mode', None)
-    wallet_result = get_wallet()
+    wallet = get_jwt_identity()['identity']
 
     response = {"success": False}
-    if not wallet_result.getFlag():
-        response['error'] = wallet_result.getData()
-        return generate_json_response(response)
-    elif _list is None:
+    if _list is None:
         response['error'] = "Application list is not given"
         return generate_json_response(response)
     elif mode is None or mode not in ['s', 'c']:
@@ -444,8 +343,6 @@ def application():
             },
         'version': custom.version
     }
-
-    wallet = wallet_result.getData()
 
     if 'count' not in tx:
         try:
@@ -707,16 +604,6 @@ def stop():
 #         return generate_json_response('Miner is not running.')
 
 
-@app.route('/miner', methods=['GET'])
-def status_miner():
-    status = {
-        'running': engine.instance.miner.get_state() == Service.RUNNING
-    }
-    if status['running']:
-        status['cpu'] = psutil.cpu_percent()
-    return generate_json_response(status)
-
-
 @app.route('/docker', methods=['GET'])
 def docker_status():
     status = PowerService.docker_status()
@@ -735,15 +622,6 @@ def docker_images():
     })
 
 
-@app.route('/power', methods=['GET'])
-def status_power():
-    return generate_json_response({
-        "running": engine.instance.power.get_state() == Service.RUNNING,
-        "status": engine.instance.power.get_status(),
-        "description": engine.instance.power.description
-    })
-
-
 @app.route('/engine', methods=['GET'])
 def engine_status():
     return generate_json_response({
@@ -756,6 +634,7 @@ def engine_status():
 
 
 @app.route('/service/<service_name>/start', methods=['POST'])
+@jwt_optional
 def service_start(service_name):
     corresponding_service = None
     if service_name == "blockchain":
@@ -766,24 +645,12 @@ def service_start(service_name):
         corresponding_service = engine.instance.peer_receive
     elif service_name == "power":
         corresponding_service = engine.instance.power
-        wallet = get_wallet()
-        if wallet.getFlag():
-            corresponding_service.set_wallet(wallet.getData())
-        else:
-            return generate_json_response({
-                "success": False,
-                "message": "This service requires a valid wallet"
-            })
+        wallet = Wallet.from_dict(get_jwt_identity()['wallet'])
+        corresponding_service.set_wallet(wallet)
     elif service_name == "miner":
         corresponding_service = engine.instance.miner
-        wallet = get_wallet()
-        if wallet.getFlag():
-            corresponding_service.set_wallet(wallet.getData())
-        else:
-            return generate_json_response({
-                "success": False,
-                "message": "This service requires a valid wallet"
-            })
+        wallet = Wallet.from_dict(get_jwt_identity()['wallet'])
+        corresponding_service.set_wallet(wallet)
 
     if corresponding_service is None:
         return generate_json_response({
@@ -851,10 +718,6 @@ def service_status(service_name):
 def generate_json_response(obj):
     result_text = json.dumps(obj, cls=ComplexEncoder, sort_keys=True)
     return Response(response=result_text, headers={"Content-Type": "application/json"})
-
-
-def changed_login_info():
-    socketio.emit('changed_default_wallet')
 
 
 def new_block():

@@ -43,6 +43,9 @@ class NewWalletForm extends Component {
       .then((response) => {
         this.props.notify('Succesfully created the wallet ' + response.data.name, 'success');
         this.props.refresh();
+      })
+      .catch((error) => {
+        this.props.notify('Error: ' + error, 'error');
       });
   }
 
