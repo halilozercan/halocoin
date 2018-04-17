@@ -81,6 +81,13 @@ def get_default_dir():
     return os.environ.get("HALOCOIN_DATA_DIR", default_dir)
 
 
+def get_default_dir_cli():
+    from os.path import expanduser
+    home = expanduser("~")
+    default_dir = os.path.join(home, '.halocoincli')
+    return os.environ.get("HALOCOIN_CLI_DIR", default_dir)
+
+
 def log(message):
     import traceback
     if isinstance(message, Exception):

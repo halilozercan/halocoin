@@ -7,23 +7,10 @@ from functools import wraps
 from getpass import getpass
 from inspect import Parameter
 
-from halocoin import custom
-
-
-class Colors:
-    HEADER = '\033[95m'
-    OKBLUE = '\033[94m'
-    OKGREEN = '\033[92m'
-    WARNING = '\033[93m'
-    FAIL = '\033[91m'
-    ENDC = '\033[0m'
-    BOLD = '\033[1m'
-    UNDERLINE = '\033[4m'
-
+from halocoin import custom, tools
 
 actions = dict()
-connection_port = 7899
-host = os.environ.get('HALOCOIN_API_HOST', 'localhost')
+config = None
 
 
 def action(func):
@@ -40,21 +27,26 @@ def make_api_request(method, http_method="GET", **kwargs):
     from requests import get, post
     if not method.startswith("/"):
         raise ValueError('Method endpoints should start with backslash')
-    url = "http://" + str(host) + ":" + str(connection_port) + method
+    url = "http://" + str(config['host']['api']) + ":" + str(config['port']['api']) + method
 
     kwargs = {k: v for k, v in kwargs.items() if v is not None}
 
-    if http_method == "GET":
-        response = get(url, params=kwargs)
-    else:
-        response = post(url, data=kwargs)
-    if response.status_code != 200:
-        return {
-            'error': response.status_code,
-            'message': response.text
-        }
-    else:
-        return response.json()
+    try:
+        if http_method == "GET":
+            response = get(url, params=kwargs, headers={"Authorization": "Bearer " + config['jwtToken']})
+        else:
+            response = post(url, data=kwargs, headers={"Authorization": "Bearer " + config['jwtToken']})
+
+        if response.status_code != 200:
+            return {
+                'error': response.status_code,
+                'message': response.text
+            }
+        else:
+            return response.json()
+    except Exception as e:
+        sys.stderr.write("Could not connect to API. Maybe halocoind is not running?\n")
+        exit(1)
 
 
 def haloprint(text):
@@ -66,56 +58,57 @@ def haloprint(text):
     print(highlight(content, JsonLexer(), TerminalFormatter()))
 
 
-def extract_configuration(dir):
+def extract_configuration(data_dir):
     from halocoin import tools
-    if dir is None:
+    if data_dir is None:
         working_dir = tools.get_default_dir()
     else:
-        working_dir = dir
+        working_dir = data_dir
 
     working_dir = os.path.join(working_dir, str(custom.version))
 
     if os.path.exists(working_dir) and not os.path.isdir(working_dir):
-        print("Given path {} is not a directory.".format(working_dir))
-        exit(1)
+        print("Given path {} is not a directory. Using default configuration...".format(working_dir))
+        return custom.generate_default_config()
     elif not os.path.exists(working_dir):
-        print("Given path {} does not exist. Attempting to create...".format(working_dir))
-        try:
-            os.makedirs(working_dir)
-            print("Successful")
-        except OSError:
-            print("Could not create a directory!")
-            exit(1)
-
-    if os.path.exists(os.path.join(working_dir, 'config')):
+        print("Given path {} does not exist. Using default configuration...")
+        return custom.generate_default_config()
+    elif not os.path.exists(os.path.join(working_dir, 'config')):
+        print("Given path {} does not have a configuration file. Using default configuration...")
+        return custom.generate_default_config()
+    else:
         config = os.path.join(working_dir, 'config')
         config = custom.read_config_file(config)
-    else:
-        config = custom.generate_default_config()
-        custom.write_config_file(config, os.path.join(working_dir, 'config'))
-
-    if config is None:
-        raise ValueError('Couldn\'t parse config file {}'.format(config))
-
-    return config, working_dir
-
-
-@action
-def start(dir=None, daemon=False):
-    from halocoin.daemon import Daemon
-    from halocoin import engine, tools
-    config, working_dir = extract_configuration(dir)
-    tools.init_logging(config['DEBUG'], working_dir, config['logging']['file'])
-    if daemon:
-        myDaemon = Daemon(pidfile='/tmp/halocoin', run_func=lambda: engine.main(config, working_dir))
-        myDaemon.start()
-    else:
-        engine.main(config, working_dir)
+        if config is None:
+            raise ValueError('Couldn\'t parse config file {}'.format(config))
+        jwtTokenPath = os.path.join(tools.get_default_dir_cli(), 'jwt')
+        if os.path.exists(jwtTokenPath):
+            jwtToken = open(jwtTokenPath, 'r').read()
+            config['jwtToken'] = jwtToken
+        else:
+            config['jwtToken'] = ""
+        return config
 
 
 @action
-def new_wallet(wallet, pw=None, set_default=None):
+def login(wallet, pw=None):
+    if pw is None:
+        wallet_pw = getpass('Password: ')
+    else:
+        wallet_pw = pw
 
+    result = make_api_request("/login", http_method="POST", wallet_name=wallet, password=wallet_pw)
+    if result['success']:
+        print("Successfully logged in with {}".format(wallet))
+        os.makedirs(tools.get_default_dir_cli(), exist_ok=True)
+        with open(os.path.join(tools.get_default_dir_cli(), 'jwt'), 'w') as f:
+            f.write(result['jwt'])
+    else:
+        print("Could not login with {}".format(wallet))
+
+
+@action
+def new_wallet(wallet, pw=None):
     if pw is None:
         wallet_pw = 'w'
         wallet_pw_2 = 'w2'
@@ -127,7 +120,7 @@ def new_wallet(wallet, pw=None, set_default=None):
 
     haloprint(make_api_request("/wallet/new", http_method="POST",
                                wallet_name=wallet, password=wallet_pw,
-                               set_default=set_default))
+                               login=login))
 
 
 @action
@@ -154,28 +147,11 @@ def wallets():
 
 
 @action
-def info_wallet(wallet=None, pw=None):
-    if wallet is not None and pw is None:
-        wallet_pw = getpass('Wallet password: ')
-    else:
-        wallet_pw = pw
+def login_info():
+    if config['jwtToken'] == '':
+        haloprint({"error": "You are not logged in!"})
 
-    information = make_api_request("/wallet/info", http_method="GET",
-                                   wallet_name=wallet,
-                                   password=wallet_pw)
-    haloprint(information)
-
-
-@action
-def default_wallet(wallet, pw=None):
-    if pw is None:
-        wallet_pw = getpass('Wallet password: ')
-    else:
-        wallet_pw = pw
-
-    information = make_api_request("/wallet/default", http_method="POST",
-                                   wallet_name=wallet,
-                                   password=wallet_pw)
+    information = make_api_request("/login/info", http_method="GET")
     haloprint(information)
 
 
@@ -203,11 +179,9 @@ def node_id():
 
 
 @action
-def send(address, amount, wallet=None, pw=None, message=None):
-    if wallet is not None and pw is None:
-        wallet_pw = getpass('Wallet password: ')
-    else:
-        wallet_pw = pw
+def send(address, amount, message=None):
+    if config['jwtToken'] == '':
+        haloprint({"error": "You are not logged in!"})
 
     haloprint(make_api_request("/tx/send", http_method="POST", address=address,
                                amount=amount, message=message,
@@ -216,10 +190,8 @@ def send(address, amount, wallet=None, pw=None, message=None):
 
 @action
 def pool_reg(wallet=None, pw=None, force=None):
-    if wallet is not None and pw is None:
-        wallet_pw = getpass('Wallet password: ')
-    else:
-        wallet_pw = pw
+    if config['jwtToken'] == '':
+        haloprint({"error": "You are not logged in!"})
 
     haloprint(make_api_request("/tx/pool_reg", http_method="POST",
                                wallet_name=wallet, password=wallet_pw, force=force))
@@ -227,10 +199,8 @@ def pool_reg(wallet=None, pw=None, force=None):
 
 @action
 def application(wallet=None, mode=None, list=None, pw=None):
-    if wallet is not None and pw is None:
-        wallet_pw = getpass('Wallet password: ')
-    else:
-        wallet_pw = pw
+    if config['jwtToken'] == '':
+        haloprint({"error": "You are not logged in!"})
 
     if list is None:
         list = ''
@@ -338,10 +308,12 @@ def mempool():
 
 
 def run(argv):
-    parser = argparse.ArgumentParser(description='CLI for halocoin.')
+    parser = argparse.ArgumentParser(description='CLI to interact with halocoin engine.')
     parser.add_argument('action', choices=sorted(actions.keys()),
                         help="Main action to perform by this CLI.")
     parser.add_argument('--version', action='version', version='%(prog)s ' + custom.version)
+    parser.add_argument('--data-dir', action="store", type=str, dest='dir',
+                        help='Directory for halocoin to use.')
     parser.add_argument('--address', action="store", type=str, dest='address',
                         help='Give a valid blockchain address')
     parser.add_argument('--message', action="store", type=str, dest='message',
@@ -374,8 +346,6 @@ def run(argv):
                         help='Rewarding sub-auth private key file in pem format')
     parser.add_argument('--pw', action="store", type=str, dest='pw',
                         help='NOT RECOMMENDED! If you want to pass wallet password as argument.')
-    parser.add_argument('--dir', action="store", type=str, dest='dir',
-                        help='Directory for halocoin to use.')
     parser.add_argument('--port', action="store", type=int, dest='port',
                         help='Override API port defined in config file.')
     parser.add_argument('--host', action="store", type=str, dest='host',
@@ -386,15 +356,12 @@ def run(argv):
                         help="Main action to perform by this CLI.")
     parser.add_argument('--force', action="store_true", dest='force',
                         help='Force something that makes trouble.')
-    parser.add_argument('--daemon', action="store_true", dest='daemon',
-                        help='Start in daemon mode.')
     parser.add_argument('--default', action="store_true", dest='set_default',
                         help='Make new wallet default')
     args = parser.parse_args(argv[1:])
 
-    config, working_dir = extract_configuration(args.dir)
-    global connection_port
-    connection_port = config['port']['api']
+    global config
+    config = extract_configuration(args.dir)
 
     from inspect import signature
     sig = signature(actions[args.action])

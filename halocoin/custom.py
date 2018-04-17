@@ -1,7 +1,7 @@
 import os
 from cdecimal import Decimal
 
-version = "0.0.18.c"
+version = "0.0.19.c"
 block_reward = 100  # Initial block reward
 miner_core_count = -1  # -1 evaluates to number of cores
 # Lower limits on what the "time" tag in a block can say.
@@ -55,6 +55,11 @@ def generate_default_config():
 
     config['logging'] = {
         'file': 'log'
+    }
+
+    config["host"] = {
+        "api": os.environ.get('HALOCOIN_API_HOST', 'localhost'),
+        "peers": os.environ.get('HALOCOIN_PEERS_HOST', '0.0.0.0')
     }
 
     config["port"] = {

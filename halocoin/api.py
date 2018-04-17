@@ -58,13 +58,12 @@ def shutdown_server():
 
 def run():
     def thread_target():
-        socketio.run(app, host=host, port=engine.instance.config['port']['api'])
+        socketio.run(app, host=engine.instance.config['host']['api'], port=engine.instance.config['port']['api'])
 
     global listen_thread
-    host = os.environ.get('HALOCOIN_API_HOST', "localhost")
     listen_thread = threading.Thread(target=thread_target, daemon=True)
     listen_thread.start()
-    print("Started API on {}:{}".format(host, engine.instance.config['port']['api']))
+    print("Started API on {}:{}".format(engine.instance.config['host']['api'], engine.instance.config['port']['api']))
 
 
 @socketio.on('connect')
