@@ -24,12 +24,12 @@ class ClientDB:
         'length': -1
     }
 
-    def __init__(self, engine):
+    def __init__(self, engine, db_name):
         self.engine = engine
         self.DB = None
         self.blockchain = None
         try:
-            db_location = os.path.join(self.engine.working_dir, 'client.db')
+            db_location = os.path.join(self.engine.working_dir, db_name)
             DB = plyvel.DB(db_location, create_if_missing=True)
             self.DB = DB.prefixed_db(custom.version.encode())
         except Exception as e:

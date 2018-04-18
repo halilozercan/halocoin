@@ -1,16 +1,23 @@
+import argparse
 import json
 import os
+import signal
 import time
 import uuid
 
 import docker
 import requests
+import sys
 import yaml
 
-from halocoin import api
-from halocoin import tools
+from halocoin import tools, custom
+from halocoin.db_client import ClientDB
+from halocoin.halocoind import extract_configuration
+from halocoin.model.wallet import Wallet
 from halocoin.ntwrk import Response
 from halocoin.service import Service, lockit
+
+instance = None
 
 
 class PowerService(Service):
@@ -22,43 +29,47 @@ class PowerService(Service):
     After solving these problems, authority verifies the results and rewards you.
     """
 
-    def __init__(self, engine):
+    def __init__(self, config, workingdir):
         Service.__init__(self, "power")
-        self.engine = engine
-        self.blockchain = None
-        self.clientdb = None
-        self.statedb = None
+        self.config = config
+        self.workingdir = workingdir
+        self.powerdb = ClientDB(self, 'power.db')
+        self.jwtToken = None
         self.wallet = None
         self.status = "Not Started"
         self.description = "Closed"
-
-    def set_wallet(self, wallet):
-        self.wallet = wallet
+        self.interrupted = False
 
     def on_register(self):
-        self.clientdb = self.engine.clientdb
-        self.blockchain = self.engine.blockchain
-        self.statedb = self.engine.statedb
-
-        if self.wallet is not None and hasattr(self.wallet, 'privkey'):
-            return True
-        else:
+        if self.jwtToken is None or self.jwtToken == "":
+            sys.stderr.write("Login credentials are invalid. Please login using halocoin CLI or GUI...\n")
             return False
+        else:
+            endpoint = "http://" + self.config['api']['host'] + ":" + str(self.config['api']['port']) + "/login/info"
+            info = requests.get(endpoint, headers={"Authorization", "Bearer " + self.jwtToken})
+            if info.status_code == 200 and info.json()['success']:
+                self.wallet = Wallet.from_dict(info.json()['wallet'])
+                return True
+            else:
+                return False
 
     def on_close(self):
-        self.wallet = None
         print('Power is turned off')
         Service.on_close(self)
 
+    def stop(self):
+        self.interrupted = True
+        self.unregister()
+
     def get_job_status(self, job):
         job_name = job['auth'] + '_' + job['id']
-        if self.clientdb.get('local_job_repo_' + job_name) is not None:
-            job_directory = os.path.join(self.engine.working_dir, 'jobs', job_name)
+        if self.powerdb.get('local_job_repo_' + job_name) is not None:
+            job_directory = os.path.join(self.workingdir, 'jobs', job_name)
             result_file = os.path.join(job_directory, 'result.zip')
             job_file = os.path.join(job_directory, 'job.cfq.gz')
             result_exists = os.path.exists(result_file)
             job_exists = os.path.exists(job_file)
-            entry = self.clientdb.get('local_job_repo_' + job_name)
+            entry = self.powerdb.get('local_job_repo_' + job_name)
             if entry['status'] == 'executed' or entry['status'] == 'downloaded':
                 if result_exists:
                     return "executed"
@@ -85,14 +96,14 @@ class PowerService(Service):
     def initiate_job(self, job):
         job_name = job['auth'] + '_' + job['id']
         print('Assigned {}'.format(job_name))
-        self.clientdb.put('local_job_repo_' + job_name, {
+        self.powerdb.put('local_job_repo_' + job_name, {
             "status": "assigned",
         })
 
     def download_job(self, job):
         job_name = job['auth'] + '_' + job['id']
         print('Downloading {}'.format(job_name))
-        job_directory = os.path.join(self.engine.working_dir, 'jobs', job_name)
+        job_directory = os.path.join(self.workingdir, 'jobs', job_name)
         if not os.path.exists(job_directory):
             os.makedirs(job_directory)
         job_file = os.path.join(job_directory, 'job.cfq.gz')
@@ -125,9 +136,9 @@ class PowerService(Service):
                 if not self.get_state() == Service.RUNNING:
                     return False
         if os.path.exists(job_file):
-            entry = self.clientdb.get('local_job_repo_' + job_name)
+            entry = self.powerdb.get('local_job_repo_' + job_name)
             entry['status'] = 'downloaded'
-            self.clientdb.put('local_job_repo_' + job_name, entry)
+            self.powerdb.put('local_job_repo_' + job_name, entry)
             return True
         else:
             return False
@@ -138,12 +149,12 @@ class PowerService(Service):
         self.set_status("Executing...")
         import docker
         client = docker.from_env()
-        job_directory = os.path.join(self.engine.working_dir, 'jobs', job_name)
+        job_directory = os.path.join(self.workingdir, 'jobs', job_name)
         job_directory = os.path.abspath(job_directory)
         result_file = os.path.join(job_directory, 'result.zip')
 
         config_file = os.path.join(job_directory, 'config.json')
-        json.dump(self.engine.config['coinami'], open(config_file, "w"))
+        json.dump(self.config['coinami'], open(config_file, "w"))
 
         container = client.containers.run(job['image'], user=os.getuid(), volumes={
             job_directory: {'bind': '/input', 'mode': 'rw'}
@@ -156,9 +167,9 @@ class PowerService(Service):
             time.sleep(1)
         if os.path.exists(result_file):
             self.set_status("Executed...")
-            entry = self.clientdb.get('local_job_repo_' + job_name)
+            entry = self.powerdb.get('local_job_repo_' + job_name)
             entry['status'] = 'executed'
-            self.clientdb.put('local_job_repo_' + job_name, entry)
+            self.powerdb.put('local_job_repo_' + job_name, entry)
             return True
         else:
             return False
@@ -167,7 +178,7 @@ class PowerService(Service):
         job_name = job['auth'] + '_' + job['id']
         print('Uploading {}'. format(job['id']))
         self.set_status("Uploading...")
-        job_directory = os.path.join(self.engine.working_dir, 'jobs', job_name)
+        job_directory = os.path.join(self.workingdir, 'jobs', job_name)
         result_file = os.path.join(job_directory, 'result.zip')
         secret_message = str(uuid.uuid4())
         payload = yaml.dump({
@@ -180,22 +191,22 @@ class PowerService(Service):
 
         r = requests.post(job['upload_url'], files=files, data=values)
         if r.status_code == 200 and r.json()['success']:
-            entry = self.clientdb.get('local_job_repo_' + job_name)
+            entry = self.powerdb.get('local_job_repo_' + job_name)
             self.set_status("Uploaded and Rewarded!")
             entry['status'] = 'uploaded'
-            self.clientdb.put('local_job_repo_' + job_name, entry)
+            self.powerdb.put('local_job_repo_' + job_name, entry)
 
     def done_job(self, job):
         job_name = job['auth'] + '_' + job['id']
-        job_directory = os.path.join(self.engine.working_dir, 'jobs', job_name)
+        job_directory = os.path.join(self.workingdir, 'jobs', job_name)
         if os.path.exists(job_directory):
             self.set_status("Cleaning job...")
             import shutil
             shutil.rmtree(job_directory)
 
-        entry = self.clientdb.get('local_job_repo_' + job_name)
+        entry = self.powerdb.get('local_job_repo_' + job_name)
         entry['status'] = 'done'
-        self.clientdb.put('local_job_repo_' + job_name, entry)
+        self.powerdb.put('local_job_repo_' + job_name, entry)
 
     def loop(self):
         """
@@ -264,3 +275,50 @@ class PowerService(Service):
             return Response(True, [image.tags for image in client.images.list()])
 
 
+def signal_handler(signal, frame):
+    if instance is not None and not instance.interrupted:
+        instance.stop()
+
+
+def start(config, workingdir):
+    global instance
+    instance = PowerService(config, workingdir)
+    if instance.register():
+        print("Power Service is now operational")
+        signal.signal(signal.SIGINT, signal_handler)
+        instance.join()
+        print("Shutting down")
+    else:
+        print("Couldn't start halocoin")
+
+
+def run(argv):
+    parser = argparse.ArgumentParser(description='Halocoin POWER module.')
+    parser.add_argument('--version', action='version', version='%(prog)s ' + custom.power_version)
+    parser.add_argument('--api-host', action="store", type=str, dest='api_host',
+                        help='Hosting address of API')
+    parser.add_argument('--api-port', action="store", type=int, dest='api_port',
+                        help='Hosting port of API')
+    parser.add_argument('--data-dir', action="store", type=str, dest='dir',
+                        help='Data directory. Defaults to ' + tools.get_default_dir())
+    args = parser.parse_args(argv[1:])
+
+    config, workingdir = extract_configuration(args.dir)
+    if args.api_host is not None and args.api_host != "":
+        config['api']['host'] = args.api_host
+    if args.api_port is not None and args.api_port != "":
+        config['api']['port'] = args.api_port
+    start(config, workingdir)
+    return
+
+
+def main():
+    if sys.stdin.isatty():
+        run(sys.argv)
+    else:
+        argv = sys.stdin.read().split(' ')
+        run(argv)
+
+
+if __name__ == '__main__':
+    run(sys.argv)

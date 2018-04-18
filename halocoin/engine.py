@@ -50,7 +50,7 @@ class Engine(Service):
         self.blockchain = BlockchainService(self)
         self.peers_check = PeerCheckService(self, self.config['peers']['list'])
         self.peer_receive = PeerListenService(self)
-        self.clientdb = ClientDB(self)
+        self.clientdb = ClientDB(self, 'client.db')
         self.statedb = StateDatabase(self)
         self.miner = MinerService(self)
         self.power = PowerService(self)

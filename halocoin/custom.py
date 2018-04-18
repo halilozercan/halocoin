@@ -2,6 +2,7 @@ import os
 from cdecimal import Decimal
 
 version = "0.0.19.c"
+power_version = "0.0.1"
 block_reward = 100  # Initial block reward
 miner_core_count = -1  # -1 evaluates to number of cores
 # Lower limits on what the "time" tag in a block can say.

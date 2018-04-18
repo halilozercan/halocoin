@@ -48,7 +48,11 @@ class Service:
 
             return insider
 
-        cont = self.on_register()
+        try:
+            cont = self.on_register()
+        except:
+            cont = False
+
         if not cont:
             tools.log("Service is not going to continue with registering!")
             return False
