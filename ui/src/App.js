@@ -1,5 +1,4 @@
 import React, { Component } from 'react';
-import darkBaseTheme from 'material-ui/styles/baseThemes/darkBaseTheme';
 import MuiThemeProvider from 'material-ui/styles/MuiThemeProvider';
 import getMuiTheme from 'material-ui/styles/getMuiTheme';
 import {
@@ -11,9 +10,13 @@ import {
 import MainPage from './MainPage.js';
 import ChooseWallet from './ChooseWallet.js';
 import io from 'socket.io-client';
-import axios from 'axios';
 import Snackbar from 'material-ui/Snackbar';
-import {Card, CardActions, CardHeader, CardText} from 'material-ui/Card';
+import {Card,CardText} from 'material-ui/Card';
+
+import {connect} from 'react-redux';
+import {bindActionCreators} from 'redux';
+import * as loginActions from './actions/loginActions';
+import PropTypes from 'prop-types';
 
 const muiTheme = getMuiTheme({
   palette: {
@@ -44,19 +47,22 @@ class App extends Component {
       "wallet_name": null,
       "account": null
     }
+
+    console.log("Login: " + this.props.jwtToken)
+    console.log("Engine: " + this.props.engine)
     
     this.socket = io('http://0.0.0.0:7001');
 
-    this.socket.on('connect', (socket => {
-      this.checkDefault();
+    /*this.socket.on('connect', (socket => {
+      //this.checkDefault();
     }));
 
     this.socket.on('disconnect', (socket => {
-      this.checkDefault();
+      //this.checkDefault();
     }));
 
     this.socket.on('changed_default_wallet', (socket) => {
-      this.checkDefault();
+      //this.checkDefault();
     });
 
     this.socket.on('new_tx_in_pool', (socket) => {
@@ -64,57 +70,20 @@ class App extends Component {
     });
 
     this.socket.on('new_block', (socket) => {
-      this.checkDefault();
+      //this.checkDefault();
     });
 
     this.socket.on('new_tx_in_pool', (socket) => {
-      this.checkDefault();
-    });
+      //this.checkDefault();
+    });*/
   }
 
   componentDidMount() {
-    axios.get('/').then((response) => {
-      this.setState((state) => {
-        state.status = 'running';
-        return state;
-      });
-      this.checkDefault();
-    }).catch((error) => {
-      console.log(error);
-      this.setState((state) => {
-        state.status = 'closed';
-        return state;
-      });
-    });
+    this.props.loginActions.checkEngine();
   }
 
   pageChanged = (newPage) => {
     this.setState({"page": newPage});
-  }
-
-  checkDefault = () => {
-    axios.get("/login/info").then((response) => {
-      let data = response.data;
-      if(data.success) {
-        this.setState((state) => {
-          state.status = 'logged_in';
-          state.account = data.account;
-          return state;
-        });
-      }
-      else {
-        this.setState((state) => {
-          state.status = 'no_login';
-          return state;
-        });
-      }
-    }).catch((error) => {
-      console.log(error);
-      this.setState((state) => {
-        state.status = 'closed';
-        return state;
-      });
-    });
   }
 
   sleep = (time) => {
@@ -134,36 +103,36 @@ class App extends Component {
     })
   }
 
+  handleLogin = (walletName, password) => {
+    this.props.loginActions.login(walletName, password);
+  }
+
+  handleLogout = () => {
+    this.props.loginActions.logout();
+  }
+
   render() {
+    console.log("rendering " + this.props.jwtToken)
     let page = <div />;
-    if(this.state.status === null) {
+    if(this.props.engine === "loading") {
       page = <Card style={{margin:"32px"}}>
               <CardText>
                 Connecting to Halocoin Engine
               </CardText>
             </Card>;
     }
-    else if(this.state.status === "running") {
-      page = <Card style={{margin:"32px"}}>
-              <CardText>
-                Checking your wallet
-              </CardText>
-            </Card>;
-    }
-    else if(this.state.status === "closed") {
+    else if(this.props.engine === "disconnected") {
       page = <Card style={{margin:"32px"}}>
               <CardText>
                 Could not connect to Halocoin engine :(
               </CardText>
             </Card>;
     }
-    else if(this.state.status === "logged_in") {
+    else if(this.props.jwtToken !== null) {
       page = <MainPage  socket={this.socket} 
-                        notify={this.notify} 
-                        wallet_name={this.state.wallet_name} 
-                        account={this.state.account}/>;
+                        notify={this.notify}/>;
     }
-    else if(this.state.status === "no_login") {
+    else if(this.props.jwtToken === null) {
       page = <ChooseWallet  socket={this.socket} 
                             notify={this.notify}/>;
     }
@@ -187,4 +156,26 @@ class App extends Component {
   }
 }
 
-export default App;
+App.propTypes = {
+  loginActions: PropTypes.object,
+  jwtToken: PropTypes.string,
+  engine: PropTypes.string
+};
+
+function mapStateToProps(state) {
+  return {
+      jwtToken: state.jwtToken,
+      engine: state.engine
+  };
+}
+
+function mapDispatchToProps(dispatch) {
+  return {
+     loginActions: bindActionCreators(loginActions, dispatch)
+  };
+}
+
+export default connect(
+  mapStateToProps,
+  mapDispatchToProps
+)(App);

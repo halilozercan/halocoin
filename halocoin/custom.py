@@ -57,17 +57,14 @@ def generate_default_config():
         'file': 'log'
     }
 
-    config["host"] = {
-        "api": os.environ.get('HALOCOIN_API_HOST', 'localhost'),
-        "peers": os.environ.get('HALOCOIN_PEERS_HOST', '0.0.0.0')
+    config['api'] = {
+        'host': os.environ.get('HALOCOIN_API_HOST', 'localhost'),
+        'port': int(os.environ.get('HALOCOIN_API_PORT', '7001'))
     }
 
-    config["port"] = {
-        "api": int(os.environ.get('HALOCOIN_API_PORT', '7001')),
-        "peers": int(os.environ.get('HALOCOIN_PEERS_PORT', '7002'))
-    }
-
-    config["peers"] = {
+    config['peers'] = {
+        'host': os.environ.get('HALOCOIN_PEERS_HOST', '0.0.0.0'),
+        'port': int(os.environ.get('HALOCOIN_PEERS_PORT', '7002')),
         "list": [
             {
                 'node_id': '52e6eb49-6d59-4bf3-af96-ca3252408a4f',

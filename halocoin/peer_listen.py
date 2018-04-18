@@ -33,9 +33,10 @@ class PeerListenService(Service):
             self.s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             self.s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             self.s.settimeout(2)
-            self.s.bind(('0.0.0.0', self.engine.config['port']['peers']))
+            self.s.bind((self.engine.config['peers']['host'], self.engine.config['peers']['port']))
             self.s.listen(10)
-            print("Started Peer Listen on 0.0.0.0:{}".format(self.engine.config['port']['peers']))
+            print("Started Peer Listen on {}:{}".format(self.engine.config['peers']['host'],
+                                                        self.engine.config['peers']['port']))
             return True
         except Exception as e:
             tools.log("Could not start Peer Receive socket!")

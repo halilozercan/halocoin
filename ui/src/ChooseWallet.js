@@ -3,7 +3,7 @@ import WalletList from './widgets/wallet_list.js';
 import NewWalletForm from './widgets/new_wallet_form.js';
 import {Card, CardHeader, CardText} from 'material-ui/Card';
 import Blockcount from './widgets/blockcount.js';
-import {axiosInstance} from './tools.js';
+import axios from 'axios';
 import {Tabs, Tab} from 'material-ui/Tabs';
 
 class ChooseWallet extends Component {
@@ -13,21 +13,14 @@ class ChooseWallet extends Component {
     this.state = {
       'wallets': null
     }
-    this.getWallets = this.getWallets.bind(this);
   } 
 
   componentDidMount() {
-    this.getWallets();
-  }
-
-  getWallets() {
-    axiosInstance.get("/wallet/list").then((response) => {
+    axios.get("/wallet/list").then((response) => {
       let data = response.data;
-      console.log(data);
       if(data.hasOwnProperty('wallets')) {
-        this.setState((state) => {
-          state['wallets'] = Object.keys(data.wallets);
-          return state;
+        this.setState({
+          'wallets': Object.keys(data.wallets)
         });
       }
     });
@@ -41,7 +34,9 @@ class ChooseWallet extends Component {
             <NewWalletForm refresh={this.getWallets} notify={this.props.notify}/>
           </Tab>
           <Tab label="Choose a Wallet" >
-            <WalletList wallets={this.state.wallets} notify={this.props.notify}/>
+            <WalletList wallets={this.state.wallets} 
+                        handleLogin={this.props.handleLogin} 
+                        notify={this.props.notify} />
           </Tab>
           <Tab label="Restore Wallet">
             <Card style={{"margin":16}}>

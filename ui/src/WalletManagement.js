@@ -4,6 +4,9 @@ import Address from './widgets/address.js';
 import Send from './widgets/send.js';
 import Stake from './widgets/stake.js';
 
+import {connect} from 'react-redux';
+import {bindActionCreators} from 'redux';
+
 class WalletManagement extends Component {
 
   render() {
@@ -30,4 +33,12 @@ class WalletManagement extends Component {
   }
 }
 
-export default WalletManagement;
+function mapStateToProps(state) {
+  return {
+      account: state.account
+  };
+}
+
+export default connect(
+  mapStateToProps
+)(WalletManagement);

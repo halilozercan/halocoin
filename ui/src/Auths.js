@@ -1,7 +1,4 @@
 import React, { Component } from 'react';
-import Balance from './widgets/balance.js';
-import Address from './widgets/address.js';
-import Send from './widgets/send.js';
 import Authority from './widgets/authority.js';
 import axios from 'axios';
 import {Card, CardText} from 'material-ui/Card';

@@ -12,6 +12,10 @@ import Lock from 'material-ui/svg-icons/action/lock';
 import Blockcount from './widgets/blockcount.js';
 import FontIcon from 'material-ui/FontIcon';
 
+import {connect} from 'react-redux';
+import {bindActionCreators} from 'redux';
+import * as loginActions from './actions/loginActions';
+
 class MainPage extends Component {
 
   constructor(props){
@@ -20,6 +24,10 @@ class MainPage extends Component {
       'drawer_open': false,
       'page': 'main'
     }
+  }
+
+  componentDidMount() {
+    this.props.loginActions.fetchAccount(this.props.jwtToken);
   }
 
   drawerToggle = () => this.setState((state) => {
@@ -47,13 +55,10 @@ class MainPage extends Component {
     if(this.state.page === 'main') {
       console.log('Account: ' + this.state.account);
       currentPage = <WalletManagement notify={this.props.notify} 
-                                      wallet_name={this.props.wallet_name} 
-                                      account={this.props.account}
                                       socket={this.props.socket} />;
     }
     else if(this.state.page === 'status') {
-      currentPage = <Status notify={this.props.notify} 
-                            account={this.props.account}
+      currentPage = <Status notify={this.props.notify}
                             socket={this.props.socket} />
     }
     else if(this.state.page === 'auths') {
@@ -62,8 +67,8 @@ class MainPage extends Component {
                             socket={this.props.socket} />
     }
     let title = "Halocoin";
-    if(this.props.wallet_name !== null) {
-      title += " - " + this.props.wallet_name;
+    if(this.props.account !== null) {
+      title += " - " + this.props.account.walletName;
     }
     return (
       <div>
@@ -85,4 +90,20 @@ class MainPage extends Component {
   }
 }
 
-export default MainPage;
+function mapStateToProps(state) {
+  return {
+      jwtToken: state.jwtToken,
+      account: state.account
+  };
+}
+
+function mapDispatchToProps(dispatch) {
+  return {
+     loginActions: bindActionCreators(loginActions, dispatch)
+  };
+}
+
+export default connect(
+  mapStateToProps,
+  mapDispatchToProps
+)(MainPage);

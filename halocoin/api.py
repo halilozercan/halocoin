@@ -1,16 +1,14 @@
 import copy
 import json
-import os
 import random
 import string
 import tempfile
 import threading
 import uuid
 
-import psutil as psutil
 # WARNING! Do not remove below import line. PyInstaller depends on it
 from engineio import async_threading
-from flask import Flask, request, Response, send_file, g
+from flask import Flask, request, Response, send_file
 from flask_jwt_simple import jwt_required, get_jwt_identity, JWTManager, jwt_optional
 from flask_socketio import SocketIO
 
@@ -58,12 +56,12 @@ def shutdown_server():
 
 def run():
     def thread_target():
-        socketio.run(app, host=engine.instance.config['host']['api'], port=engine.instance.config['port']['api'])
+        socketio.run(app, host=engine.instance.config['api']['host'], port=engine.instance.config['api']['port'])
 
     global listen_thread
     listen_thread = threading.Thread(target=thread_target, daemon=True)
     listen_thread.start()
-    print("Started API on {}:{}".format(engine.instance.config['host']['api'], engine.instance.config['port']['api']))
+    print("Started API on {}:{}".format(engine.instance.config['api']['host'], engine.instance.config['api']['port']))
 
 
 @socketio.on('connect')

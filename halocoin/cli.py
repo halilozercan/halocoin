@@ -27,7 +27,7 @@ def make_api_request(method, http_method="GET", **kwargs):
     from requests import get, post
     if not method.startswith("/"):
         raise ValueError('Method endpoints should start with backslash')
-    url = "http://" + str(config['host']['api']) + ":" + str(config['port']['api']) + method
+    url = "http://" + str(config['api']['host']) + ":" + str(config['api']['port']) + method
 
     kwargs = {k: v for k, v in kwargs.items() if v is not None}
 
@@ -184,21 +184,20 @@ def send(address, amount, message=None):
         haloprint({"error": "You are not logged in!"})
 
     haloprint(make_api_request("/tx/send", http_method="POST", address=address,
-                               amount=amount, message=message,
-                               wallet_name=wallet, password=wallet_pw))
+                               amount=amount, message=message))
 
 
 @action
-def pool_reg(wallet=None, pw=None, force=None):
+def pool_reg(force=None):
     if config['jwtToken'] == '':
         haloprint({"error": "You are not logged in!"})
 
     haloprint(make_api_request("/tx/pool_reg", http_method="POST",
-                               wallet_name=wallet, password=wallet_pw, force=force))
+                               force=force))
 
 
 @action
-def application(wallet=None, mode=None, list=None, pw=None):
+def application(mode=None, list=None):
     if config['jwtToken'] == '':
         haloprint({"error": "You are not logged in!"})
 
@@ -209,7 +208,7 @@ def application(wallet=None, mode=None, list=None, pw=None):
         mode = 's'
 
     haloprint(make_api_request("/tx/application", http_method="POST",
-                               wallet_name=wallet, password=wallet_pw, list=list, mode=mode))
+                               list=list, mode=mode))
 
 
 @action

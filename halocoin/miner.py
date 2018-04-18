@@ -9,12 +9,6 @@ from halocoin import tools
 from halocoin.service import Service, lockit
 
 
-def preexec_function():
-    # Ignore the SIGINT signal by setting the handler to the standard
-    # signal handler SIG_IGN.
-    signal.signal(signal.SIGINT, signal.SIG_IGN)
-
-
 class MinerService(Service):
     """
     Simple miner service. Starts running when miner is turned on.

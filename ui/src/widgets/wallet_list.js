@@ -4,7 +4,11 @@ import {Card, CardHeader, CardText} from 'material-ui/Card';
 import RaisedButton from 'material-ui/RaisedButton';
 import Dialog from 'material-ui/Dialog';
 import TextField from 'material-ui/TextField';
-import axios from 'axios';
+
+import {connect} from 'react-redux';
+import {bindActionCreators} from 'redux';
+import * as loginActions from '../actions/loginActions';
+import PropTypes from 'prop-types';
 
 class WalletList extends Component {
 
@@ -13,23 +17,6 @@ class WalletList extends Component {
     this.state = {
       open: false
     }
-  }
-
-  removeWallet(wallet_name) {
-    let password = prompt("Enter Wallet Password", '');
-    let data = new FormData();
-    data.append('wallet_name', wallet_name);
-    data.append('password', password);
-
-    axios.post('/remove_wallet', data).then((response) => {
-      data = response.data;
-      if(data.success) {
-        this.props.notify(data.message, 'success');
-        //this.props.refresh();
-      } else {
-        this.props.notify(data.error, 'error');
-      }
-    })
   }
 
   downloadWallet(wallet_name) {
@@ -55,22 +42,7 @@ class WalletList extends Component {
   }
 
   login = () => {
-    let password = this.state.password;
-    let data = new FormData();
-    data.append('wallet_name', this.state.name);
-    data.append('password', password);
-
-    axios.post('/login', data).then((response) => {
-      let success = response.data.success;
-      if(success) {
-        this.props.notify('Successfully updated your default wallet', 'success');
-      }
-      else {
-        this.props.notify('Failed to update your default wallet', 'error');
-      }
-    })
-
-    this.setState({open: false});
+    this.props.loginActions.login(this.state.name, this.state.password)
   }
 
   render() {
@@ -122,4 +94,24 @@ class WalletList extends Component {
   }
 }
 
-export default WalletList;
+WalletList.propTypes = {
+  loginActions: PropTypes.object,
+  jwtToken: PropTypes.string
+};
+
+function mapStateToProps(state) {
+  return {
+      jwtToken: state.jwtToken
+  };
+}
+
+function mapDispatchToProps(dispatch) {
+  return {
+     loginActions: bindActionCreators(loginActions, dispatch)
+  };
+}
+
+export default connect(
+  mapStateToProps,
+  mapDispatchToProps
+)(WalletList);

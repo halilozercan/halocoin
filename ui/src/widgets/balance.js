@@ -1,15 +1,13 @@
 import React, { Component } from 'react';
-import {MCardStats} from '../components/card.js';
-import {Card, CardActions, CardHeader, CardMedia, CardTitle, CardText} from 'material-ui/Card';
+import {Card, CardHeader} from 'material-ui/Card';
 import Avatar from 'material-ui/Avatar';
 import FontIcon from 'material-ui/FontIcon';
-import {red500, green500} from 'material-ui/styles/colors';
+import {green500} from 'material-ui/styles/colors';
 
 class Balance extends Component {
 
   render() {
     let balance = 0;
-    let name = "";
     if(this.props.account !== null){
       balance = this.props.account.amount;
     }

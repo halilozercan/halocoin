@@ -1,30 +1,15 @@
 import React, { Component } from 'react';
-import {MCardStats} from '../components/card.js';
 import {axiosInstance} from '../tools.js';
-import LinearProgress from 'material-ui/LinearProgress';
-import {Card, CardActions, CardHeader, CardMedia, CardTitle, CardText} from 'material-ui/Card';
+import {Card, CardHeader, } from 'material-ui/Card';
 import Avatar from 'material-ui/Avatar';
 import Toggle from 'material-ui/Toggle';
-import FlatButton from 'material-ui/FlatButton';
 import FontIcon from 'material-ui/FontIcon';
 import {red500, green500} from 'material-ui/styles/colors';
-import TouchRipple from 'material-ui/internal/TouchRipple';
 import Dialog from 'material-ui/Dialog';
 import TextField from 'material-ui/TextField';
 import RaisedButton from 'material-ui/RaisedButton';
 
 class ServiceToggle extends Component {
-  constructor(props) {
-    /*
-    title:
-    subtitle:
-    avatarColor:
-    avatarIcon:
-    toggled:
-    changeStatus(function):
-    */
-    super(props);
-  }
 
   render() {
     return <table>
@@ -75,11 +60,11 @@ class EngineStatus extends Component {
     axiosInstance.get("/engine").then((response) => {
       let data = response.data;
       this.setState((state) => {
-        state['miner'] = data.miner == 'RUNNING';
-        state['power'] = data.power == 'RUNNING';
-        state['blockchain'] = data.blockchain == 'RUNNING';
-        state['peers_check'] = data.peers_check == 'RUNNING';
-        state['peer_receive'] = data.peer_receive == 'RUNNING';
+        state['miner'] = data.miner === 'RUNNING';
+        state['power'] = data.power === 'RUNNING';
+        state['blockchain'] = data.blockchain === 'RUNNING';
+        state['peers_check'] = data.peers_check === 'RUNNING';
+        state['peer_receive'] = data.peer_receive === 'RUNNING';
         return state;
       });
     });
@@ -104,7 +89,7 @@ class EngineStatus extends Component {
       });
     }
     else {
-      if(service_name == "power" || service_name == "miner") {
+      if(service_name === "power" || service_name === "miner") {
         this.handleOpen(service_name);
       }
       else{

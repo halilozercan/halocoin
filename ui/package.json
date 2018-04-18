@@ -8,7 +8,11 @@
     "material-ui": "^0.20.0",
     "react": "^16.2.0",
     "react-dom": "^16.2.0",
+    "react-redux": "^5.0.7",
     "react-tag-input": "^5.0.1",
+    "redux": "^3.7.2",
+    "redux-persist": "^5.9.1",
+    "redux-thunk": "^2.2.0",
     "socket.io-client": "^2.0.4"
   },
   "main": "src/electron-starter.js",

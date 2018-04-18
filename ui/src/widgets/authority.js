@@ -1,25 +1,9 @@
 import React, { Component } from 'react';
 //import {shell} from 'electron';
-import {MCardStats} from '../components/card.js';
-import {Card, CardActions, CardHeader, CardMedia, CardTitle, CardText} from 'material-ui/Card';
-import Avatar from 'material-ui/Avatar';
-import FontIcon from 'material-ui/FontIcon';
+import {Card, CardActions, CardHeader, CardText} from 'material-ui/Card';
 import RaisedButton from 'material-ui/RaisedButton';
 
 class Authority extends Component {
-
-  constructor(props) {
-    /**
-     * name
-     * supply
-     * avatar
-     * description
-     * rewardDistributed
-     * rewardPool
-     * webAddress
-     */
-    super(props);
-  }
 
   render() {
 

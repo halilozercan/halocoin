@@ -1,21 +1,9 @@
 import React, { Component } from 'react';
-import {MCardStats} from '../components/card.js';
-import {Card, CardActions, CardHeader, CardText, CardTitle} from 'material-ui/Card';
+import {Card, CardActions, CardHeader} from 'material-ui/Card';
 import RaisedButton from 'material-ui/RaisedButton';
 import Dialog from 'material-ui/Dialog';
 import TextField from 'material-ui/TextField';
 import axios from 'axios';
-import {
-  Table,
-  TableBody,
-  TableHeader,
-  TableHeaderColumn,
-  TableRow,
-  TableRowColumn,
-} from 'material-ui/Table';
-import Avatar from 'material-ui/Avatar';
-import FontIcon from 'material-ui/FontIcon';
-import {yellow800} from 'material-ui/styles/colors';
 import SelectField from 'material-ui/SelectField';
 import MenuItem from 'material-ui/MenuItem';
 import { WithContext as ReactTags } from 'react-tag-input';
@@ -153,7 +141,7 @@ class Stake extends Component {
     let assignedJob = "None";
     if(this.props.account !== null){
       score = this.props.account.score;
-      applicationMode = this.props.account.application.mode == 's' ? 'Single':'Continuous';
+      applicationMode = this.props.account.application.mode === 's' ? 'Single':'Continuous';
       applicationList = this.props.account.application.list;
       if(this.props.account.assigned_job.auth !== null) {
         assignedJob = "Auth " + this.props.account.assigned_job.auth + " JobId " + this.props.account.assigned_job.job_id;
@@ -226,7 +214,7 @@ class Stake extends Component {
         />
         <CardHeader
           title="Application List"
-          subtitle={applicationList.length != 0 ? applicationList.join(", ") : "Empty"}
+          subtitle={applicationList.length !== 0 ? applicationList.join(", ") : "Empty"}
         />
         <CardActions align='right'>
           <RaisedButton label="Edit Application" primary={true} onClick={() => {this.openDialog()}} />

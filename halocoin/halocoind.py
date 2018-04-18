@@ -1,7 +1,5 @@
 import argparse
-
 import os
-
 import sys
 
 from halocoin import custom, tools
@@ -71,13 +69,13 @@ def run(argv):
 
     config, working_dir = extract_configuration(args.dir)
     if args.api_host is not None and args.api_host != "":
-        config['host']['api'] = args.api_host
+        config['api']['host'] = args.api_host
     if args.api_port is not None and args.api_port != "":
-        config['port']['api'] = args.api_port
+        config['api']['port'] = args.api_port
     if args.p2p_host is not None and args.p2p_host != "":
-        config['host']['peers'] = args.p2p_host
+        config['peers']['host'] = args.p2p_host
     if args.p2p_port is not None and args.p2p_port != "":
-        config['port']['peers'] = args.p2p_port
+        config['peers']['port'] = args.p2p_port
 
     start(config, working_dir, args.daemon)
     return
