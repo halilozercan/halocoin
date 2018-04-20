@@ -43,7 +43,6 @@ def print_help(action=None):
                 print("Optional")
 
 
-
 def parseParams(params, **kwargs):
     def getArgumentName(arg):
         while arg[0] == '-':
@@ -194,24 +193,6 @@ def start(data_dir=None, daemon=False):
         sys.stderr.write(tools.get_locked_file())
 
 
-
-@action
-def login(wallet, pw=None):
-    if pw is None:
-        wallet_pw = getpass('Password: ')
-    else:
-        wallet_pw = pw
-
-    result = make_api_request("/login", http_method="POST", wallet_name=wallet, password=wallet_pw)
-    if result['success']:
-        print("Successfully logged in with {}".format(wallet))
-        os.makedirs(tools.get_default_dir_cli(), exist_ok=True)
-        with open(os.path.join(tools.get_default_dir_cli(), 'jwt'), 'w') as f:
-            f.write(result['jwt'])
-    else:
-        print("Could not login with {}".format(wallet))
-
-
 @action
 def new_wallet(wallet, pw=None):
     if pw is None:
@@ -251,11 +232,12 @@ def wallets():
 
 
 @action
-def login_info():
-    if jwtToken() == '':
-        haloprint({"error": "You are not logged in!"})
-
-    information = make_api_request("/login/info", http_method="GET")
+def info_wallet(wallet=None, password=None):
+    if wallet is None:
+        wallet = input("Wallet name: ")
+    if password is None:
+        password = getpass('Password: ')
+    information = make_api_request("/wallet/info", http_method="GET", wallet_name=wallet, password=password)
     haloprint(information)
 
 
@@ -283,27 +265,33 @@ def node_id():
 
 
 @action
-def send(address, amount, message=None):
-    if jwtToken() == '':
-        haloprint({"error": "You are not logged in!"})
+def send(address, amount, wallet=None, password=None, message=None):
+    if wallet is None:
+        wallet = input("Wallet name: ")
+    if password is None:
+        password = getpass('Password: ')
 
     haloprint(make_api_request("/tx/send", http_method="POST", address=address,
-                               amount=amount, message=message))
+                               amount=amount, message=message, wallet_name=wallet, password=password))
 
 
 @action
-def pool_reg(force=None):
-    if jwtToken() == '':
-        haloprint({"error": "You are not logged in!"})
+def pool_reg(wallet=None, password=None, force=None):
+    if wallet is None:
+        wallet = input("Wallet name: ")
+    if password is None:
+        password = getpass('Password: ')
 
     haloprint(make_api_request("/tx/pool_reg", http_method="POST",
-                               force=force))
+                               force=force, wallet_name=wallet, password=password))
 
 
 @action
-def application(mode=None, list=None):
-    if jwtToken() == '':
-        haloprint({"error": "You are not logged in!"})
+def application(wallet=None, password=None, mode=None, list=None):
+    if wallet is None:
+        wallet = input("Wallet name: ")
+    if password is None:
+        password = getpass('Password: ')
 
     if list is None:
         list = ''
@@ -312,7 +300,7 @@ def application(mode=None, list=None):
         mode = 's'
 
     haloprint(make_api_request("/tx/application", http_method="POST",
-                               list=list, mode=mode))
+                               list=list, mode=mode, wallet_name=wallet, password=password))
 
 
 @action
@@ -357,13 +345,13 @@ def stop():
 
 
 @action
-def start_miner(wallet=None, pw=None):
-    if wallet is not None and pw is None:
-        wallet_pw = getpass('Wallet password: ')
-    else:
-        wallet_pw = pw
+def start_miner(wallet=None, password=None):
+    if wallet is None:
+        wallet = input("Wallet name: ")
+    if password is None:
+        password = getpass('Password: ')
 
-    haloprint(make_api_request("service/miner/start", http_method="POST", wallet_name=wallet, password=wallet_pw))
+    haloprint(make_api_request("service/miner/start", http_method="POST", wallet_name=wallet, password=password))
 
 
 @action
@@ -377,13 +365,13 @@ def status_miner():
 
 
 @action
-def start_power(wallet=None, pw=None):
-    if wallet is not None and pw is None:
-        wallet_pw = getpass('Wallet password: ')
-    else:
-        wallet_pw = pw
+def start_power(wallet=None, password=None):
+    if wallet is None:
+        wallet = input("Wallet name: ")
+    if password is None:
+        password = getpass('Password: ')
 
-    haloprint(make_api_request("service/power/start", http_method="POST", wallet_name=wallet, password=wallet_pw))
+    haloprint(make_api_request("service/miner/start", http_method="POST", wallet_name=wallet, password=password))
 
 
 @action

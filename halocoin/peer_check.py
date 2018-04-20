@@ -64,7 +64,7 @@ class PeerCheckService(Service):
                                 {
                                     'action': 'greetings',
                                     'node_id': self.node_id,
-                                    'port': self.engine.config['port']['peers'],
+                                    'port': self.engine.config['peers']['port'],
                                     'length': self.db.get('length'),
                                     'diffLength': self.db.get('diffLength')
                                 },
