@@ -1,16 +1,85 @@
 #!/usr/bin/env python
-import argparse
+import json
 import os
 import sys
 import time
 from functools import wraps
 from getpass import getpass
-from inspect import Parameter
+from inspect import Parameter, signature
 
 from halocoin import custom, tools
 
 actions = dict()
-config = None
+
+"""
+0.0.19.c CLI changes
+
+- Every CLI command must start with an action. 
+- Actions are tied to a function
+- Function parameters are command line arguments
+- Optional arguments are defined with None as default value
+- Help is completely auto generated according to this scheme.
+- Help first level only lists actions
+- Action help command returns help for that action only
+"""
+
+
+def print_help(action=None):
+    print("Halocoin Commandline Interface")
+    print("Version: " + custom.version)
+    if action is None:
+        print("List of actions:\n")
+        sorted_actions = sorted(actions, key=lambda x:x)
+        for action in sorted_actions:
+            print("\t" + action)
+    else:
+        print("Parameters:")
+        sig = signature(actions[action])
+        for parameter in sig.parameters.keys():
+            sys.stdout.write("\t--" + sig.parameters[parameter].name + "\t")
+            if sig.parameters[parameter].default == Parameter.empty:
+                print("Required")
+            else:
+                print("Optional")
+
+
+
+def parseParams(params, **kwargs):
+    def getArgumentName(arg):
+        while arg[0] == '-':
+            arg = arg[1:]
+        arg = arg.replace("-", "_")
+        return arg
+
+    result = {
+        "action": None,
+        "map": dict()
+    }
+
+    for key, value in kwargs.items():
+        result['map'][key] = value
+
+    if len(params) == 0:
+        sys.stderr.write("You must define at least one action\n\n")
+        print_help()
+        exit(1)
+
+    result['action'] = params[0]
+
+    current_arg = None
+    for param in params[1:]:
+        if current_arg is None and param[0] != '-':
+            sys.stderr.write("Could'nt parse command line arguments\n\n")
+            exit(1)
+        elif current_arg is None:
+            current_arg = getArgumentName(param)
+            result['map'][current_arg] = None
+        elif param[0] != '-':
+            result["map"][current_arg] = param
+        elif param[0] == '-':
+            current_arg = getArgumentName(param)
+            result['map'][current_arg] = None
+    return result
 
 
 def action(func):
@@ -27,15 +96,16 @@ def make_api_request(method, http_method="GET", **kwargs):
     from requests import get, post
     if not method.startswith("/"):
         raise ValueError('Method endpoints should start with backslash')
+    config = json.load(open(tools.get_engine_info_file()))
     url = "http://" + str(config['api']['host']) + ":" + str(config['api']['port']) + method
 
     kwargs = {k: v for k, v in kwargs.items() if v is not None}
 
     try:
         if http_method == "GET":
-            response = get(url, params=kwargs, headers={"Authorization": "Bearer " + config['jwtToken']})
+            response = get(url, params=kwargs, headers={"Authorization": "Bearer " + jwtToken()})
         else:
-            response = post(url, data=kwargs, headers={"Authorization": "Bearer " + config['jwtToken']})
+            response = post(url, data=kwargs, headers={"Authorization": "Bearer " + jwtToken()})
 
         if response.status_code != 200:
             return {
@@ -58,36 +128,71 @@ def haloprint(text):
     print(highlight(content, JsonLexer(), TerminalFormatter()))
 
 
-def extract_configuration(data_dir):
+def extract_configuration(dir):
     from halocoin import tools
-    if data_dir is None:
+    if dir is None:
         working_dir = tools.get_default_dir()
     else:
-        working_dir = data_dir
+        working_dir = dir
 
     working_dir = os.path.join(working_dir, str(custom.version))
 
     if os.path.exists(working_dir) and not os.path.isdir(working_dir):
-        print("Given path {} is not a directory. Using default configuration...".format(working_dir))
-        return custom.generate_default_config()
+        print("Given path {} is not a directory.".format(working_dir))
+        exit(1)
     elif not os.path.exists(working_dir):
-        print("Given path {} does not exist. Using default configuration...")
-        return custom.generate_default_config()
-    elif not os.path.exists(os.path.join(working_dir, 'config')):
-        print("Given path {} does not have a configuration file. Using default configuration...")
-        return custom.generate_default_config()
-    else:
+        print("Given path {} does not exist. Attempting to create...".format(working_dir))
+        try:
+            os.makedirs(working_dir)
+            print("Successful")
+        except OSError:
+            print("Could not create a directory!")
+            exit(1)
+
+    if os.path.exists(os.path.join(working_dir, 'config')):
         config = os.path.join(working_dir, 'config')
         config = custom.read_config_file(config)
-        if config is None:
-            raise ValueError('Couldn\'t parse config file {}'.format(config))
-        jwtTokenPath = os.path.join(tools.get_default_dir_cli(), 'jwt')
-        if os.path.exists(jwtTokenPath):
-            jwtToken = open(jwtTokenPath, 'r').read()
-            config['jwtToken'] = jwtToken
-        else:
-            config['jwtToken'] = ""
-        return config
+    else:
+        config = custom.generate_default_config()
+        custom.write_config_file(config, os.path.join(working_dir, 'config'))
+
+    if config is None:
+        raise ValueError('Couldn\'t parse config file {}'.format(config))
+
+    return config, working_dir
+
+
+def jwtToken():
+    jwtTokenPath = os.path.join(tools.get_default_dir_cli(), 'jwt')
+    if os.path.exists(jwtTokenPath):
+        jwtToken = open(jwtTokenPath, 'r').read()
+        return jwtToken
+    else:
+        return ""
+
+
+@action
+def start(data_dir=None, daemon=False):
+    from filelock import FileLock, Timeout
+    from halocoin.daemon import Daemon
+    from halocoin import engine, tools
+
+    lock = FileLock(tools.get_locked_file(), timeout=1)
+    try:
+        with lock:
+            config, working_dir = extract_configuration(data_dir)
+            json.dump(config, open(tools.get_engine_info_file(), "w"))
+            tools.init_logging(config['DEBUG'], working_dir, config['logging']['file'])
+            if daemon:
+                myDaemon = Daemon(pidfile='/tmp/halocoin', run_func=lambda: engine.main(config, working_dir))
+                myDaemon.start()
+            else:
+                engine.main(config, working_dir)
+    except Timeout:
+        sys.stderr.write("It seems like another halocoin instance is already running.\n")
+        sys.stderr.write("If you are sure there is a mistake, remove the file at: \n")
+        sys.stderr.write(tools.get_locked_file())
+
 
 
 @action
@@ -119,8 +224,7 @@ def new_wallet(wallet, pw=None):
         wallet_pw = pw
 
     haloprint(make_api_request("/wallet/new", http_method="POST",
-                               wallet_name=wallet, password=wallet_pw,
-                               login=login))
+                               wallet_name=wallet, password=wallet_pw))
 
 
 @action
@@ -148,7 +252,7 @@ def wallets():
 
 @action
 def login_info():
-    if config['jwtToken'] == '':
+    if jwtToken() == '':
         haloprint({"error": "You are not logged in!"})
 
     information = make_api_request("/login/info", http_method="GET")
@@ -180,7 +284,7 @@ def node_id():
 
 @action
 def send(address, amount, message=None):
-    if config['jwtToken'] == '':
+    if jwtToken() == '':
         haloprint({"error": "You are not logged in!"})
 
     haloprint(make_api_request("/tx/send", http_method="POST", address=address,
@@ -189,7 +293,7 @@ def send(address, amount, message=None):
 
 @action
 def pool_reg(force=None):
-    if config['jwtToken'] == '':
+    if jwtToken() == '':
         haloprint({"error": "You are not logged in!"})
 
     haloprint(make_api_request("/tx/pool_reg", http_method="POST",
@@ -198,7 +302,7 @@ def pool_reg(force=None):
 
 @action
 def application(mode=None, list=None):
-    if config['jwtToken'] == '':
+    if jwtToken() == '':
         haloprint({"error": "You are not logged in!"})
 
     if list is None:
@@ -239,6 +343,7 @@ def auth_reg(certificate, privkey, host, amount, description):
 @action
 def jobs():
     haloprint(make_api_request("/job/list", http_method="GET"))
+
 
 @action
 def peers():
@@ -307,71 +412,22 @@ def mempool():
 
 
 def run(argv):
-    parser = argparse.ArgumentParser(description='CLI to interact with halocoin engine.')
-    parser.add_argument('action', choices=sorted(actions.keys()),
-                        help="Main action to perform by this CLI.")
-    parser.add_argument('--version', action='version', version='%(prog)s ' + custom.version)
-    parser.add_argument('--data-dir', action="store", type=str, dest='dir',
-                        help='Directory for halocoin to use.')
-    parser.add_argument('--address', action="store", type=str, dest='address',
-                        help='Give a valid blockchain address')
-    parser.add_argument('--message', action="store", type=str, dest='message',
-                        help='Message to send with transaction')
-    parser.add_argument('--amount', action="store", type=int, dest='amount',
-                        help='Amount of coins that are going to be used')
-    parser.add_argument('--start', metavar='<integer>', action="store", type=str, dest='start',
-                        help='Starting number while requesting range of blocks')
-    parser.add_argument('--end', metavar='<integer>', action="store", type=str, dest='end',
-                        help='Ending number while requesting range of blocks')
-    parser.add_argument('--file', metavar='/file/path', action="store", type=str, dest='file',
-                        help='File path for wallet upload')
-    parser.add_argument('--wallet', metavar='my_wallet', action="store", type=str, dest='wallet',
-                        help='Wallet name')
-    parser.add_argument('--certificate', action="store", type=str, dest='certificate',
-                        help='Rewarding sub-auth certificate file in pem format')
-    parser.add_argument('--download-url', action="store", type=str, dest='download_url',
-                        help='Job dump download address')
-    parser.add_argument('--upload-url', action="store", type=str, dest='upload_url',
-                        help='Job dump upload address')
-    parser.add_argument('--image', action="store", type=str, dest='image',
-                        help='Job dump docker image tag')
-    parser.add_argument('--hashsum', action="store", type=str, dest='hashsum',
-                        help='Job dump file hashsum')
-    parser.add_argument('--description', action="store", type=str, dest='description',
-                        help='Required at sub-auth registration')
-    parser.add_argument('--job-id', action="store", type=str, dest='job_id',
-                        help='While dumping, requesting, or rewarding, necessary job id.')
-    parser.add_argument('--privkey', action="store", type=str, dest='privkey',
-                        help='Rewarding sub-auth private key file in pem format')
-    parser.add_argument('--pw', action="store", type=str, dest='pw',
-                        help='NOT RECOMMENDED! If you want to pass wallet password as argument.')
-    parser.add_argument('--port', action="store", type=int, dest='port',
-                        help='Override API port defined in config file.')
-    parser.add_argument('--host', action="store", type=str, dest='host',
-                        help='Define a host address while registering an auth.')
-    parser.add_argument('--list', action="store", type=str, dest='list',
-                        help='Sub authority application list')
-    parser.add_argument('--mode', choices=sorted(['c', 's']), dest='mode',
-                        help="Main action to perform by this CLI.")
-    parser.add_argument('--force', action="store_true", dest='force',
-                        help='Force something that makes trouble.')
-    parser.add_argument('--default', action="store_true", dest='set_default',
-                        help='Make new wallet default')
-    args = parser.parse_args(argv[1:])
-
-    global config
-    config = extract_configuration(args.dir)
+    params = parseParams(argv[1:], dir=None)
 
     from inspect import signature
-    sig = signature(actions[args.action])
+    sig = signature(actions[params['action']])
     kwargs = {}
     for parameter in sig.parameters.keys():
         if sig.parameters[parameter].default == Parameter.empty and \
-                (not hasattr(args, parameter) or getattr(args, parameter) is None):
-            sys.stderr.write("\"{}\" requires parameter {}\n".format(args.action, parameter))
+                (parameter not in params['map']):
+            sys.stderr.write("\"{}\" requires parameter {}\n".format(params['action'], parameter))
             sys.exit(1)
-        kwargs[parameter] = getattr(args, parameter)
-    actions[args.action](**kwargs)
+        elif parameter in params['map']:
+            kwargs[parameter] = params['map'][parameter]
+    if "help" in kwargs:
+        print_help(params['action'])
+        exit(0)
+    actions[params['action']](**kwargs)
     return
 
 

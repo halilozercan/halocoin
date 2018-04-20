@@ -415,3 +415,19 @@ def readable_bytes(num, suffix='B'):
             return "%3.1f%s%s" % (num, unit, suffix)
         num /= 1024.0
     return "%.1f%s%s" % (num, 'Yi', suffix)
+
+
+def get_locked_file():
+    import sys
+    if "linux" in sys.platform:
+        return "/tmp/halocoin.lock"
+    elif "win" in sys.platform:
+        return os.path.join("%TEMP%", "halocoin.lock")
+
+
+def get_engine_info_file():
+    import sys
+    if "linux" in sys.platform:
+        return "/tmp/halocoin_info.lock"
+    elif "win" in sys.platform:
+        return os.path.join("%TEMP%", "halocoin_info.lock")
