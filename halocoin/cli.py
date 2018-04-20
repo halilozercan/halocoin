@@ -371,7 +371,7 @@ def start_power(wallet=None, password=None):
     if password is None:
         password = getpass('Password: ')
 
-    haloprint(make_api_request("/service/miner/start", http_method="POST", wallet_name=wallet, password=password))
+    haloprint(make_api_request("/service/power/start", http_method="POST", wallet_name=wallet, password=password))
 
 
 @action
