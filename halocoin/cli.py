@@ -351,17 +351,17 @@ def start_miner(wallet=None, password=None):
     if password is None:
         password = getpass('Password: ')
 
-    haloprint(make_api_request("service/miner/start", http_method="POST", wallet_name=wallet, password=password))
+    haloprint(make_api_request("/service/miner/start", http_method="POST", wallet_name=wallet, password=password))
 
 
 @action
 def stop_miner():
-    haloprint(make_api_request("service/miner/stop", http_method="POST"))
+    haloprint(make_api_request("/service/miner/stop", http_method="POST"))
 
 
 @action
 def status_miner():
-    haloprint(make_api_request("service/miner/status", http_method="GET"))
+    haloprint(make_api_request("/service/miner/status", http_method="GET"))
 
 
 @action
@@ -371,17 +371,17 @@ def start_power(wallet=None, password=None):
     if password is None:
         password = getpass('Password: ')
 
-    haloprint(make_api_request("service/miner/start", http_method="POST", wallet_name=wallet, password=password))
+    haloprint(make_api_request("/service/miner/start", http_method="POST", wallet_name=wallet, password=password))
 
 
 @action
 def stop_power():
-    haloprint(make_api_request("service/power/stop", http_method="POST"))
+    haloprint(make_api_request("/service/power/stop", http_method="POST"))
 
 
 @action
 def status_power():
-    haloprint(make_api_request("service/power/status", http_method="GET"))
+    haloprint(make_api_request("/service/power/status", http_method="GET"))
 
 
 @action
