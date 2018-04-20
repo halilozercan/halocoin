@@ -63,6 +63,8 @@ def init_logging(DEBUG, working_dir, log_file):
                             format='%(levelname)s on %(asctime)s\n%(message)s',
                             datefmt='%m/%d/%Y %I:%M:%S %p')
     else:
+        print("Current working directory: " + os.getcwd())
+        print("Working_dir: " + working_dir)
         logging.basicConfig(filename=os.path.join(working_dir, log_file),
                             level=logging.DEBUG,
                             format='%(levelname)s on %(asctime)s\n%(message)s',

@@ -578,33 +578,6 @@ def stop():
     return generate_json_response('Shutting down')
 
 
-# @app.route('/miner/start', methods=['POST'])
-# def start_miner():
-#     response = {"success": False}
-#
-#     wallet_result = get_wallet()
-#     if not wallet_result.getFlag():
-#         response['error'] = wallet_result.getData()
-#         return generate_json_response(response)
-#
-#     if engine.instance.miner.get_state() == Service.RUNNING:
-#         return generate_json_response('Miner is already running.')
-#     else:
-#         engine.instance.miner.set_wallet(wallet_result.getData())
-#         engine.instance.miner.register()
-#         return generate_json_response('Running miner')
-#
-#
-# @app.route('/miner/stop', methods=['POST'])
-# def stop_miner():
-#     if engine.instance.miner.get_state() == Service.RUNNING:
-#         engine.instance.miner.unregister()
-#         miner_status()
-#         return generate_json_response('Closed miner')
-#     else:
-#         return generate_json_response('Miner is not running.')
-
-
 @app.route('/docker', methods=['GET'])
 def docker_status():
     status = PowerService.docker_status()
