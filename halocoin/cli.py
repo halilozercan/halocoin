@@ -242,7 +242,7 @@ def info_wallet(wallet=None, password=None):
 
 
 @action
-def info_address(address=None):
+def info_address(address):
     information = make_api_request("/address/" + address, http_method="GET")
     haloprint(information)
 
