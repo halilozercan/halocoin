@@ -108,7 +108,7 @@ class PeerListenService(Service):
         self.clientdb.add_peer(peer, 'greetings')
         return {
             'node_id': self.node_id,
-            'port': self.engine.config['port']['peers'],
+            'port': self.engine.config['peers']['port'],
             'length': self.db.get('length'),
             'diffLength': self.db.get('diffLength')
         }
