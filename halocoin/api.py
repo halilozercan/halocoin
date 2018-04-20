@@ -146,21 +146,10 @@ def wallet_info():
 
 @app.route('/wallet/new', methods=['POST'])
 def new_wallet():
-    from flask_jwt_simple import create_jwt
     wallet_name = request.values.get('wallet_name', None)
     pw = request.values.get('password', None)
-    login = request.values.get('login', None)
     wallet = Wallet(wallet_name)
     success = engine.instance.clientdb.new_wallet(pw, wallet)
-    if login and success:
-        jwt = create_jwt(identity={
-            "wallet": wallet.as_dict(),
-        })
-        return generate_json_response({
-            "name": wallet_name,
-            "jwt": jwt,
-            "success": success
-        })
 
     return generate_json_response({
         "name": wallet_name,

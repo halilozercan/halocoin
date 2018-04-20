@@ -16,8 +16,8 @@ setup(
         ],
     },
     include_package_data=True,
-    install_requires=['requests', 'wheel', 'pyyaml', 'flask', 'flask-socketio',
+    install_requires=['requests', 'wheel', 'pyyaml', 'flask', 'flask-socketio', 'filelock',
                       'pycrypto', 'm3-cdecimal', 'pyopenssl', 'fastecdsa',
-                      'werkzeug', 'tabulate', 'ecdsa', 'plyvel', 'docker'],
+                      'werkzeug', 'ecdsa', 'plyvel', 'docker'],
     packages=find_packages(exclude=("tests", "tests.*")),
 )
