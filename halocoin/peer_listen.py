@@ -11,6 +11,8 @@ from halocoin.service import Service
 
 
 class PeerListenService(Service):
+    actions = ['greetings', 'receive_peer', 'block_count', 'range_request', 'peers', 'txs', 'push_tx', 'push_block']
+
     def __init__(self, engine):
         Service.__init__(self, 'peer_receive')
         self.engine = engine
@@ -55,31 +57,49 @@ class PeerListenService(Service):
         try:
             client_sock, address = self.s.accept()
             response, leftover = ntwrk.receive(client_sock)
-            if response.getFlag():
-                message = Message.from_str(response.getData())
-                request = message.get_body()
-                try:
-                    if hasattr(self, request['action']) \
-                            and request['version'] == custom.version \
-                            and message.get_header("node_id") != self.node_id:
-                        kwargs = copy.deepcopy(request)
-                        if request['action'] == 'greetings':
-                            kwargs['__remote_ip__'] = client_sock.getpeername()
-                        elif request['action'] == 'push_block':
-                            kwargs['node_id'] = message.get_header("node_id")
-                        del kwargs['action']
-                        del kwargs['version']
-                        result = getattr(self, request['action'])(**kwargs)
-                    else:
-                        result = 'Received action is not valid'
-                except:
-                    result = 'Something went wrong while evaluating.\n'
-                    tools.log(sys.exc_info())
-                response = Message(headers={'ack': message.get_header('id'),
-                                            'node_id': self.node_id},
-                                   body=result)
-                ntwrk.send(response, client_sock)
-                client_sock.close()
+            if not response.getFlag():
+                return
+            message = Message.from_str(response.getData())
+            request = message.get_body()
+
+            try:
+                if request['action'] not in PeerListenService.actions \
+                        or request['version'] != custom.version \
+                        or message.get_header("node_id") == self.node_id:
+                    result = 'Received action is not valid'
+                elif request['action'] == 'greetings':
+                    result = self.greetings(request['node_id'],
+                                            request['port'],
+                                            request['length'],
+                                            request['diffLength'],
+                                            client_sock.getpeername())
+                elif request['action'] == 'push_block':
+                    result = self.push_block(request['blocks'],
+                                             message.get_header("node_id"))
+                elif request['action'] == 'receive_peer':
+                    result = self.receive_peer(request['peer'])
+                elif request['action'] == 'block_count':
+                    result = self.block_count()
+                elif request['action'] == 'range_request':
+                    result = self.range_request(request['range'])
+                elif request['action'] == 'peers':
+                    result = self.peers()
+                elif request['action'] == 'txs':
+                    result = self.txs()
+                elif request['action'] == 'push_tx':
+                    result = self.push_tx(request['tx'])
+                elif request['action'] == 'push_block':
+                    result = self.push_block(request['blocks'], message.get_header('node_id'))
+                else:
+                    result = "Unknown action"
+            except Exception as e:
+                result = 'Something went wrong while evaluating.\n' + str(e)
+                tools.log(sys.exc_info())
+            response = Message(headers={'ack': message.get_header('id'),
+                                        'node_id': self.node_id},
+                               body=result)
+            ntwrk.send(response, client_sock)
+            client_sock.close()
         except Exception as e:
             import time
             time.sleep(0.1)

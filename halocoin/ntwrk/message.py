@@ -1,6 +1,5 @@
 import uuid
 
-import yaml
 from halocoin import tools
 
 

@@ -7,7 +7,6 @@ import docker
 import requests
 import yaml
 
-from halocoin import api
 from halocoin import tools
 from halocoin.ntwrk import Response
 from halocoin.service import Service, lockit
@@ -191,7 +190,7 @@ class PowerService(Service):
         if os.path.exists(job_directory):
             self.set_status("Cleaning job...")
             import shutil
-            shutil.rmtree(job_directory)
+            shutil.rmtree(job_directory, ignore_errors=True)
 
         entry = self.clientdb.get('local_job_repo_' + job_name)
         entry['status'] = 'done'
