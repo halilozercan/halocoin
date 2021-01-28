@@ -23,7 +23,7 @@
   },
   "devDependencies": {
     "concurrently": "^3.5.1",
-    "electron": "^1.7.10",
+    "electron": "^9.4.0",
     "electron-installer-debian": "^0.7.1",
     "electron-packager": "^10.1.0",
     "foreman": "^3.0.1",
