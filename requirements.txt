@@ -15,7 +15,7 @@ future==0.16.0
 greenlet==0.4.12
 idna==2.5
 itsdangerous==0.24
-Jinja2==2.10
+Jinja2==2.11.3
 m3-cdecimal==2.3
 macholib==1.9
 MarkupSafe==1.0
