@@ -8,7 +8,7 @@ cryptography==2.1.4
 dnspython==1.15.0
 ecdsa==0.13.3
 enum-compat==0.0.2
-eventlet==0.21.0
+eventlet==0.31.0
 Flask==0.12.2
 Flask-SocketIO==2.9.2
 future==0.16.0
