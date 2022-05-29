@@ -1,10 +1,6 @@
 Halocoin
 =============
 
-*In development*
-
-![this is real, ok?](http://i.imgur.com/lz7hOlC.gif)
-
 ## What is this?
 
 Halocoin is my personal project to learn, experiment and build around blockchain technology. This project is by no means production ready or close to actual implementation of Bitcoin protocol.
