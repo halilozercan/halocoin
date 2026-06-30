@@ -27,7 +27,7 @@ PyInstaller==3.3.1
 pyOpenSSL==17.5.0
 python-engineio==2.0.1
 python-slugify==1.2.4
-python-socketio==1.8.3
+python-socketio==5.16.2
 PyYAML==3.12
 requests==2.18.2
 requests-toolbelt==0.8.0
